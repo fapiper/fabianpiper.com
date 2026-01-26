@@ -1,0 +1,17 @@
+apiVersion: externaldns.k8s.io/v1alpha1
+kind: DNSEndpoint
+metadata:
+  name: k3s-ingress-dns
+  namespace: external-dns
+spec:
+  endpoints:
+  - dnsName: glg.fabianpiper.com
+    recordTTL: 300
+    recordType: A
+    targets:
+    - 130.61.178.108
+  - dnsName: cd.glg.fabianpiper.com
+    recordTTL: 300
+    recordType: A
+    targets:
+    - 130.61.178.108

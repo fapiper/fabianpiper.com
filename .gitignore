@@ -1,0 +1,29 @@
+# CLI configuration files
+.terraformrc
+terraform.rc
+.claude/settings.local.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build outputs
+dist/
+**/dist/
+.astro/
+**/.astro/
+
+# Bun
+bun.lockb
+
+# Terraform specific
+**/tfplan
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfvars
+**/*.tfvars.json
+**/.terraform/
