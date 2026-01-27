@@ -192,7 +192,7 @@ pre-commit run --all-files
 
 ## Documentation
 
-The full documentation is available at the live cluster site: **[https://k3s.sudhanva.me](https://k3s.sudhanva.me)**.
+The full documentation is available at the live cluster site: **[https://glg.fabianpiper.com](https://glg.fabianpiper.com)**.
 
 To view and edit the documentation locally:
 
