@@ -1,6 +1,6 @@
 # fabianpiper.com
 
-A K3s cluster on OCI using always free tier resources. 
+A K3s cluster on OCI using always free tier resources.
 Provisions infrastructure with Terraform, bootstraps Argo CD for GitOps, and deploys applications via Gateway API with automatic HTTPS.
 
 ```mermaid
