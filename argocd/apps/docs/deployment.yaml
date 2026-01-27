@@ -17,7 +17,7 @@ spec:
         - name: regcred
       containers:
         - name: docs
-          image: ghcr.io/fapiper/k3s-oracle/docs:latest
+          image: ghcr.io/fapiper/fabianpiper.com/docs:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 80
