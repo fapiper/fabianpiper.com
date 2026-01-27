@@ -4,7 +4,6 @@ dist/
 .astro/
 
 # Bun
-bun.lock
 bun.lockb
 
 # Environment
