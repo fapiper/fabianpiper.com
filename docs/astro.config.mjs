@@ -4,7 +4,7 @@ import sitemap from '@astrojs/sitemap';
 import mermaid from 'astro-mermaid';
 
 export default defineConfig({
-  site: 'https://k3s.sudhanva.me',
+  site: 'https://glg.fabianpiper.com',
   integrations: [
     sitemap(),
     mermaid(),
@@ -12,7 +12,7 @@ export default defineConfig({
       title: 'K3s on OCI Always Free',
       description: 'Deploy a production-ready K3s Kubernetes cluster on Oracle Cloud Infrastructure Always Free tier using Terraform, ArgoCD GitOps, Envoy Gateway, and automatic TLS certificates.',
       social: [
-        { icon: 'github', label: 'GitHub', href: 'https://github.com/nsudhanva/k3s-oracle' },
+        { icon: 'github', label: 'GitHub', href: 'https://github.com/fapiper/fabianpiper.com' },
       ],
       head: [
         {
@@ -33,7 +33,7 @@ export default defineConfig({
           tag: 'meta',
           attrs: {
             property: 'og:image',
-            content: 'https://k3s.sudhanva.me/og-image.svg',
+            content: 'https://glg.fabianpiper.com/og-image.svg',
           },
         },
         {
@@ -54,14 +54,14 @@ export default defineConfig({
           tag: 'meta',
           attrs: {
             name: 'twitter:image',
-            content: 'https://k3s.sudhanva.me/og-image.svg',
+            content: 'https://glg.fabianpiper.com/og-image.svg',
           },
         },
         {
           tag: 'link',
           attrs: {
             rel: 'canonical',
-            href: 'https://k3s.sudhanva.me',
+            href: 'https://glg.fabianpiper.com',
           },
         },
         {
@@ -83,7 +83,7 @@ export default defineConfig({
               'name': 'k3s-oracle',
               'url': 'https://github.com/nsudhanva/k3s-oracle',
             },
-            'mainEntityOfPage': 'https://k3s.sudhanva.me',
+            'mainEntityOfPage': 'https://glg.fabianpiper.com',
           }),
         },
       ],

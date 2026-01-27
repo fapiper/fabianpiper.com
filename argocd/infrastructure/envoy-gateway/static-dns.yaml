@@ -9,9 +9,9 @@ spec:
     recordTTL: 300
     recordType: A
     targets:
-    - 130.61.178.108
+    - 158.180.44.196
   - dnsName: cd.glg.fabianpiper.com
     recordTTL: 300
     recordType: A
     targets:
-    - 130.61.178.108
+    - 158.180.44.196
