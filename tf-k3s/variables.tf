@@ -74,9 +74,9 @@ variable "git_username" {
 }
 
 variable "git_repo_name" {
-  description = "The repository name (e.g. k3s-oracle) to construct GHCR image paths."
+  description = "The repository name (e.g. fabianpiper.com) to construct GHCR image paths."
   type        = string
-  default     = "k3s-oracle"
+  default     = "fabianpiper.com"
 }
 
 variable "k3s_token" {
