@@ -252,7 +252,7 @@ Add projects in `src/content/projects/` as Markdown files:
 name: 'Project A'
 description: 'This is an example project description! You should replace this with a description of your own project.'
 tags: ['Framework A', 'Library B', 'Tool C', 'Resource D']
-image: '/static/1200x630.png'
+image: './banner.png'
 link: 'https://example.com'
 startDate: '2024-01-01'
 endDate: '2024-01-01'
