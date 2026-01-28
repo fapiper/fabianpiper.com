@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://glg.fabianpiper.com/sitemap-index.xml
