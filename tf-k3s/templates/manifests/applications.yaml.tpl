@@ -110,8 +110,9 @@ metadata:
   annotations:
     argocd-image-updater.argoproj.io/image-list: www=ghcr.io/fapiper/fabianpiper.com/www
     argocd-image-updater.argoproj.io/www.update-strategy: latest
-    argocd-image-updater.argoproj.io/www.allow-tags: regexp:^sha-[a-f0-9]{40}$
+    argocd-image-updater.argoproj.io/www.allow-tags: regexp:^(latest|sha-[a-f0-9]{40})$
     argocd-image-updater.argoproj.io/write-back-method: git
+    argocd-image-updater.argoproj.io/git-branch: main
 spec:
   project: default
   source:
