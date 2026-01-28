@@ -1,11 +1,9 @@
 ---
 import Link from '@/components/Link.astro'
-import { Badge } from '@/components/ui/badge'
-import { formatDate } from '@/lib/utils'
+import { Separator } from '@/components/ui/separator'
 import { Icon } from 'astro-icon/components'
 import { Image } from 'astro:assets'
 import type { CollectionEntry } from 'astro:content'
-import { Separator } from '@/components/ui/separator'
 
 interface Props {
   entry: CollectionEntry<'projects'>
@@ -13,50 +11,46 @@ interface Props {
 
 const { entry } = Astro.props
 
-let imageProps = null;
+let imageProps = null
 
 if (entry.data.image) {
   imageProps = {
     src: entry.data.image,
     alt: entry.data.name,
-  };
+  }
 } else if (entry.data.links) {
-  const githubLink = entry.data.links.find(link => link.href.includes("github.com"));
+  const githubLink = entry.data.links.find((link) =>
+    link.href.includes('github.com'),
+  )
 
   if (githubLink) {
     // Matches: github.com/user/repo
-    const match = githubLink.href.match(/github\.com\/([^\/]+)\/([^\/]+)/);
+    const match = githubLink.href.match(/github\.com\/([^\/]+)\/([^\/]+)/)
     if (match) {
       imageProps = {
         src: `https://opengraph.githubassets.com/1/${match[1]}/${match[2]}`,
         alt: `${entry.data.name} OpenGraph Image`,
         // Remote images require explicit dimensions in Astro
         width: 1200,
-        height: 630
-      };
+        height: 630,
+      }
     }
   }
 }
-
 ---
 
-<div
-  class="rounded-xl border p-4"
->
+<div class="rounded-xl border p-4">
   <div class="flex flex-col gap-4 sm:flex-row">
     {
-        imageProps && (
-            <div class="w-full sm:max-w-3xs sm:shrink-0">
-              <Image
-                  {...imageProps}
-                  class="rounded-xl object-cover"
-              />
-            </div>
-        )
+      imageProps && (
+        <div class="w-full sm:max-w-3xs sm:shrink-0">
+          <Image {...imageProps} class="rounded-xl object-cover" />
+        </div>
+      )
     }
 
-    <div class="grow flex flex-col gap-y-2">
-      <div class="grow flex flex-col gap-y-1">
+    <div class="flex grow flex-col gap-y-2">
+      <div class="flex grow flex-col gap-y-1">
         <h3 class="text-lg font-medium">
           {entry.data.name}
         </h3>
@@ -64,31 +58,26 @@ if (entry.data.image) {
         <p class="text-muted-foreground text-sm">
           {entry.data.description}
         </p>
-
       </div>
 
       {
         entry.data.links && entry.data.links.length > 0 && (
           <div class="flex flex-wrap items-center gap-x-3 text-xs">
-            {entry.data.links.map((link,index) => (
-                <>
-                  {index > 0 &&           <Separator orientation="vertical" className="h-3!" />
-                  }
-              <Link
-                href={link.href}
-                class="flex items-center gap-x-1 text-muted-foreground/60 hover:text-muted-foreground"
-                external
-              >
+            {entry.data.links.map((link, index) => (
+              <>
+                {index > 0 && (
+                  <Separator orientation="vertical" className="h-3!" />
+                )}
+                <Link
+                  href={link.href}
+                  class="text-muted-foreground/60 hover:text-muted-foreground flex items-center gap-x-1"
+                  external
+                >
+                  <Icon name={'lucide:external-link'} class="size-3" />
 
-                      <Icon
-                              name={"lucide:external-link"}
-                              class="size-3"
-                      />
-
-                <span>{link.label}</span>
-              </Link>
-
-                  </>
+                  <span>{link.label}</span>
+                </Link>
+              </>
             ))}
           </div>
         )

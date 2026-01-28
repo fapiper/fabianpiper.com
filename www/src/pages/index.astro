@@ -1,16 +1,15 @@
 ---
-import BlogCard from '@/components/BlogCard.astro'
 import Link from '@/components/Link.astro'
 import PageHead from '@/components/PageHead.astro'
-import { buttonVariants } from '@/components/ui/button'
-import Layout from '@/layouts/Layout.astro'
-import {Image} from "astro:assets";
-import logo from '../../public/static/logo.png'
-import {getFeaturedProjects, getFeaturedPublications, getRecentProjects} from "../lib/data-utils";
 import ProjectCard from '@/components/ProjectCard.astro'
 import PublicationCard from '@/components/PublicationCard.astro'
-import SocialIcons from "../components/SocialIcons.astro";
-import {SOCIAL_LINKS} from "../consts";
+import { buttonVariants } from '@/components/ui/button'
+import Layout from '@/layouts/Layout.astro'
+import { Image } from 'astro:assets'
+import logo from '../../public/static/logo.png'
+import SocialIcons from '../components/SocialIcons.astro'
+import { SOCIAL_LINKS } from '../consts'
+import { getFeaturedProjects, getFeaturedPublications } from '../lib/data-utils'
 
 const projects = await getFeaturedProjects()
 const publications = await getFeaturedPublications()
@@ -20,28 +19,30 @@ const publications = await getFeaturedPublications()
   <PageHead slot="head" title="Home" />
   <section class="py-6">
     <div class="mb-8">
-      <div class="w-full max-w-32 sm:shrink-0 rounded-xl overflow-hidden">
+      <div class="w-full max-w-32 overflow-hidden rounded-xl sm:shrink-0">
         <Image
-            src={logo}
-            alt={"Fabian Piper"}
-            width={512}
-            height={512}
-            class="object-cover"
+          src={logo}
+          alt={'Fabian Piper'}
+          width={512}
+          height={512}
+          class="object-cover"
         />
       </div>
     </div>
 
     <div class="prose">
       <p class="mt-0">
-        I'm a Software Engineer and Researcher based in Berlin, Germany.
-        Below, you can find a selection of my projects, contributions, and publications.
+        I'm a Software Engineer and Researcher based in Berlin, Germany. Below,
+        you can find a selection of my projects, contributions, and
+        publications.
       </p>
       <p>
-        I'm always open to new connections and interesting discussions. Please feel free to <Link
+        I'm always open to new connections and interesting discussions. Please
+        feel free to <Link
           href="mailto:hello@fabianpiper.com"
           class="text-foreground"
           underline>reach out</Link
-      >, I'd love to hear from you!
+        >, I'd love to hear from you!
       </p>
     </div>
 
@@ -71,23 +72,22 @@ const publications = await getFeaturedPublications()
     <ul class="flex flex-col gap-y-4">
       {
         publications.map((publication) => (
-            <li>
-              <PublicationCard entry={publication} />
-            </li>
+          <li>
+            <PublicationCard entry={publication} />
+          </li>
         ))
       }
     </ul>
     <div class="flex justify-center">
       <Link
-          href="/publications"
-          class={buttonVariants({ variant: 'ghost' }) + ' group'}
+        href="/publications"
+        class={buttonVariants({ variant: 'ghost' }) + ' group'}
       >
         See all publications <span
           class="ml-1.5 transition-transform group-hover:translate-x-1"
-      >&rarr;</span
-      >
+          >&rarr;</span
+        >
       </Link>
     </div>
   </section>
-
 </Layout>

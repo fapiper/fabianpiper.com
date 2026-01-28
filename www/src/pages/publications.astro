@@ -2,17 +2,17 @@
 import Breadcrumbs from '@/components/Breadcrumbs.astro'
 import PageHead from '@/components/PageHead.astro'
 import Layout from '@/layouts/Layout.astro'
-import ProjectCard from "@/components/ProjectCard.astro";
-import {getAllProjects} from "@/lib/data-utils";
-import {getAllPublications} from "../lib/data-utils";
-import PublicationCard from "../components/PublicationCard.astro";
+import PublicationCard from '../components/PublicationCard.astro'
+import { getAllPublications } from '../lib/data-utils'
 
 const publications = await getAllPublications()
 ---
 
 <Layout class="max-w-3xl">
   <PageHead slot="head" title="Publications" />
-  <Breadcrumbs items={[{ label: 'Publications', icon: 'lucide:book-open-text' }]} />
+  <Breadcrumbs
+    items={[{ label: 'Publications', icon: 'lucide:book-open-text' }]}
+  />
   {
     publications.length > 0 ? (
       <ul class="flex flex-col gap-4">

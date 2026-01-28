@@ -30,7 +30,9 @@ export async function getAllProjects(): Promise<CollectionEntry<'projects'>[]> {
   })
 }
 
-export async function getAllPublications(): Promise<CollectionEntry<'publications'>[]> {
+export async function getAllPublications(): Promise<
+  CollectionEntry<'publications'>[]
+> {
   return await getCollection('publications')
 }
 
@@ -125,29 +127,31 @@ export async function getRecentPosts(
 }
 
 export async function getRecentProjects(
-    count: number,
+  count: number,
 ): Promise<CollectionEntry<'projects'>[]> {
   const projects = await getAllProjects()
   return projects.slice(0, count)
 }
 
-export async function getFeaturedProjects(
-): Promise<CollectionEntry<'projects'>[]> {
+export async function getFeaturedProjects(): Promise<
+  CollectionEntry<'projects'>[]
+> {
   const projects = await getAllProjects()
-  return projects.filter((project => project.data.featured))
+  return projects.filter((project) => project.data.featured)
 }
 
 export async function getRecentPublications(
-    count: number,
+  count: number,
 ): Promise<CollectionEntry<'publications'>[]> {
   const publications = await getAllPublications()
   return publications.slice(0, count)
 }
 
-export async function getFeaturedPublications(
-): Promise<CollectionEntry<'publications'>[]> {
+export async function getFeaturedPublications(): Promise<
+  CollectionEntry<'publications'>[]
+> {
   const publications = await getAllPublications()
-  return publications.filter((entry => entry.data.featured))
+  return publications.filter((entry) => entry.data.featured)
 }
 
 export async function getSortedTags(): Promise<

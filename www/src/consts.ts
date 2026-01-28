@@ -20,7 +20,7 @@ export const NAV_LINKS: SocialLink[] = [
   {
     href: '/publications',
     label: 'publications',
-  }
+  },
 ]
 
 export const SOCIAL_LINKS: SocialLink[] = [
