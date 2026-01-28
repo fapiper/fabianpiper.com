@@ -40,6 +40,7 @@ const projects = defineCollection({
       description: z.string(),
       tags: z.array(z.string()).optional(),
       image: image().optional(),
+      date: z.coerce.date().optional(),
       links: z
         .array(
           z.object({
@@ -49,6 +50,7 @@ const projects = defineCollection({
         )
         .optional(),
       featured: z.boolean().optional(),
+      order: z.number().optional(),
     }),
 })
 
@@ -75,6 +77,7 @@ const publications = defineCollection({
       date: z.coerce.date().optional(),
       image: image().optional(),
       featured: z.boolean().optional(),
+      order: z.number().optional(),
     }),
 })
 

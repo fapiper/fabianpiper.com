@@ -4,6 +4,7 @@ import { Separator } from '@/components/ui/separator'
 import { Icon } from 'astro-icon/components'
 import { Image } from 'astro:assets'
 import type { CollectionEntry } from 'astro:content'
+import { formatYear } from '../lib/utils'
 
 interface Props {
   entry: CollectionEntry<'projects'>
@@ -60,11 +61,17 @@ if (entry.data.image) {
       </div>
 
       {
-        entry.data.links && entry.data.links.length > 0 && (
+        (entry.data.date || entry.data.links) && (
           <div class="flex flex-wrap items-center gap-x-3 text-xs">
-            {entry.data.links.map((link, index) => (
+            {entry.data.date && (
+              <div class="text-muted-foreground flex items-center gap-x-1">
+                <Icon name={'lucide:calendar'} class="size-3" />
+                <span>{formatYear(entry.data.date)}</span>
+              </div>
+            )}
+            {entry.data.links?.map((link, index) => (
               <>
-                {index > 0 && (
+                {index > (entry.data.date ? -1 : 0) && (
                   <Separator orientation="vertical" className="h-3!" />
                 )}
                 <Link

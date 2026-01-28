@@ -22,20 +22,47 @@ export async function getAllPostsAndSubposts(): Promise<
 }
 
 export async function getAllProjects(): Promise<CollectionEntry<'projects'>[]> {
-  return getCollection('projects')
-  /*
-  return projects.sort((a, b) => {
+  const projects = await getCollection('projects')
+  const sorted = projects.sort((a, b) => {
     const dateA = a.data.date?.getTime() || 0
     const dateB = b.data.date?.getTime() || 0
     return dateB - dateA
   })
-*/
+
+  const withOrder = sorted
+    .filter((p) => p.data.order !== undefined)
+    .sort((a, b) => a.data.order! - b.data.order!)
+
+  const withoutOrder = sorted.filter((p) => p.data.order === undefined)
+
+  withOrder.forEach((project) => {
+    withoutOrder.splice(project.data.order!, 0, project)
+  })
+
+  return withoutOrder
 }
 
 export async function getAllPublications(): Promise<
   CollectionEntry<'publications'>[]
 > {
-  return await getCollection('publications')
+  const publications = await getCollection('publications')
+  const sorted = publications.sort((a, b) => {
+    const dateA = a.data.date?.getTime() || 0
+    const dateB = b.data.date?.getTime() || 0
+    return dateB - dateA
+  })
+
+  const withOrder = sorted
+    .filter((p) => p.data.order !== undefined)
+    .sort((a, b) => a.data.order! - b.data.order!)
+
+  const withoutOrder = sorted.filter((p) => p.data.order === undefined)
+
+  withOrder.forEach((publication) => {
+    withoutOrder.splice(publication.data.order!, 0, publication)
+  })
+
+  return withoutOrder
 }
 
 export async function getAllTags(): Promise<Map<string, number>> {
