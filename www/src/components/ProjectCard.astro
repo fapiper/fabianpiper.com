@@ -29,8 +29,7 @@ if (entry.data.image) {
     if (match) {
       imageProps = {
         src: `https://opengraph.githubassets.com/1/${match[1]}/${match[2]}`,
-        alt: `${entry.data.name} OpenGraph Image`,
-        // Remote images require explicit dimensions in Astro
+        alt: `${entry.data.name} Image`,
         width: 1200,
         height: 630,
       }
