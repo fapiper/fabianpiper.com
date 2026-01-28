@@ -107,6 +107,11 @@ metadata:
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd-image-updater.argoproj.io/image-list: docs=ghcr.io/fapiper/fabianpiper.com/docs
+    argocd-image-updater.argoproj.io/docs.update-strategy: digest
+    argocd-image-updater.argoproj.io/docs.allow-tags: regexp:^sha-.*
+    argocd-image-updater.argoproj.io/write-back-method: git
 spec:
   project: default
   source:
@@ -211,6 +216,29 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: external-secrets
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd-image-updater
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/fapiper/fabianpiper.com.git
+    targetRevision: HEAD
+    path: argocd/infrastructure/argocd-image-updater
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
   syncPolicy:
     automated:
       prune: true
