@@ -102,7 +102,7 @@ spec:
       allowedRoutes:
         namespaces:
           from: All
-    - name: https-docs
+    - name: https-www
       port: 443
       protocol: HTTPS
       hostname: "glg.fabianpiper.com"
@@ -112,7 +112,7 @@ spec:
       tls:
         mode: Terminate
         certificateRefs:
-          - name: docs-tls
+          - name: www-tls
             namespace: default
     - name: https-argocd
       port: 443

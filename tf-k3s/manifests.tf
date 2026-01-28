@@ -5,6 +5,11 @@ resource "local_file" "argocd_apps" {
   })
 }
 
+resource "local_file" "argocd_image_updater_kustomization" {
+  filename = "../argocd/infrastructure/argocd-image-updater/kustomization.yaml"
+  content  = file("${path.module}/templates/manifests/argocd-image-updater/kustomization.yaml")
+}
+
 resource "local_file" "cert_manager_kustomization" {
   filename = "../argocd/infrastructure/cert-manager/kustomization.yaml"
   content  = file("${path.module}/templates/manifests/cert-manager/kustomization.yaml")
@@ -62,10 +67,10 @@ resource "local_file" "argocd_self_managed" {
   content  = file("${path.module}/templates/manifests/argocd/kustomization.yaml")
 }
 
-resource "local_file" "docs_manifests" {
-  for_each = fileset("${path.module}/templates/manifests/docs", "*")
-  filename = "../argocd/apps/docs/${replace(each.value, ".tpl", "")}"
-  content = templatefile("${path.module}/templates/manifests/docs/${each.value}", {
+resource "local_file" "www_manifests" {
+  for_each = fileset("${path.module}/templates/manifests/www", "*")
+  filename = "../argocd/apps/www/${replace(each.value, ".tpl", "")}"
+  content = templatefile("${path.module}/templates/manifests/www/${each.value}", {
     domain_name       = var.domain_name
     git_username      = var.git_username
     git_repo_name     = var.git_repo_name

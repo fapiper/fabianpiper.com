@@ -24,5 +24,5 @@ ignore: |
   dist/
   .astro/
   .git/
-  docs-site/dist/
-  docs-site/node_modules/
+  www-site/dist/
+  www-site/node_modules/

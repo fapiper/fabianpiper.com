@@ -1,7 +1,7 @@
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: docs-route
+  name: www-route
   namespace: default
   annotations:
     external-dns.alpha.kubernetes.io/target: "${ingress_public_ip}"
@@ -9,7 +9,7 @@ spec:
   parentRefs:
   - name: public-gateway
     namespace: envoy-gateway-system
-    sectionName: https-docs
+    sectionName: https-www
   hostnames:
   - "${domain_name}"
   rules:
@@ -18,13 +18,13 @@ spec:
         type: PathPrefix
         value: /
     backendRefs:
-    - name: docs
+    - name: www
       port: 80
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: docs-redirect
+  name: www-redirect
   namespace: default
 spec:
   parentRefs:
@@ -43,10 +43,10 @@ spec:
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: docs-tls
+  name: www-tls
   namespace: default
 spec:
-  secretName: docs-tls
+  secretName: www-tls
   issuerRef:
     name: cloudflare-issuer
     kind: ClusterIssuer

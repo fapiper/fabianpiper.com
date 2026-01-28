@@ -172,11 +172,11 @@ GitHub Actions workflows handle linting and deployment:
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
 | `lint.yml` | Pull requests | Run pre-commit hooks (markdownlint, yamllint, tflint) |
-| `docker-publish.yml` | Push to main (docs/) | Build Docker image, push to GHCR, restart docs pod |
+| `docker-publish.yml` | Push to main (www/) | Build Docker image, push to GHCR, restart www pod |
 
 ### GitHub Secrets Required
 
-For automatic docs deployment, add these secrets at `Settings > Secrets > Actions`:
+For automatic www deployment, add these secrets at `Settings > Secrets > Actions`:
 
 | Secret | Value |
 |--------|-------|
@@ -197,7 +197,7 @@ The full documentation is available at the live cluster site: **[https://glg.fab
 To view and edit the documentation locally:
 
 ```bash
-cd docs
+cd www
 bun install
 bun start
 ```

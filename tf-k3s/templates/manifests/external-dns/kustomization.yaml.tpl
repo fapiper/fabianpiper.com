@@ -20,9 +20,9 @@ helmCharts:
               name: cloudflare-api-token-secret
               key: api-token
       domainFilters:
-        - sudhanva.me
+        - fabianpiper.com
       extraArgs:
-        - --zone-id-filter=293c1768d72a5378bbdb4d59fc8e8bfc
+        - --zone-id-filter=537a18e193fc9874b0f3c3ddcd12912f
       sources:
         - crd
       rbac:

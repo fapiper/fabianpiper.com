@@ -103,16 +103,21 @@ spec:
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: docs-app
+  name: www-app
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd-image-updater.argoproj.io/image-list: www=ghcr.io/fapiper/fabianpiper.com/www
+    argocd-image-updater.argoproj.io/www.update-strategy: digest
+    argocd-image-updater.argoproj.io/www.allow-tags: regexp:^sha-.*
+    argocd-image-updater.argoproj.io/write-back-method: git
 spec:
   project: default
   source:
     repoURL: ${git_repo_url}
     targetRevision: HEAD
-    path: argocd/apps/docs
+    path: argocd/apps/www
   destination:
     server: https://kubernetes.default.svc
     namespace: default
@@ -211,6 +216,29 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: external-secrets
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd-image-updater
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: ${git_repo_url}
+    targetRevision: HEAD
+    path: argocd/infrastructure/argocd-image-updater
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
   syncPolicy:
     automated:
       prune: true
