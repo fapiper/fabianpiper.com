@@ -3,23 +3,24 @@ import BlogCard from '@/components/BlogCard.astro'
 import Link from '@/components/Link.astro'
 import PageHead from '@/components/PageHead.astro'
 import { buttonVariants } from '@/components/ui/button'
-import { SITE } from '@/consts'
 import Layout from '@/layouts/Layout.astro'
-import { getRecentPosts } from '@/lib/data-utils'
 import {Image} from "astro:assets";
 import logo from '../../public/static/logo.png'
-import {getRecentProjects} from "../lib/data-utils";
+import {getFeaturedProjects, getFeaturedPublications, getRecentProjects} from "../lib/data-utils";
 import ProjectCard from '@/components/ProjectCard.astro'
+import PublicationCard from '@/components/PublicationCard.astro'
+import SocialIcons from "../components/SocialIcons.astro";
+import {SOCIAL_LINKS} from "../consts";
 
-const projects = await getRecentProjects(SITE.featuredProjectCount)
-const publications = await getRecentPosts(SITE.featuredPublicationCount)
+const projects = await getFeaturedProjects()
+const publications = await getFeaturedPublications()
 ---
 
 <Layout class="max-w-3xl">
   <PageHead slot="head" title="Home" />
   <section class="py-6">
     <div class="mb-8">
-      <div class="w-full sm:max-w-32 sm:shrink-0 rounded-xl overflow-hidden">
+      <div class="w-full max-w-32 sm:shrink-0 rounded-xl overflow-hidden">
         <Image
             src={logo}
             alt={"Fabian Piper"}
@@ -43,12 +44,14 @@ const publications = await getRecentPosts(SITE.featuredPublicationCount)
       >, I'd love to hear from you!
       </p>
     </div>
+
+    <SocialIcons links={SOCIAL_LINKS} />
   </section>
 
   <section class="flex flex-col gap-y-4">
     <h2 class="text-2xl font-medium">Latest projects</h2>
     <ul class="flex flex-col gap-y-4">
-      {projects.map((project) => <ProjectCard project={project} />)}
+      {projects.map((project) => <ProjectCard entry={project} />)}
     </ul>
     <div class="flex justify-center">
       <Link
@@ -64,12 +67,12 @@ const publications = await getRecentPosts(SITE.featuredPublicationCount)
   </section>
 
   <section class="flex flex-col gap-y-4">
-    <h2 class="text-2xl font-medium">Latest publications</h2>
+    <h2 class="text-2xl font-medium">Featured publications</h2>
     <ul class="flex flex-col gap-y-4">
       {
         publications.map((publication) => (
             <li>
-              <BlogCard entry={publication} />
+              <PublicationCard entry={publication} />
             </li>
         ))
       }

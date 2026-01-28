@@ -1,0 +1,152 @@
+---
+import Link from '@/components/Link.astro'
+import { formatDate } from '@/lib/utils'
+import { Icon } from 'astro-icon/components'
+import { Image } from 'astro:assets'
+import type { CollectionEntry } from 'astro:content'
+import { Separator } from './ui/separator'
+
+interface Props {
+  entry: CollectionEntry<'publications'>
+}
+
+const { entry } = Astro.props
+
+const metadataItems  = [
+  entry.data.date && {
+    label: formatDate(entry.data.date),
+    icon: "lucide:calendar",
+    href: null,
+  },
+  entry.data.doi && {
+    label: entry.data.paperType,
+    icon: "lucide:external-link",
+    href: `https://doi.org/${entry.data.doi}`,
+  },
+  entry.data.pdfUrl && {
+    label: "PDF",
+    icon: "lucide:external-link",
+    href: entry.data.pdfUrl,
+  },
+  entry.data.htmlUrl && {
+    label: "HTML",
+    icon: "lucide:external-link",
+    href: entry.data.htmlUrl,
+  },
+].filter(Boolean) as Array<{
+  label: string
+  icon: string
+  href: string | null
+}>
+
+const abbreviateName = (name: string): string => {
+  const parts = name.trim().split(' ')
+  if (parts.length === 1) return name
+
+  const lastName = parts[parts.length - 1]
+  const initials = parts
+    .slice(0, -1)
+    .map((part) => part[0] + '.')
+    .join(' ')
+  return `${initials} ${lastName}`
+}
+
+const isMainAuthor = (author: string): boolean => {
+  return author === 'Fabian Piper'
+}
+---
+
+<div
+  class="rounded-xl border p-4"
+>
+  <div class="flex flex-col gap-4 sm:flex-row">
+    {
+      entry.data.image && (
+        <div class="w-full max-w-3xs sm:shrink-0 mx-auto">
+          <Image
+            src={entry.data.image}
+            alt={entry.data.title}
+            width={1200}
+            height={675}
+            class="rounded-xl object-cover"
+          />
+        </div>
+      )
+    }
+    <div class="grow flex flex-col gap-y-2">
+      <div class="grow flex flex-col gap-y-1">
+      <h3 class="text-lg font-medium">
+        {entry.data.title}
+      </h3>
+
+      <p class="text-muted-foreground text-sm">
+        By{' '}
+        {
+          entry.data.authors.map((author, index) => (
+            <span key={author}>
+              <span
+                class:list={[
+                  isMainAuthor(author) &&
+                    'text-primary underline underline-offset-2',
+                ]}
+              >
+                {abbreviateName(author)}
+              </span>
+              {index < entry.data.authors.length - 1 && ', '}
+              {index === entry.data.authors.length - 2 && 'and '}
+            </span>
+          ))
+        }
+      </p>
+
+        {
+            entry.data.publishedIn && (
+                <p class="text-muted-foreground text-sm">
+                  {entry.data.published ? 'In proceedings of ' : 'To appear in '}
+                  <Link
+                      href={entry.data.publishedIn.url}
+                      class="inline text-muted-foreground/60 hover:text-muted-foreground"
+                      external
+                  >
+                    {entry.data.publishedIn.name}
+                  </Link>
+                </p>
+            )
+        }
+
+      </div>
+
+      {
+          metadataItems.length > 0 && (
+              <div class="flex flex-wrap items-center gap-x-3 text-xs">
+                {metadataItems.map((item, index) => (
+                    <>
+                      {index > 0 && <Separator orientation="vertical" className="h-3!" />}
+
+                      <div class="text-muted-foreground">
+
+
+                        {item.href ? (
+                            <Link
+                                href={item.href}
+                                class="flex items-center gap-x-1 text-muted-foreground/60 hover:text-muted-foreground"
+                                external
+                            >
+                              <Icon name={item.icon} class="size-3" />
+                              {item.label}
+                            </Link>
+                        ) : (
+                            <div class="flex items-center gap-x-1">
+                              <Icon name={item.icon} class="size-3" />
+                              <span>{item.label}</span>
+                              </div>
+                        )}
+                      </div>
+                    </>
+                ))}
+              </div>
+          )
+      }
+    </div>
+  </div>
+</div>

@@ -5,66 +5,94 @@ import { formatDate } from '@/lib/utils'
 import { Icon } from 'astro-icon/components'
 import { Image } from 'astro:assets'
 import type { CollectionEntry } from 'astro:content'
+import { Separator } from '@/components/ui/separator'
 
 interface Props {
-  project: CollectionEntry<'projects'>
+  entry: CollectionEntry<'projects'>
 }
 
-const { project } = Astro.props
+const { entry } = Astro.props
+
+let imageProps = null;
+
+if (entry.data.image) {
+  imageProps = {
+    src: entry.data.image,
+    alt: entry.data.name,
+  };
+} else if (entry.data.links) {
+  const githubLink = entry.data.links.find(link => link.href.includes("github.com"));
+
+  if (githubLink) {
+    // Matches: github.com/user/repo
+    const match = githubLink.href.match(/github\.com\/([^\/]+)\/([^\/]+)/);
+    if (match) {
+      imageProps = {
+        src: `https://opengraph.githubassets.com/1/${match[1]}/${match[2]}`,
+        alt: `${entry.data.name} OpenGraph Image`,
+        // Remote images require explicit dimensions in Astro
+        width: 1200,
+        height: 630
+      };
+    }
+  }
+}
+
 ---
 
 <div
-  class="hover:bg-muted/50 rounded-xl border p-4 transition-colors duration-300 ease-in-out"
+  class="rounded-xl border p-4"
 >
-  <Link
-    href={project.data.link}
-    class="flex flex-col gap-4 sm:flex-row"
-    external
-  >
+  <div class="flex flex-col gap-4 sm:flex-row">
     {
-      project.data.image && (
-        <div class="w-full sm:max-w-3xs sm:shrink-0">
-          <Image
-            src={project.data.image}
-            alt={project.data.name}
-            width={1200}
-            height={630}
-            class="object-cover"
-          />
-        </div>
-      )
-    }
-    <div class="grow">
-      <h3 class="mb-1 text-lg font-medium">
-        {project.data.name}
-      </h3>
-      <p class="text-muted-foreground mb-2 text-sm">
-        {project.data.description}
-      </p>
-      {
-        project.data.startDate && (
-          <p class="text-muted-foreground/70 mb-2 flex items-center gap-x-1.5 text-xs">
-            <span class="flex items-center gap-x-1.5">
-              <Icon name="lucide:calendar" class="size-3" />
-              <span>
-                {formatDate(project.data.startDate)}
-                {project.data.endDate
-                  ? ` → ${formatDate(project.data.endDate)}`
-                  : ' → Present'}
-              </span>
-            </span>
-          </p>
+        imageProps && (
+            <div class="w-full max-w-3xs sm:shrink-0 mx-auto">
+              <Image
+                  {...imageProps}
+                  class="rounded-xl object-cover"
+              />
+            </div>
         )
-      }
+    }
+
+    <div class="grow flex flex-col gap-y-2">
+      <div class="grow flex flex-col gap-y-1">
+        <h3 class="text-lg font-medium">
+          {entry.data.name}
+        </h3>
+
+        <p class="text-muted-foreground text-sm">
+          {entry.data.description}
+        </p>
+
+      </div>
+
       {
-        project.data.tags && (
-          <div class="flex flex-wrap gap-2">
-            {project.data.tags.map((tag: string) => (
-              <Badge variant="muted">{tag}</Badge>
+        entry.data.links && entry.data.links.length > 0 && (
+          <div class="flex flex-wrap items-center gap-x-3 text-xs">
+            {entry.data.links.map((link,index) => (
+                <>
+                  {index > 0 &&           <Separator orientation="vertical" className="h-3!" />
+                  }
+              <Link
+                href={link.href}
+                class="flex items-center gap-x-1 text-muted-foreground/60 hover:text-muted-foreground"
+                external
+              >
+
+                      <Icon
+                              name={"lucide:external-link"}
+                              class="size-3"
+                      />
+
+                <span>{link.label}</span>
+              </Link>
+
+                  </>
             ))}
           </div>
         )
       }
     </div>
-  </Link>
+  </div>
 </div>

@@ -33,17 +33,42 @@ const authors = defineCollection({
 })
 
 const projects = defineCollection({
-  loader: glob({ pattern: '**/*.{md,mdx}', base: './src/content/projects' }),
-  schema: ({ image }) =>
-    z.object({
-      name: z.string(),
-      description: z.string(),
-      tags: z.array(z.string()),
-      image: image(),
-      link: z.string().url(),
-      startDate: z.coerce.date().optional(),
-      endDate: z.coerce.date().optional(),
-    }),
+    loader: glob({ pattern: '**/*.{md,mdx}', base: './src/content/projects' }),
+    schema: ({ image }) =>
+        z.object({
+            name: z.string(),
+            description: z.string(),
+            tags: z.array(z.string()).optional(),
+            image: image().optional(),
+            links: z.array(
+                z.object({
+                    label: z.string(),
+                    href: z.string().url(),
+                })
+            ).optional(),
+            featured: z.boolean().optional(),
+        }),
 })
 
-export const collections = { blog, authors, projects }
+const publications = defineCollection({
+    loader: glob({ pattern: '**/*.{md,mdx}', base: './src/content/publications' }),
+    schema: ({ image }) =>
+        z.object({
+            title: z.string(),
+            authors: z.array(z.string()),
+            published: z.boolean(),
+            publishedIn: z.object({
+                name: z.string(),
+                url: z.string().url(),
+            }).optional(),
+            pdfUrl: z.string().url().optional(),
+            htmlUrl: z.string().url().optional(),
+            doi: z.string().optional(),
+            paperType: z.enum(['Full paper', 'Short paper']),
+            date: z.coerce.date().optional(),
+            image: image().optional(),
+            featured: z.boolean().optional(),
+        }),
+})
+
+export const collections = { blog, authors, projects, publications }

@@ -6,14 +6,20 @@ export type Site = {
   locale: string
   featuredProjectCount: number
   featuredPublicationCount: number
-  postsPerPage: number
 }
 
 export type SocialLink = {
   href: string
   label: string
+  icon?: string
 }
 
 export type IconMap = {
   [key: string]: string
+}
+
+export type ProjectLink = {
+  label: string
+  href: string
+  icon?: string
 }
