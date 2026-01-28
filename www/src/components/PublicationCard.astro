@@ -81,7 +81,7 @@ const isMainAuthor = (author: string): boolean => {
           By{' '}
           {
             entry.data.authors.map((author, index) => (
-              <span key={author}>
+              <span>
                 <span
                   class:list={[
                     isMainAuthor(author) &&
