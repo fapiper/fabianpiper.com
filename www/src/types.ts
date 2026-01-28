@@ -6,6 +6,7 @@ export type Site = {
   locale: string
   featuredProjectCount: number
   featuredPublicationCount: number
+  pageSize: number
 }
 
 export type SocialLink = {

@@ -9,16 +9,16 @@ export const SITE: Site = {
   locale: 'en-US',
   featuredProjectCount: 4,
   featuredPublicationCount: 3,
-  postsPerPage: 3,
+  pageSize: 6,
 }
 
 export const NAV_LINKS: SocialLink[] = [
   {
-    href: '/blog',
+    href: '/projects',
     label: 'projects',
   },
   {
-    href: '/authors',
+    href: '/publications',
     label: 'publications',
   }
 ]
@@ -36,10 +36,6 @@ export const SOCIAL_LINKS: SocialLink[] = [
     href: 'mailto:hello@fabianpiper.com',
     label: 'Email',
   },
-  {
-    href: '/rss.xml',
-    label: 'RSS',
-  },
 ]
 
 export const ICON_MAP: IconMap = {
@@ -47,5 +43,4 @@ export const ICON_MAP: IconMap = {
   GitHub: 'lucide:github',
   LinkedIn: 'lucide:linkedin',
   Email: 'lucide:mail',
-  RSS: 'lucide:rss',
 }
