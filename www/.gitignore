@@ -1,14 +1,13 @@
-# Astro / Node
-node_modules/
 dist/
 .astro/
-
-# Bun
-bun.lockb
-
-# Environment
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 .env
-.env.*
-
-# OS
+.env.production
 .DS_Store
+.idea/
+teaser.pptx
+~$teaser.pptx

@@ -1,29 +1,90 @@
 ---
-import BaseLayout from '../layouts/BaseLayout.astro';
-import PostCard from '../components/PostCard.astro';
-import { getCollection } from 'astro:content';
+import BlogCard from '@/components/BlogCard.astro'
+import Link from '@/components/Link.astro'
+import PageHead from '@/components/PageHead.astro'
+import { buttonVariants } from '@/components/ui/button'
+import { SITE } from '@/consts'
+import Layout from '@/layouts/Layout.astro'
+import { getRecentPosts } from '@/lib/data-utils'
+import {Image} from "astro:assets";
+import logo from '../../public/static/logo.png'
+import {getRecentProjects} from "../lib/data-utils";
+import ProjectCard from '@/components/ProjectCard.astro'
 
-const posts = (await getCollection('posts'))
-  .filter(post => !post.data.draft)
-  .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+const projects = await getRecentProjects(SITE.featuredProjectCount)
+const publications = await getRecentPosts(SITE.featuredPublicationCount)
 ---
 
-<BaseLayout title="Terminal">
-  <div class="index-content framed">
-    <h1 id="hello-there">Hello there!</h1>
-    <p>Welcome to the Astro Terminal theme! This is a port of the popular Hugo Terminal theme by panr, bringing the same retro terminal aesthetic to Astro.</p>
-    <p>
-      You can customise the colour scheme using panr's <a href="https://panr.github.io/terminal-css/"><strong>Terminal.css</strong></a> 
-      generator - all generated schemes are fully compatible with this theme.
-    </p>
-    <p>
-      <a href="https://panr.github.io/terminal-css/">
-        <img src="https://panr.github.io/hugo-theme-terminal-demo/img/terminal-css.png" alt="Terminal.css Preview" />
-      </a>
-    </p>
-  </div>
-  
-  <div class="posts">
-    {posts.map((post) => <PostCard post={post} />)}
-  </div>
-</BaseLayout>
+<Layout class="max-w-3xl">
+  <PageHead slot="head" title="Home" />
+  <section class="py-6">
+    <div class="mb-8">
+      <div class="w-full sm:max-w-32 sm:shrink-0 rounded-xl overflow-hidden">
+        <Image
+            src={logo}
+            alt={"Fabian Piper"}
+            width={512}
+            height={512}
+            class="object-cover"
+        />
+      </div>
+    </div>
+
+    <div class="prose">
+      <p class="mt-0">
+        I'm a Software Engineer and Researcher based in Berlin, Germany.
+        Below, you can find a selection of my projects, contributions, and publications.
+      </p>
+      <p>
+        I'm always open to new connections and interesting discussions. Please feel free to <Link
+          href="mailto:hello@fabianpiper.com"
+          class="text-foreground"
+          underline>reach out</Link
+      >, I'd love to hear from you!
+      </p>
+    </div>
+  </section>
+
+  <section class="flex flex-col gap-y-4">
+    <h2 class="text-2xl font-medium">Latest projects</h2>
+    <ul class="flex flex-col gap-y-4">
+      {projects.map((project) => <ProjectCard project={project} />)}
+    </ul>
+    <div class="flex justify-center">
+      <Link
+        href="/blog"
+        class={buttonVariants({ variant: 'ghost' }) + ' group'}
+      >
+        See all projects <span
+          class="ml-1.5 transition-transform group-hover:translate-x-1"
+          >&rarr;</span
+        >
+      </Link>
+    </div>
+  </section>
+
+  <section class="flex flex-col gap-y-4">
+    <h2 class="text-2xl font-medium">Latest publications</h2>
+    <ul class="flex flex-col gap-y-4">
+      {
+        publications.map((publication) => (
+            <li>
+              <BlogCard entry={publication} />
+            </li>
+        ))
+      }
+    </ul>
+    <div class="flex justify-center">
+      <Link
+          href="/publications"
+          class={buttonVariants({ variant: 'ghost' }) + ' group'}
+      >
+        See all publications <span
+          class="ml-1.5 transition-transform group-hover:translate-x-1"
+      >&rarr;</span
+      >
+      </Link>
+    </div>
+  </section>
+
+</Layout>

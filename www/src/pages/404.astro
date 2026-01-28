@@ -1,25 +1,29 @@
 ---
-import BaseLayout from '../layouts/BaseLayout.astro';
-
-const missingBackButtonLabel = "Back to home page";
-const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : import.meta.env.BASE_URL + '/';
+import Breadcrumbs from '@/components/Breadcrumbs.astro'
+import Link from '@/components/Link.astro'
+import PageHead from '@/components/PageHead.astro'
+import { buttonVariants } from '@/components/ui/button'
+import Layout from '@/layouts/Layout.astro'
+import { cn } from '@/lib/utils'
 ---
 
-<BaseLayout title="404 - Page Not Found">
-  <div class="page">
-    <h1>404 — Page not found...</h1>
-      <p>The page you're looking for doesn't exist. It might have been moved, deleted, or you may have entered the wrong URL.</p>
-      <div>
-        <a href={base} class="button inline">
-          <span class="button__text">{missingBackButtonLabel} →</span>
-        </a>
-      </div>
-  </div>
-</BaseLayout>
+<Layout class="max-w-3xl">
+  <PageHead slot="head" title="404" />
+  <Breadcrumbs items={[{ label: '???', icon: 'lucide:circle-help' }]} />
 
-<style>
-  .page {
-    max-width: 760px;
-    margin: 0 auto;
-  }
-</style>
+  <section
+    class="flex flex-col items-center justify-center gap-y-4 text-center"
+  >
+    <div class="max-w-md">
+      <h1 class="mb-4 text-3xl font-medium">404: Page not found</h1>
+      <p class="prose">Oops! The page you're looking for doesn't exist.</p>
+    </div>
+    <Link
+      href="/"
+      class={cn(buttonVariants({ variant: 'outline' }), 'flex gap-x-1.5 group')}
+    >
+      <span class="transition-transform group-hover:-translate-x-1">&larr;</span
+      > Go to home page
+    </Link>
+  </section>
+</Layout>
