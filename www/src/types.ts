@@ -18,9 +18,3 @@ export type SocialLink = {
 export type IconMap = {
   [key: string]: string
 }
-
-export type ProjectLink = {
-  label: string
-  href: string
-  icon?: string
-}
