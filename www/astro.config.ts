@@ -18,10 +18,23 @@ import { pluginLineNumbers } from '@expressive-code/plugin-line-numbers'
 import type { ExpressiveCodeTheme } from 'rehype-expressive-code'
 
 import tailwindcss from '@tailwindcss/vite'
+import mixpanel from 'astrojs-mixpanel'
 
 export default defineConfig({
   site: 'https://glg.fabianpiper.com',
-  integrations: [mdx(), react(), sitemap(), icon()],
+  integrations: [
+    mdx(),
+    react(),
+    sitemap(),
+    icon(),
+    mixpanel({
+      token: '',
+      config: {
+        api_host: 'https://api-eu.mixpanel.com',
+      },
+      autoTrack: true,
+    }),
+  ],
   vite: {
     plugins: [tailwindcss()],
   },
