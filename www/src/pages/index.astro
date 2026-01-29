@@ -18,8 +18,10 @@ const publications = await getFeaturedPublications()
 <Layout class="max-w-3xl">
   <PageHead slot="head" title="Home" />
   <section class="py-6">
-    <div class="mb-8">
-      <div class="w-full max-w-32 overflow-hidden rounded-xl sm:shrink-0">
+    <div class="mb-6">
+      <div
+        class="mx-auto w-full max-w-32 overflow-hidden rounded-xl sm:shrink-0"
+      >
         <Image
           src={logo}
           alt={'Fabian Piper'}
@@ -30,11 +32,18 @@ const publications = await getFeaturedPublications()
       </div>
     </div>
 
-    <div class="prose">
+    <div class="prose text-center">
       <p class="mt-0">
         I'm a Software Engineer and Researcher based in Berlin, Germany. Below,
-        you can find a selection of my projects, contributions, and
-        publications.
+        you can find a selection of my <Link
+          href="/projects"
+          class="text-foreground"
+          underline>projects</Link
+        >, <Link href="/projects" class="text-foreground" underline
+          >contributions</Link
+        >, and <Link href="/publications" class="text-foreground" underline
+          >publications</Link
+        >.
       </p>
       <p>
         I'm always open to new connections and interesting discussions. Please
@@ -46,7 +55,9 @@ const publications = await getFeaturedPublications()
       </p>
     </div>
 
-    <SocialIcons links={SOCIAL_LINKS} />
+    <div class="mx-auto flex items-center justify-center">
+      <SocialIcons links={SOCIAL_LINKS} />
+    </div>
   </section>
 
   <section class="flex flex-col gap-y-4">
