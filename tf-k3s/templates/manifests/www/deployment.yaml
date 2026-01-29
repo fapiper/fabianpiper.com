@@ -1,23 +1,23 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: docs
+  name: www
   namespace: default
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: docs
+      app: www
   template:
     metadata:
       labels:
-        app: docs
+        app: www
     spec:
       imagePullSecrets:
         - name: regcred
       containers:
-        - name: docs
-          image: ghcr.io/${git_username}/${git_repo_name}/docs:latest
+        - name: www
+          image: ghcr.io/${git_username}/${git_repo_name}/www:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 80
