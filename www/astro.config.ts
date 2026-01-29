@@ -28,7 +28,7 @@ export default defineConfig({
     sitemap(),
     icon(),
     mixpanel({
-      token: '',
+      token: 'TODO',
       config: {
         api_host: 'https://api-eu.mixpanel.com',
       },
