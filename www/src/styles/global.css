@@ -3,11 +3,12 @@
 @custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
 
 @theme inline {
+  /* Updated to use Fira Code as the primary mono font */
   --font-sans:
           Geist, ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
           'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
   --font-mono:
-          Geist Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
           'Liberation Mono', 'Courier New', monospace;
 
   --color-background: var(--background);
@@ -42,58 +43,28 @@
   font-display: swap;
 }
 
-/* Gruvbox Light Hard Inspired */
 :root {
-  /* Main background - light0_hard with warm cream tone */
-  --background: oklch(0.980 0.020 85.8); /* #f9f5d7 - warm cream */
-
-  /* Main foreground - dark1 with slight warmth */
-  --foreground: oklch(0.302 0.024 68.2); /* #3c3836 - warm dark brown */
-
-  /* Primary color - bright blue accent */
-  --primary: oklch(0.558 0.131 253.4); /* #458588 - gruvbox blue */
-  --primary-foreground: oklch(0.980 0.020 85.8); /* light cream */
-
-  /* Muted background - light1 */
-  --muted: oklch(0.958 0.022 85.8); /* #ebdbb2 - lighter warm */
-  --muted-foreground: oklch(0.493 0.020 68.2); /* #665c54 - muted brown */
-
-  /* Destructive - bright red */
-  --destructive: oklch(0.548 0.198 27.7); /* #cc241d - gruvbox red */
-  --destructive-foreground: oklch(0.980 0.020 85.8);
-
-  /* Border - light2 for visible separation */
-  --border: oklch(0.898 0.026 85.8); /* #d5c4a1 - tan border */
-
-  /* Ring - blue accent */
-  --ring: oklch(0.558 0.131 253.4); /* #458588 */
+  /* GitHub Light 4 Blue Palette */
+  --background: oklch(0.93 0.012 254.0);
+  --foreground: oklch(0.28 0.07 265.0);
+  --primary: oklch(0.60 0.14 255.0);
+  --primary-foreground: oklch(0.93 0.012 254.0);
+  --muted: oklch(0.90 0.02 255.0);
+  --muted-foreground: oklch(0.45 0.06 260.0);
+  --border: oklch(0.88 0.015 255.0);
+  --ring: oklch(0.60 0.14 255.0);
 }
 
-/* Gruvbox Dark (Hard variant) Inspired */
 [data-theme='dark'] {
-  /* Main background - dark0_hard with slight warmth */
-  --background: oklch(0.157 0.012 68.2); /* #1d2021 - deep warm black */
-
-  /* Main foreground - light1 with warm cream tone */
-  --foreground: oklch(0.882 0.027 85.8); /* #ebdbb2 - warm cream text */
-
-  /* Primary color - bright blue */
-  --primary: oklch(0.663 0.123 233.1); /* #83a598 - lighter blue for dark bg */
-  --primary-foreground: oklch(0.157 0.012 68.2); /* dark bg */
-
-  /* Muted background - dark1 */
-  --muted: oklch(0.302 0.024 68.2); /* #3c3836 - warm dark */
-  --muted-foreground: oklch(0.730 0.018 68.2); /* #a89984 - muted warm gray */
-
-  /* Destructive - bright red */
-  --destructive: oklch(0.635 0.221 25.3); /* #fb4934 - bright red */
-  --destructive-foreground: oklch(0.980 0.020 85.8);
-
-  /* Border - dark2 for subtle separation */
-  --border: oklch(0.378 0.020 68.2); /* #504945 - medium brown border */
-
-  /* Ring - bright blue */
-  --ring: oklch(0.663 0.123 233.1); /* #83a598 */
+  /* GitHub Dark Dimmed Palette */
+  --background: oklch(0.240 0.018 245.0);
+  --foreground: oklch(0.750 0.025 245.0);
+  --primary: oklch(0.700 0.120 25.0);
+  --primary-foreground: oklch(0.240 0.018 245.0);
+  --muted: oklch(0.280 0.025 245.0);
+  --muted-foreground: oklch(0.650 0.020 245.0);
+  --border: oklch(0.320 0.025 245.0);
+  --ring: oklch(0.700 0.120 25.0);
 }
 
 @layer base {
@@ -102,6 +73,6 @@
   ::before,
   ::backdrop,
   ::file-selector-button {
-    @apply border-border outline-ring/50 tracking-tight;
+    @apply border-border outline-ring/50;
   }
 }

@@ -90,7 +90,7 @@ const isMainAuthor = (author: string): boolean => {
                 <span
                   class:list={[
                     isMainAuthor(author) &&
-                      'text-primary underline underline-offset-2',
+                      'text-foreground underline underline-offset-2',
                   ]}
                 >
                   {abbreviateName(author)}
@@ -127,7 +127,7 @@ const isMainAuthor = (author: string): boolean => {
                   <Separator orientation="vertical" className="h-3!" />
                 )}
 
-                <div class="text-muted-foreground">
+                <div class="text-muted-foreground font-mono font-medium">
                   {item.href ? (
                     <Link
                       href={item.href}

@@ -51,7 +51,7 @@ if (entry.data.image) {
 
     <div class="flex grow flex-col gap-y-2">
       <div class="flex grow flex-col gap-y-1">
-        <div class="flex items-center gap-x-1">
+        <div class="flex items-start gap-x-1">
           <h3 class="grow text-lg font-medium">
             {entry.data.name}
           </h3>
@@ -81,11 +81,10 @@ if (entry.data.image) {
                 )}
                 <Link
                   href={link.href}
-                  class="text-muted-foreground/60 hover:text-muted-foreground flex items-center gap-x-1"
+                  class="text-muted-foreground/60 hover:text-muted-foreground flex items-center gap-x-1 font-mono font-medium"
                   external
                 >
                   <Icon name={'lucide:external-link'} class="size-3" />
-
                   <span>{link.label}</span>
                 </Link>
               </>
