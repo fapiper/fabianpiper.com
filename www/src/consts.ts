@@ -3,7 +3,7 @@ import type { IconMap, SocialLink, Site } from '@/types'
 export const SITE: Site = {
   title: 'Fabian Piper',
   description:
-    'astro-erudite is a opinionated, unstyled blogging template—built with Astro, Tailwind, and shadcn/ui.',
+    "I'm a Software Engineer and Researcher based in Berlin, Germany. Find a selection of my projects, contributions, and publications. Please feel free to reach out!",
   href: 'https://glg.fabianpiper.com',
   author: 'fapiper',
   locale: 'en-US',

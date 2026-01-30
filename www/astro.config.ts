@@ -19,16 +19,23 @@ import type { ExpressiveCodeTheme } from 'rehype-expressive-code'
 
 import tailwindcss from '@tailwindcss/vite'
 import mixpanel from 'astrojs-mixpanel'
+import { loadEnv } from 'vite'
+
+const { PUBLIC_MIXPANEL_TOKEN, PUBLIC_SITE_URL } = loadEnv(
+  process.env.NODE_ENV!,
+  process.cwd(),
+  '',
+)
 
 export default defineConfig({
-  site: 'https://glg.fabianpiper.com',
+  site: PUBLIC_SITE_URL,
   integrations: [
     mdx(),
     react(),
     sitemap(),
     icon(),
     mixpanel({
-      token: 'TODO',
+      token: PUBLIC_MIXPANEL_TOKEN,
       config: {
         api_host: 'https://api-eu.mixpanel.com',
       },
@@ -36,7 +43,8 @@ export default defineConfig({
     }),
   ],
   vite: {
-    plugins: [tailwindcss()],
+    // Tailwind v4 and Astro 5 sometimes bring conflicting Vite type definitions, even if the code works perfectly
+    plugins: [tailwindcss() as any],
   },
   server: {
     port: 1234,
