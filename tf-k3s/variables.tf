@@ -117,3 +117,8 @@ variable "git_email" {
   description = "Email address for GitHub container registry authentication"
   type        = string
 }
+
+variable "mixpanel_token" {
+  description = "Public token for mixpanel www analytics"
+  type        = string
+}

@@ -93,3 +93,6 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64
+          build-args: |
+            PUBLIC_MIXPANEL_TOKEN=${{ secrets.MIXPANEL_TOKEN }}
+            PUBLIC_SITE_URL=https://glg.fabianpiper.com

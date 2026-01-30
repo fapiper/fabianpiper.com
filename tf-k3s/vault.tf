@@ -150,6 +150,18 @@ resource "oci_vault_secret" "ssh_public_key" {
   }
 }
 
+resource "oci_vault_secret" "mixpanel_token" {
+  compartment_id = var.compartment_ocid
+  vault_id       = oci_kms_vault.k3s_vault.id
+  key_id         = oci_kms_key.master_key.id
+  secret_name    = "mixpanel-token"
+
+  secret_content {
+    content_type = "BASE64"
+    content      = base64encode(var.mixpanel_token)
+  }
+}
+
 output "vault_ocid" {
   value       = oci_kms_vault.k3s_vault.id
   description = "OCI Vault OCID for secret retrieval"
@@ -173,6 +185,7 @@ output "secret_ocids" {
     argocd_admin_password      = oci_vault_secret.argocd_admin_password.id
     argocd_admin_password_hash = oci_vault_secret.argocd_admin_password_hash.id
     ssh_public_key             = oci_vault_secret.ssh_public_key.id
+    mixpanel_token             = oci_vault_secret.mixpanel_token.id
   }
   description = "Map of secret names to their OCIDs for retrieval"
   sensitive   = true
