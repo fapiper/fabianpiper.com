@@ -1,19 +1,11 @@
+> [!WARNING]  
+> WIP: This repository is currently undergoing some refactorings
+
 <div align="center">
 
 # fabianpiper.com
 
 *Another overengineered portfolio using K3s, Terraform, Atmos, Argo CD on OCI Free Tier*
-
-</div>
-
-> [!WARNING]  
-> WIP: This repository is currently undergoing some refactorings
-
-<br />
-
-<div align="center">
-
-[LinkedIn](https://linkedin.com/in/fabian-piper) <span> | </span> [GitHub](https://github.com/fapiper)
 
 </div>
 
