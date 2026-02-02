@@ -1,0 +1,11 @@
+components:
+  terraform:
+    vault/defaults:
+      metadata:
+        component: vault
+        type: real
+      vars:
+        git_username: '{{ .vars.git_username }}'
+        git_repo_name: '{{ .vars.git_repo_name }}'
+        acme_email: '{{ .vars.acme_email }}'
+        ssh_public_key_path: '{{ .vars.ssh_public_key_path }}'

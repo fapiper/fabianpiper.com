@@ -1,0 +1,20 @@
+# IAM Component Catalog Defaults
+# Dynamic group and policies for K3s nodes to access OCI Vault
+
+components:
+  terraform:
+    iam/defaults:
+      metadata:
+        type: abstract
+        component: iam
+
+      vars:
+        enabled: true
+
+        # Dynamic Group Configuration
+        dynamic_group_name: "k3s-nodes-dg"
+        dynamic_group_description: "Dynamic group for K3s nodes to access OCI Vault"
+
+        # Policy Configuration
+        policy_name: "k3s-secrets-read-policy"
+        policy_description: "Allow K3s nodes to read secrets from Vault"

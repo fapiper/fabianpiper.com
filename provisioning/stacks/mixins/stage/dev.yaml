@@ -1,0 +1,36 @@
+# Development stage configuration
+# This mixin defines development-specific defaults with minimal resources
+
+vars:
+  stage: dev
+
+  # Development tags
+  tags:
+    Environment: development
+    ManagedBy: atmos
+    Stage: dev
+
+components:
+  terraform:
+    k3s-cluster:
+      vars:
+        # Dev sizing for OCI Free Tier (minimal)
+        ingress_shape_config:
+          ocpus: 1
+          memory_in_gbs: 6
+
+        server_shape_config:
+          ocpus: 1
+          memory_in_gbs: 6
+
+        worker_shape_config:
+          ocpus: 1
+          memory_in_gbs: 6
+
+        # Disable worker node in dev to save resources
+        enable_worker: false
+
+    networking:
+      vars:
+        # Dev network security (more permissive)
+        ssh_source_cidr: "0.0.0.0/0"

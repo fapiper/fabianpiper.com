@@ -1,0 +1,18 @@
+workflows:
+  provision-cluster:
+    description: "Full bootstrap of OCI Infrastructure and ArgoCD"
+    steps:
+      - command: terraform apply networking -s {{.stack}}
+      - command: terraform apply iam -s {{.stack}}
+      - command: terraform apply vault -s {{.stack}}
+      - command: terraform apply k3s-cluster -s {{.stack}}
+      - command: terraform apply argocd-bootstrap -s {{.stack}}
+
+  destroy-cluster:
+    description: "Full teardown of OCI Infrastructure and ArgoCD"
+    steps:
+      - command: terraform destroy argocd-bootstrap -s {{.stack}}
+      - command: terraform destroy k3s-cluster -s {{.stack}}
+      - command: terraform destroy vault -s {{.stack}}
+      - command: terraform destroy iam -s {{.stack}}
+      - command: terraform destroy networking -s {{.stack}}

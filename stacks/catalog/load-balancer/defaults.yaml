@@ -1,0 +1,9 @@
+# Load-Balancer Component Catalog Defaults
+
+components:
+  terraform:
+    load-balancer/defaults:
+      metadata:
+        component: load-balancer
+        type: real
+      # No additional vars needed - all come from component dependencies

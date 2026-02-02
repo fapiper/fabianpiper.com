@@ -1,0 +1,13 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: www-tls
+  namespace: www
+spec:
+  secretName: www-tls # This name must match the one in your Gateway listener
+  issuerRef:
+    name: cloudflare-issuer
+    kind: ClusterIssuer
+  commonName: "fabianpiper.com"
+  dnsNames:
+    - "fabianpiper.com"

@@ -1,0 +1,26 @@
+#cloud-config
+# K3s Worker Node Initialization
+# Optional worker node that runs in the private subnet
+
+package_update: true
+packages:
+  - curl
+  - iptables-persistent
+
+runcmd:
+  # Configure iptables
+  - iptables -P INPUT ACCEPT
+  - iptables -P FORWARD ACCEPT
+  - iptables -F INPUT
+  - iptables -F FORWARD
+  - netfilter-persistent save
+
+  # Wait for K3s server to be ready
+  - |
+    until curl -k https://${server_ip}:6443; do
+      echo "Waiting for K3s Server..."
+      sleep 10
+    done
+
+  # Install K3s agent with worker role
+  - curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="agent --node-label role=worker" K3S_URL=https://${server_ip}:6443 K3S_TOKEN=${k3s_token} sh -

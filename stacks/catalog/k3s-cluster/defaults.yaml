@@ -1,0 +1,32 @@
+components:
+  terraform:
+    k3s-cluster/defaults:
+      metadata:
+        component: k3s-cluster
+        type: real
+      vars:
+        vcn_cidr_block: '{{ .vars.vcn_cidr_block }}'
+        private_subnet_cidr: '{{ .vars.private_subnet_cidr }}'
+        ingress_private_ip: '{{ .vars.ingress_private_ip }}'
+        server_private_ip: '{{ .vars.server_private_ip }}'
+        
+        ssh_public_key_path: '{{ .vars.ssh_public_key_path }}'
+        
+        git_username: '{{ .vars.git_username }}'
+        
+        enable_worker: '{{ .vars.enable_worker }}'
+        
+        availability_domain: '{{ .vars.availability_domain }}'
+        
+        # OCI free tier: 4 OCPUs, 24GB RAM
+        ingress_shape_config:
+          ocpus: 1
+          memory_in_gbs: 6
+        
+        server_shape_config:
+          ocpus: 2
+          memory_in_gbs: 12
+        
+        worker_shape_config:
+          ocpus: 1
+          memory_in_gbs: 6

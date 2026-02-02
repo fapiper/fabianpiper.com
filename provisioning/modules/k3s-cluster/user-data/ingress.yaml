@@ -1,0 +1,32 @@
+#cloud-config
+# Ingress/NAT Node Initialization
+# This node acts as both NAT gateway for private subnet and K3s agent for ingress traffic
+
+package_update: true
+packages:
+  - curl
+  - iptables-persistent
+
+runcmd:
+  # Configure iptables for NAT and forwarding
+  - iptables -P INPUT ACCEPT
+  - iptables -P FORWARD ACCEPT
+  - iptables -F INPUT
+  - iptables -F FORWARD
+  - iptables -t nat -A POSTROUTING -s 10.0.2.0/24 -o ens3 -j MASQUERADE
+  - iptables -I FORWARD -s 10.0.2.0/24 -j ACCEPT
+  - iptables -I INPUT -p tcp --dport 22 -j ACCEPT
+  - iptables -I INPUT -p tcp --dport 80 -j ACCEPT
+  - iptables -I INPUT -p tcp --dport 443 -j ACCEPT
+  - iptables -I FORWARD -s 10.42.0.0/16 -d 10.42.0.0/16 -j ACCEPT
+  - netfilter-persistent save
+
+  # Wait for K3s server to be ready
+  - |
+    until curl -k https://${server_ip}:6443; do
+      echo "Waiting for K3s Server..."
+      sleep 10
+    done
+
+  # Install K3s agent with ingress role
+  - curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="agent --node-label role=ingress" K3S_URL=https://${server_ip}:6443 K3S_TOKEN=${k3s_token} sh -

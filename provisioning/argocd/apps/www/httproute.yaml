@@ -1,0 +1,17 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: www-route
+  namespace: www
+spec:
+  parentRefs:
+    - name: public-gateway
+      namespace: envoy-gateway-system
+  hostnames:
+    - "fabianpiper.com"
+  rules:
+    - matches:
+        - path: { type: PathPrefix, value: / }
+      backendRefs:
+        - name: www
+          port: 80

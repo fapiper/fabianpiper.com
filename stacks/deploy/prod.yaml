@@ -1,0 +1,100 @@
+# Production Stack Configuration
+# This stack deploys all components for the K3s cluster
+
+import:
+  - catalog/networking/defaults
+  - catalog/k3s-cluster/defaults
+  - catalog/load-balancer/defaults
+  - catalog/iam/defaults
+  - catalog/vault/defaults
+
+vars:
+  stage: prod
+  environment: production
+  
+  # OCI configuration - Set via environment variables:
+  # export TF_VAR_compartment_ocid="ocid1.compartment..."
+  # Or define here (not recommended for sensitive values)
+  
+  # Domain configuration - Set in terraform.tfvars or environment
+  # domain_name: "example.com"
+  # cloudflare_zone_id: "your-zone-id"
+  
+  # Git repository configuration
+  # git_repo_url: "https://github.com/username/repo"
+
+components:
+  terraform:
+    # 1. Networking
+    networking:
+      metadata:
+        component: networking
+        inherits:
+          - networking/defaults
+      vars:
+        compartment_ocid: '{{ .vars.compartment_ocid }}'
+        common_tags: '{{ .vars.common_tags }}'
+    
+    # 2. IAM
+    iam:
+      metadata:
+        inherits:
+          - iam/defaults
+      vars:
+        tenancy_ocid: '{{ .vars.tenancy_ocid }}'
+        compartment_ocid: '{{ .vars.compartment_ocid }}'
+    
+    # 3. Vault
+    vault:
+      metadata:
+        inherits:
+          - vault/defaults
+      vars:
+        compartment_ocid: '{{ .vars.compartment_ocid }}'
+        common_tags: '{{ .vars.common_tags }}'
+        
+        # These should come from environment variables or tfvars:
+        # cloudflare_api_token: "${TF_VAR_cloudflare_api_token}"
+        # cloudflare_zone_id: "${TF_VAR_cloudflare_zone_id}"
+        # domain_name: "${TF_VAR_domain_name}"
+        # git_pat: "${TF_VAR_git_pat}"
+        # git_repo_url: "${TF_VAR_git_repo_url}"
+        # k3s_token: "${TF_VAR_k3s_token}"
+        # argocd_admin_password: "${TF_VAR_argocd_admin_password}"
+        # argocd_admin_password_hash: "${TF_VAR_argocd_admin_password_hash}"
+        # git_email: "${TF_VAR_git_email}"
+        # mixpanel_token: "${TF_VAR_mixpanel_token}"
+    
+    # 4. K3s Cluster
+    k3s-cluster:
+      metadata:
+        inherits:
+          - k3s-cluster/defaults
+      vars:
+        compartment_ocid: '{{ .vars.compartment_ocid }}'
+        common_tags: '{{ .vars.common_tags }}'
+        
+        # Get networking outputs using remote state
+        vcn_id: '{{ (atmos.Component "networking" .stack).outputs.vcn_id }}'
+        public_subnet_id: '{{ (atmos.Component "networking" .stack).outputs.public_subnet_id }}'
+        private_security_list_id: '{{ (atmos.Component "networking" .stack).outputs.private_security_list_id }}'
+        vcn_cidr_block: '{{ (atmos.Component "networking" .stack).outputs.vcn_cidr_block }}'
+        
+        # Sensitive variables from environment:
+        # k3s_token: "${TF_VAR_k3s_token}"
+        # git_pat: "${TF_VAR_git_pat}"
+        # git_repo_url: "${TF_VAR_git_repo_url}"
+        # cloudflare_api_token: "${TF_VAR_cloudflare_api_token}"
+    
+    # 5. Load Balancer
+    load-balancer:
+      metadata:
+        inherits:
+          - load-balancer/defaults
+      vars:
+        compartment_ocid: '{{ .vars.compartment_ocid }}'
+        common_tags: '{{ .vars.common_tags }}'
+        
+        # Get networking and cluster outputs
+        public_subnet_id: '{{ (atmos.Component "networking" .stack).outputs.public_subnet_id }}'
+        ingress_instance_id: '{{ (atmos.Component "k3s-cluster" .stack).outputs.ingress_instance_id }}'

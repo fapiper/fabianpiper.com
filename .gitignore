@@ -1,29 +1,228 @@
-# CLI configuration files
+# =============================================================================
+# Terraform
+# =============================================================================
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+terraform.tfvars
+terraform.tfvars.json
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
 .terraformrc
 terraform.rc
-.claude/settings.local.json
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# Dependencies
-node_modules/
-**/node_modules/
-
-# Build outputs
-dist/
-**/dist/
-.astro/
-**/.astro/
-
-# Bun
-bun.lockb
-
-# Terraform specific
 **/tfplan
 **/*.tfstate
 **/*.tfstate.*
 **/*.tfvars
 **/*.tfvars.json
 **/.terraform/
+
+# =============================================================================
+# Atmos
+# =============================================================================
+.atmos/
+
+# =============================================================================
+# Secrets and Credentials
+# =============================================================================
+*.pem
+*.key
+*.crt
+*.cert
+*.p12
+*.pfx
+.envrc
+.env
+.env.*
+!.envrc.example
+secrets/
+secrets.yaml
+secrets.yml
+*.secret
+*.secrets
+
+# SSH keys
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+*.ppk
+
+# OCI config
+.oci/
+oci_api_key.pem
+oci_config
+
+# Kubeconfig
+kubeconfig
+kubeconfig.*
+*.kubeconfig
+k3s.yaml
+
+# =============================================================================
+# Backups
+# =============================================================================
+backup/
+backups/
+*.backup
+*.bak
+*.old
+*-backup.yaml
+*-backup.json
+
+# =============================================================================
+# Operating System Files
+# =============================================================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# =============================================================================
+# IDE / Editor
+# =============================================================================
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# VSCode
+.vscode/
+*.code-workspace
+.history/
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+Session.vim
+Sessionx.vim
+.netrwhist
+*~
+tags
+[._]*.un~
+
+# Emacs
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# =============================================================================
+# Logs
+# =============================================================================
+*.log
+logs/
+log/
+*.log.*
+crash.log
+error.log
+
+# =============================================================================
+# Temporary Files
+# =============================================================================
+tmp/
+temp/
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# =============================================================================
+# Build Artifacts
+# =============================================================================
+dist/
+build/
+target/
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+
+# =============================================================================
+# Testing
+# =============================================================================
+.test/
+test-results/
+coverage/
+*.test
+*.cover
+
+# =============================================================================
+# Miscellaneous
+# =============================================================================
+# Cached files
+.cache/
+*.cache
+
+# Lock files (keep for reproducibility)
+# Uncomment if you want to ignore lock files
+# package-lock.json
+# yarn.lock
+# Gemfile.lock
+
+# Node modules
+node_modules/
+**/node_modules/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+venv/
+ENV/
+env/
+
+# Go
+vendor/
+go.sum
+
+# Examples should be committed
+!*.example
+!*-example.*
+!example-*
+
+
+# CLI configuration files
+.claude/settings.local.json
+
+# Build outputs
+**/dist/
+.astro/
+**/.astro/
+
+# Bun
+bun.lockb

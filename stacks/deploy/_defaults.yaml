@@ -1,0 +1,48 @@
+# Global Stack Defaults
+# These settings apply to all stacks and components
+
+import:
+  - mixins/oci-provider
+  - mixins/backend
+
+vars:
+  # Default tags applied to all resources
+  common_tags:
+    Project: "k3s-oracle-free"
+    ManagedBy: "Terraform"
+    Environment: "Production"
+    ProvisionedWith: "Atmos"
+  
+  # Default region (can be overridden per stack)
+  region: "us-ashburn-1"
+  
+  # Network defaults
+  vcn_cidr_block: "10.0.0.0/16"
+  public_subnet_cidr: "10.0.1.0/24"
+  private_subnet_cidr: "10.0.2.0/24"
+  
+  # Instance IPs
+  ingress_private_ip: "10.0.1.10"
+  server_private_ip: "10.0.2.10"
+  
+  # SSH configuration
+  ssh_source_cidr: "0.0.0.0/0"  # SECURITY: Restrict this in production!
+  ssh_public_key_path: "~/.ssh/id_rsa.pub"
+  
+  # Git defaults
+  git_username: "git_user"
+  git_repo_name: "git_repo"
+  
+  # ACME/Let's Encrypt
+  acme_email: "admin@example.com"
+  
+  # Enable worker node by default
+  enable_worker: true
+  
+  # Availability domain (0-indexed)
+  availability_domain: 0
+
+# Settings for all components
+settings:
+  spacelift:
+    workspace_enabled: false

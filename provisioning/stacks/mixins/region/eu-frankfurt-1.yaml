@@ -1,0 +1,19 @@
+# Region-specific configuration for OCI eu-frankfurt-1
+# This mixin contains all region-specific defaults
+
+vars:
+  region: "eu-frankfurt-1"
+  environment: "fra"  # Short abbreviation for region
+
+  # OCI Free Tier Availability Domain (usually AD-1, AD-2, or AD-3)
+  # Frankfurt has 3 ADs, Free Tier resources typically in AD-1
+  availability_domain: 0  # 0-indexed, maps to first AD
+
+components:
+  terraform:
+    networking:
+      vars:
+        # Region-specific CIDR blocks
+        vcn_cidr_block: "10.0.0.0/16"
+        public_subnet_cidr: "10.0.1.0/24"
+        private_subnet_cidr: "10.0.2.0/24"

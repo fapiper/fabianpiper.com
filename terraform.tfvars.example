@@ -1,0 +1,45 @@
+# OCI Provider Configuration
+tenancy_ocid     = "ocid1.tenancy.oc1..aaaaaaaa..."
+user_ocid        = "ocid1.user.oc1..aaaaaaaa..."
+fingerprint      = "xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx"
+private_key_path = "~/.oci/oci_api_key.pem"
+region           = "us-ashburn-1"
+compartment_ocid = "ocid1.compartment.oc1..aaaaaaaa..."
+
+# Domain and DNS Configuration
+domain_name          = "example.com"
+cloudflare_api_token = "your-cloudflare-api-token"
+cloudflare_zone_id   = "your-cloudflare-zone-id"
+
+# Git Repository Configuration
+git_repo_url  = "https://github.com/username/repo"
+git_username  = "your-github-username"
+git_repo_name = "repo"
+git_pat       = "github_pat_xxxxxxxxxxxxxxxxxxxxx"
+git_email     = "your@email.com"
+
+# K3s Configuration
+k3s_token = "your-secure-random-token-here"
+# Generate with: openssl rand -base64 32
+
+# ArgoCD Configuration
+argocd_admin_password = "your-secure-password"
+# Generate hash with: htpasswd -nbBC 10 admin your-password | cut -d: -f2
+argocd_admin_password_hash = "$2y$10$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+# SSL/TLS Configuration
+acme_email = "admin@example.com"
+
+# Analytics (Optional)
+mixpanel_token = ""
+
+# SSH Configuration
+ssh_public_key_path = "~/.ssh/id_rsa.pub"
+ssh_source_cidr     = "0.0.0.0/0"  # SECURITY: Change to your IP for production!
+
+# Resource Tags
+common_tags = {
+  Project     = "k3s-oracle-free"
+  ManagedBy   = "Terraform"
+  Environment = "Production"
+}

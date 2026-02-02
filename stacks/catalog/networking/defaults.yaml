@@ -1,0 +1,15 @@
+# Networking Component Catalog Defaults
+
+components:
+  terraform:
+    networking/defaults:
+      metadata:
+        type: abstract
+        component: networking
+      vars:
+        vcn_cidr_block: '{{ .vars.vcn_cidr_block }}'
+        public_subnet_cidr: '{{ .vars.public_subnet_cidr }}'
+        private_subnet_cidr: '{{ .vars.private_subnet_cidr }}'
+        ssh_source_cidr: '{{ .vars.ssh_source_cidr }}'
+        ingress_private_ip: '{{ .vars.ingress_private_ip }}'
+        vcn_dns_label: "k3svcn"

@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: www
+  namespace: www
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: www
+  template:
+    metadata:
+      labels:
+        app: www
+    spec:
+      imagePullSecrets:
+        - name: regcred
+      containers:
+        - name: www
+          image: ghcr.io/fapiper/fabianpiper.com/www:latest
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"

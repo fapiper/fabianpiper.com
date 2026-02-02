@@ -1,0 +1,25 @@
+import:
+  - mixins/region/eu-frankfurt-1
+  - mixins/stage/prod
+  - catalog/networking/defaults
+  - catalog/iam/defaults
+  - catalog/vault/defaults
+  - catalog/k3s-cluster/defaults
+  - catalog/argocd-bootstrap/defaults
+
+vars:
+  tenant: fabianpiper
+  oci_namespace: "${OCI_NAMESPACE}"
+
+  domain_name: "fabianpiper.com"
+  acme_email: "mail@example.com"
+  git_repo_url: "https://github.com/fapiper/fabianpiper.com.git"
+  git_username: "fapiper"
+
+  secret_values:
+    github-pat: "${GITHUB_PAT}"
+    cloudflare-api-token: "${CLOUDFLARE_API_TOKEN}"
+    cloudflare-tunnel-json: "${CLOUDFLARE_TUNNEL_JSON}"
+    k3s-token: "${K3S_TOKEN}"
+    argocd-admin-password-hash: "${ARGOCD_ADMIN_PASSWORD_HASH}"
+    mixpanel-token: "${MIXPANEL_TOKEN}"

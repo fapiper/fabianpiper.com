@@ -1,0 +1,47 @@
+components:
+  terraform:
+    k3s-cluster/defaults:
+      metadata:
+        type: abstract
+        component: k3s-cluster
+
+      vars:
+        enabled: true
+
+        # Instance Configuration
+        instance_shape: "VM.Standard.A1.Flex"  # ARM-based free tier
+        instance_os: "Canonical Ubuntu"
+        instance_os_version: "24.04"
+
+        # Ingress/NAT Instance Configuration
+        ingress_display_name: "k3s-ingress"
+        ingress_hostname_label: "ingress"
+        ingress_private_ip: "10.0.1.10"
+        ingress_shape_config:
+          ocpus: 1
+          memory_in_gbs: 6
+
+        # Server Instance Configuration
+        server_display_name: "k3s-server"
+        server_hostname_label: "server"
+        server_private_ip: "10.0.2.10"
+        server_shape_config:
+          ocpus: 2
+          memory_in_gbs: 12
+
+        # Worker Instance Configuration
+        worker_display_name: "k3s-worker"
+        worker_hostname_label: "worker-1"
+        worker_shape_config:
+          ocpus: 1
+          memory_in_gbs: 6
+
+        # Enable/disable worker (set false in dev to save resources)
+        enable_worker: true
+
+        # K3s Configuration
+        k3s_version: "v1.28.5+k3s1"  # Stable version
+
+        # Initialization Method
+        # Options: "cloud-init" (default), "ansible", "script"
+        initialization_method: "cloud-init"

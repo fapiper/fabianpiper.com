@@ -1,0 +1,21 @@
+components:
+  terraform:
+    vault/defaults:
+      metadata:
+        type: abstract
+        component: vault
+      vars:
+        enabled: true
+        vault_name: "k3s-secrets-vault"
+        vault_type: "DEFAULT"
+        master_key_name: "k3s-master-key"
+        master_key_algorithm: "AES"
+        master_key_length: 32
+        master_key_protection_mode: "SOFTWARE"
+        secrets:
+          - name: "cloudflare-api-token"
+          - name: "cloudflare-tunnel-json"
+          - name: "github-pat"
+          - name: "argocd-admin-password-hash"
+          - name: "k3s-token"
+          - name: "mixpanel-token"

@@ -1,0 +1,4 @@
+resources:
+  - argocd-image-updater.yaml
+  - cloudflare-tunnel.yaml
+  - www-app.yaml

@@ -1,0 +1,86 @@
+#cloud-config
+# K3s Server Node Initialization
+# This is the control plane node that runs in the private subnet
+
+package_update: true
+packages:
+  - curl
+  - iptables-persistent
+
+write_files:
+  - path: /var/lib/rancher/k3s/server/manifests/argocd.yaml
+    owner: root:root
+    permissions: '0644'
+    content: |
+      apiVersion: helm.cattle.io/v1
+      kind: HelmChart
+      metadata:
+        name: argocd
+        namespace: kube-system
+      spec:
+        chart: argo-cd
+        repo: https://argoproj.github.io/argo-helm
+        targetNamespace: argocd
+        createNamespace: true
+        valuesContent: |-
+          server:
+            extraArgs:
+              - --insecure
+            config:
+              kustomize.buildOptions: "--enable-helm"
+            service:
+              type: ClusterIP
+
+  - path: /var/lib/rancher/k3s/server/manifests/root-app.yaml
+    owner: root:root
+    permissions: '0644'
+    content: |
+      apiVersion: argoproj.io/v1alpha1
+      kind: Application
+      metadata:
+        name: root-app
+        namespace: argocd
+        finalizers:
+          - resources-finalizer.argocd.argoproj.io
+      spec:
+        project: default
+        source:
+          repoURL: ${git_repo_url}
+          targetRevision: HEAD
+          path: argocd
+        destination:
+          server: https://kubernetes.default.svc
+          namespace: default
+        syncPolicy:
+          automated:
+            prune: true
+            selfHeal: true
+          syncOptions:
+            - CreateNamespace=true
+
+  - path: /etc/rancher/k3s/registries.yaml
+    owner: root:root
+    permissions: '0644'
+    content: |
+      configs:
+        ghcr.io:
+          auth:
+            username: ${git_username}
+            password: ${git_pat}
+
+runcmd:
+  # Configure iptables
+  - iptables -P INPUT ACCEPT
+  - iptables -P FORWARD ACCEPT
+  - iptables -F INPUT
+  - iptables -F FORWARD
+  - netfilter-persistent save
+
+  # Install K3s server
+  - |
+    curl -sfL https://get.k3s.io | sh -s - server \
+      --token ${k3s_token} \
+      --tls-san ${public_ip} \
+      --disable traefik \
+      --disable servicelb \
+      --node-label role=server
