@@ -13,7 +13,7 @@
 
 ## Stack
 
-* Infrastructure as Code: Terraform orchestrated by [Atmos](https://atmos.tools).
+* Infrastructure as Code: [Terraform](https://www.terraform.io/) + [Atmos](https://atmos.tools).
 * Container Orchestration: K3s on Oracle Cloud Infrastructure (OCI).
 * Ingress & Networking: Cloudflare Tunnels + Kubernetes Gateway API (Envoy).
 * GitOps: Argo CD using the "App of Apps" pattern.
@@ -23,7 +23,7 @@
 
 ## Overview
 
-The infrastructure is managed following a component-based setup using [Atmos](https://atmos.tools):
+The infrastructure is managed following a component-based setup using Atmos:
 
 * Modules: Reusable, environment-agnostic Terraform logic
 * Components: Functional wrappers for specific configurations
