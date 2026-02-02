@@ -1,11 +1,14 @@
 output "dynamic_group_id" {
-  // TODO required?
-  description = "OCID of the nodes dynamic group"
-  value       = oci_identity_dynamic_group.default.id
+  description = "OCID of the dynamic group"
+  value       = module.iam.dynamic_group_id
+}
+
+output "dynamic_group_name" {
+  description = "Name of the dynamic group"
+  value       = module.iam.dynamic_group_name
 }
 
 output "policy_id" {
-  // TODO required?
-  description = "OCID of the vault access policy"
-  value       = oci_identity_policy.default.id
+  description = "OCID of the policy"
+  value       = module.iam.policy_id
 }

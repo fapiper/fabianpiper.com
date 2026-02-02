@@ -1,2 +1,36 @@
+# Production stage configuration
+# This mixin defines production-specific defaults
+
 vars:
   stage: prod
+
+  # Production tags
+  tags:
+    Environment: production
+    ManagedBy: atmos
+    Stage: prod
+
+components:
+  terraform:
+    k3s-cluster:
+      vars:
+        # Production sizing for OCI Free Tier (optimized)
+        ingress_shape_config:
+          ocpus: 1
+          memory_in_gbs: 6
+
+        server_shape_config:
+          ocpus: 2
+          memory_in_gbs: 12
+
+        worker_shape_config:
+          ocpus: 1
+          memory_in_gbs: 6
+
+        # Enable worker node in production
+        enable_worker: true
+
+    networking:
+      vars:
+        # Production network security
+        ssh_source_cidr: "0.0.0.0/0"  # TODO: Restrict to your IP in production!

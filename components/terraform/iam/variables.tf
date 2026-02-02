@@ -1,43 +1,20 @@
-variable "tenancy_ocid" {
-  type = string
-}
-
-variable "user_ocid" {
-  type = string
-}
-
-variable "private_key_path" {
-  type = string
-}
-
-variable "fingerprint" {
-  type = string
-}
-
-variable "region" {
-  type = string
-}
-
 variable "compartment_ocid" {
-  type = string
+  description = "OCI Compartment OCID"
+  type        = string
 }
 
-variable "enabled" {
-  type = bool
-}
-
-variable "tenant" {
-  type = string
-}
-
-variable "environment" {
-  type = string
-}
-
-variable "stage" {
-  type = string
+variable "tenancy_ocid" {
+  description = "OCI Tenancy OCID"
+  type        = string
 }
 
 variable "name" {
-  type = string
+  description = "Base name for IAM resources"
+  type        = string
+}
+
+variable "enabled" {
+  description = "Enable or disable this component"
+  type        = bool
+  default     = true
 }

@@ -1,141 +1,73 @@
-# K3s Cluster Component
-# Manages compute instances for K3s server, worker, and ingress nodes
+# K3s Cluster Module Variables
 
 variable "compartment_ocid" {
   description = "OCI Compartment OCID"
   type        = string
 }
 
+variable "name" {
+  description = "Base name for K3s cluster resources"
+  type        = string
+}
+
 variable "availability_domain" {
-  description = "Availability domain for instances (0-indexed)"
-  type        = number
-  default     = 0
+  description = "Availability domain for instances"
+  type        = string
 }
 
 variable "vcn_id" {
-  description = "VCN OCID from networking component"
+  description = "VCN OCID"
   type        = string
 }
 
 variable "public_subnet_id" {
-  description = "Public subnet OCID from networking component"
+  description = "Public subnet OCID"
   type        = string
 }
 
-variable "private_subnet_id" {
-  description = "Private subnet OCID (created by this component)"
-  type        = string
-  default     = ""
-}
-
-variable "vcn_cidr_block" {
-  description = "VCN CIDR block from networking component"
+variable "ssh_public_key" {
+  description = "SSH public key for instances"
   type        = string
 }
 
-variable "private_subnet_cidr" {
-  description = "CIDR block for private subnet"
+variable "instance_shape" {
+  description = "OCI instance shape"
   type        = string
-  default     = "10.0.2.0/24"
+  default     = "VM.Standard.A1.Flex"
 }
 
-variable "private_security_list_id" {
-  description = "Security list ID for private subnet"
+variable "instance_os" {
+  description = "Operating system for instances"
   type        = string
+  default     = "Canonical Ubuntu"
 }
 
-variable "ssh_public_key_path" {
-  description = "Path to the SSH Public Key to use for instances"
+variable "instance_os_version" {
+  description = "OS version for instances"
   type        = string
-  default     = "~/.ssh/id_rsa.pub"
+  default     = "24.04"
 }
 
-variable "ingress_private_ip" {
-  description = "Static Private IP for the Ingress/NAT node"
-  type        = string
-  default     = "10.0.1.10"
+variable "server_ocpus" {
+  description = "OCPUs for server instance"
+  type        = number
+  default     = 2
 }
 
-variable "server_private_ip" {
-  description = "Static Private IP for the K3s server node"
-  type        = string
-  default     = "10.0.2.10"
+variable "server_memory_in_gbs" {
+  description = "Memory in GBs for server instance"
+  type        = number
+  default     = 12
 }
 
 variable "k3s_token" {
-  description = "Shared secret for K3s cluster authentication"
+  description = "K3s cluster token"
   type        = string
   sensitive   = true
 }
 
-variable "git_repo_url" {
-  description = "Git repository URL for ArgoCD"
-  type        = string
-}
-
-variable "git_pat" {
-  description = "GitHub Personal Access Token"
-  type        = string
-  sensitive   = true
-}
-
-variable "git_username" {
-  description = "GitHub Username"
-  type        = string
-  default     = "git"
-}
-
-variable "cloudflare_api_token" {
-  description = "Cloudflare API token with Zone.DNS permissions"
-  type        = string
-  sensitive   = true
-}
-
-variable "common_tags" {
-  description = "Tags to be applied to all resources"
-  type        = map(string)
-  default     = {}
-}
-
-# Compute shape configuration for FREE TIER
-variable "ingress_shape_config" {
-  description = "Shape configuration for ingress node"
-  type = object({
-    ocpus         = number
-    memory_in_gbs = number
-  })
-  default = {
-    ocpus         = 1
-    memory_in_gbs = 6
-  }
-}
-
-variable "server_shape_config" {
-  description = "Shape configuration for server node"
-  type = object({
-    ocpus         = number
-    memory_in_gbs = number
-  })
-  default = {
-    ocpus         = 2
-    memory_in_gbs = 12
-  }
-}
-
-variable "worker_shape_config" {
-  description = "Shape configuration for worker node"
-  type = object({
-    ocpus         = number
-    memory_in_gbs = number
-  })
-  default = {
-    ocpus         = 1
-    memory_in_gbs = 6
-  }
-}
-
-variable "enable_worker" {
-  description = "Whether to provision a worker node"
+variable "enabled" {
+  description = "Enable or disable this component"
   type        = bool
   default     = true
 }

@@ -1,6 +1,3 @@
-# Atmos CLI Configuration
-# https://atmos.tools/cli/configuration/
-
 base_path: "."
 
 components:
@@ -10,14 +7,13 @@ components:
     deploy_run_init: true
     init_run_reconfigure: true
     auto_generate_backend_file: true
-    # Global backend configuration for all components
     backend_type: s3
     backend:
       s3:
         bucket: "k3s-tfstate"
-        key: "terraform/{{.component}}/terraform.tfstate"
-        region: "us-ashburn-1"
-        endpoint: "https://{{.env.OCI_NAMESPACE}}.compat.objectstorage.us-ashburn-1.oraclecloud.com"
+        key: "terraform/{{.stack}}/{{.component}}/terraform.tfstate"
+        region: "eu-frankfurt-1"
+        endpoint: "https://{{.vars.oci_namespace}}.compat.objectstorage.eu-frankfurt-1.oraclecloud.com"
         skip_region_validation: true
         skip_credentials_validation: true
         skip_requesting_account_id: true
@@ -28,34 +24,8 @@ components:
 stacks:
   base_path: "stacks"
   included_paths:
-    - "deploy/**/*"
-  excluded_paths:
-    - "**/_defaults.yaml"
-    - "**/catalog/**/*"
-  name_pattern: "{tenant}-{environment}-{stage}"
-
-logs:
-  file: "/dev/stderr"
-  level: Info
-
-schemas:
-  jsonschema:
-    base_path: "stacks/schemas/jsonschema"
-  opa:
-    base_path: "stacks/schemas/opa"
-
-templates:
-  settings:
-    enabled: true
-    sprig:
-      enabled: true
-    gomplate:
-      enabled: true
+    - "targets/**/*"
+  name_pattern: "{stage}-{region}"
 
 settings:
   list_merge_strategy: replace
-
-terminal:
-  color: true
-  max_width: 120
-  pager: false
