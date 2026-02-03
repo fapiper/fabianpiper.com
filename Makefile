@@ -1,105 +1,220 @@
 #----------------------------------------------------------------
-# Variables
+# Shell & Tooling Aliases
 #----------------------------------------------------------------
-CURRENT_BRANCH      := $(shell git rev-parse --abbrev-ref HEAD | sed 's/[^a-zA-Z0-9]/-/g')
-CURRENT_COMMIT_HASH := $(shell git rev-parse --short=10 HEAD)
+SHELL      := /bin/sh
+ATMOS      := atmos
+TERRAFORM  := terraform
+SOPS       := sops
+BUN        := bun
+DOCKER     := docker
+FIND       := find
+PRINTF     := printf
+SED        := sed
+GIT        := git
+
+#----------------------------------------------------------------
+# Metadata & Versioning
+#----------------------------------------------------------------
+REGISTRY            := ghcr.io/fapiper/fabianpiper.com
+CURRENT_BRANCH      := $(shell $(GIT) rev-parse --abbrev-ref HEAD | $(SED) 's/[^a-zA-Z0-9]/-/g')
+CURRENT_COMMIT_HASH := $(shell $(GIT) rev-parse --short=10 HEAD)
 DEPLOY_VERSION      := $(CURRENT_BRANCH)-$(CURRENT_COMMIT_HASH)
 
-# Configuration
-STACK               ?= prod-fra1
-BASE_DIR    := .
-SECRETS_FILE        := $(BASE_DIR)/stacks/secrets.yaml
-
-# Atmos Commands
-ATMOS               := atmos
-TERRAFORM           := terraform
+#----------------------------------------------------------------
+# APPS
+#----------------------------------------------------------------
+WWW                 := www
+ARGOCD              := argocd
+ALL_APPS            := $(WWW) $(ARGOCD)
 
 #----------------------------------------------------------------
-# SOPS Logic
+# Configuration & Paths
 #----------------------------------------------------------------
-# This section re-runs the Makefile inside 'sops exec-env'
-# ensuring all secrets are available as real environment variables.
-#----------------------------------------------------------------
-export _SOPS_EXPORTED
+STACK_SUFFIX        := fra1
+SOPS_SECRETS_DIR    := ./secrets
+APPS_DIR            := ./apps
+AGE_KEY_FILE        := $(SOPS_SECRETS_DIR)/.sops.key
 
-ifndef _SOPS_EXPORTED
+#----------------------------------------------------------------
+# Helper Functions
+#----------------------------------------------------------------
+get_parts      = $(subst -, ,$@)
+total_words    = $(words $(get_parts))
+get_env        = $(word 2,$(get_parts))
+get_comp       = $(if $(filter 3,$(total_words)),$(word 3,$(get_parts)),all)
+get_stack      = $(get_env)-$(STACK_SUFFIX)
+
+#----------------------------------------------------------------
+# SOPS Recursive Injection
+#----------------------------------------------------------------
+export SOPS_AGE_KEY_FILE := $(AGE_KEY_FILE)
+export _SOPS_EXPORTED_REQUIRED_FILES
+export _SOPS_REQUIRED_FILES
+export _SOPS_REMAINING_FILES
+export _SOPS_PROCESSING_STARTED
+export _SOPS_PROCESSING_FINISHED
+
+ifdef _SOPS_REQUIRED_FILES
+    ifndef _SOPS_PROCESSING_FINISHED
+        _PROCESS_SOPS_FILES := 1
+        ifndef _SOPS_PROCESSING_STARTED
+            _SOPS_REMAINING_FILES = $(_SOPS_REQUIRED_FILES)
+            _SOPS_PROCESSING_STARTED := 1
+        endif
+    else
+        _SOPS_REQUIRED_FILES      :=
+        _SOPS_REMAINING_FILES     :=
+        _SOPS_PROCESSING_STARTED  :=
+        _SOPS_PROCESSING_FINISHED :=
+    endif
+endif
+
+ifndef _SOPS_EXPORTED_REQUIRED_FILES
 %:
-	@echo "Decrypting secrets for $(STACK)..."
-	@$(eval _SOPS_EXPORTED := 1)
-	@sops exec-env $(SECRETS_FILE) "$(MAKE) $@"
+	$(eval _ENV_NAME := $(get_env))
+	$(eval _SECRETS  := $(wildcard $(SOPS_SECRETS_DIR)/$(_ENV_NAME)/*.yaml))
+	@if [ "$@" = "help" ] || [ -z "$(_SECRETS)" ]; then \
+		$(MAKE) $@ _SOPS_EXPORTED_REQUIRED_FILES=1; \
+	else \
+		_SOPS_EXPORTED_REQUIRED_FILES=1 _SOPS_REQUIRED_FILES="$(_SECRETS)" $(MAKE) $@; \
+	fi
+else ifdef _PROCESS_SOPS_FILES
+%:
+	$(eval _CURRENT_SOPS_FILE := $(firstword $(_SOPS_REMAINING_FILES)))
+	$(eval _SOPS_REMAINING_FILES := $(wordlist 2,$(words $(_SOPS_REMAINING_FILES)),$(_SOPS_REMAINING_FILES)))
+	$(if $(_SOPS_REMAINING_FILES),,$(eval _SOPS_PROCESSING_FINISHED := 1))
+	@$(SOPS) exec-env $(_CURRENT_SOPS_FILE) '$(MAKE) $@'
 else
+%: _SOPS_EXPORTED_REQUIRED_FILES :=
 
 #----------------------------------------------------------------
-# Infrastructure Targets (Atmos)
+# Infrastructure Targets
 #----------------------------------------------------------------
 
-# Full Bootstrap using the Atmos Workflow
-bootstrap:
-	@echo "Provisioning full cluster stack: $(STACK)"
-	cd $(BASE_DIR) && $(ATMOS) workflow provision-cluster -s $(STACK)
+# make bootstrap-prod
+bootstrap-%:
+	$(ATMOS) workflow bootstrap -s $(get_stack)
 
-# Teardown
-destroy: confirm-destroy
-	@echo "Destroying full cluster stack: $(STACK)"
-	cd $(BASE_DIR) && $(ATMOS) workflow destroy-cluster -s $(STACK)
-
-# Component-specific targets
-# Usage: make apply-networking, make plan-k3s-cluster
-apply-%:
-	cd $(BASE_DIR) && $(ATMOS) $(TERRAFORM) apply $* -s $(STACK)
-
+# make plan-prod OR make plan-prod-vault
 plan-%:
-	cd $(BASE_DIR) && $(ATMOS) $(TERRAFORM) plan $* -s $(STACK)
+	@if [ "$(get_comp)" = "all" ]; then \
+		$(ATMOS) workflow plan -s $(get_stack); \
+	else \
+		$(ATMOS) $(TERRAFORM) plan $(get_comp) -s $(get_stack); \
+	fi
 
-validate:
-	@echo "🔍 Validating all Terraform components..."
-	cd $(BASE_DIR) && $(ATMOS) $(TERRAFORM) validate networking -s $(STACK)
-	cd $(BASE_DIR) && $(ATMOS) $(TERRAFORM) validate iam -s $(STACK)
-	cd $(BASE_DIR) && $(ATMOS) $(TERRAFORM) validate vault -s $(STACK)
-	cd $(BASE_DIR) && $(ATMOS) $(TERRAFORM) validate k3s-cluster -s $(STACK)
+# make apply-prod-vault
+apply-%:
+	$(ATMOS) $(TERRAFORM) apply $(get_comp) -s $(get_stack)
+
+# make validate-prod
+validate-%:
+	@if [ "$(get_comp)" = "all" ]; then \
+		$(ATMOS) workflow validate -s $(get_stack); \
+	else \
+		$(ATMOS) $(TERRAFORM) validate $(get_comp) -s $(get_stack); \
+	fi
+
+# make destroy-prod-all or make destroy-prod-vcn
+destroy-%: confirm-destroy
+	@if [ "$(get_comp)" = "all" ]; then \
+		$(ATMOS) workflow destroy -s $(get_stack); \
+	else \
+		$(ATMOS) $(TERRAFORM) destroy $(get_comp) -s $(get_stack); \
+	fi
 
 #----------------------------------------------------------------
-# Application Targets
+# App Targets
 #----------------------------------------------------------------
 
-www-dev:
-	cd apps/www && bun install && bun run dev
+dev-%:
+	cd $(APPS_DIR)/$(get_comp) && $(BUN) install && $(BUN) run dev
 
-www-build:
-	cd apps/www && bun install && bun run build
+build-%:
+	cd $(APPS_DIR)/$(get_comp) && $(BUN) install && $(BUN) run build
 
-www-docker-build:
-	docker build -t ghcr.io/fapiper/fabianpiper.com/www:$(DEPLOY_VERSION) ./apps/www
-	docker tag ghcr.io/fapiper/fabianpiper.com/www:$(DEPLOY_VERSION) ghcr.io/fapiper/fabianpiper.com/www:latest
+docker-build-%:
+	$(DOCKER) build --secret id=secrets,src=$(SOPS_SECRETS_DIR)/$(get_env)/$(get_comp).yaml \
+		-t $(REGISTRY)/$(get_comp):$(DEPLOY_VERSION) $(APPS_DIR)/$(get_comp)
+
+docker-tag-%:
+	$(DOCKER) tag $(REGISTRY)/$(get_comp):$(DEPLOY_VERSION) $(REGISTRY)/$(get_comp):latest
+
+#----------------------------------------------------------------
+# Secret Management (SOPS)
+#----------------------------------------------------------------
+
+sops-setup:
+	@if [ -f $(AGE_KEY_FILE) ]; then \
+		$(PRINTF) "--- [SOPS] Key exists: $(AGE_KEY_FILE) ---\n"; \
+	else \
+		$(AGE_KEYGEN) -o $(AGE_KEY_FILE); \
+		$(PRINTF) "--- [SOPS] Key generated: $(AGE_KEY_FILE) ---\n"; \
+	fi
+	@$(PRINTF) "--- [SOPS] Public Key: %s ---\n" "$$(grep 'public key' $(AGE_KEY_FILE) | cut -d' ' -f4)"
+
+sops-init-%:
+	$(eval _PUB_KEY := $(shell grep 'public key' $(AGE_KEY_FILE) | cut -d' ' -f4))
+	@if [ "$(get_env)" = "all" ]; then \
+		for dir in $(wildcard $(SOPS_SECRETS_DIR)/*/); do \
+			$(PRINTF) "creation_rules:\n  - path_regex: .*\.yaml$$\n    age: %s\n" "$(_PUB_KEY)" > $${dir}.sops.yaml; \
+			$(PRINTF) "--- [SOPS] Created $${dir}.sops.yaml ---\n"; \
+		done; \
+	elif [ "$(get_comp)" = "all" ]; then \
+		mkdir -p $(SOPS_SECRETS_DIR)/$(get_env); \
+		$(PRINTF) "creation_rules:\n  - path_regex: .*\.yaml$$\n    age: %s\n" "$(_PUB_KEY)" > $(SOPS_SECRETS_DIR)/$(get_env)/.sops.yaml; \
+		$(PRINTF) "--- [SOPS] Created $(get_env)/.sops.yaml ---\n"; \
+	else \
+		mkdir -p $(SOPS_SECRETS_DIR)/$(get_env); \
+		$(PRINTF) "creation_rules:\n  - path_regex: $(get_comp)\.yaml$$\n    age: %s\n" "$(_PUB_KEY)" > $(SOPS_SECRETS_DIR)/$(get_env)/.sops.yaml; \
+		$(PRINTF) "--- [SOPS] Created $(get_env)/.sops.yaml targeting $(get_comp).yaml ---\n"; \
+	fi
+
+sops-encrypt-%:
+	@if [ "$(get_comp)" = "all" ]; then \
+		$(FIND) $(SOPS_SECRETS_DIR)/$(get_env) -name "*.yaml" -type f ! -name ".sops.yaml" -exec $(SOPS) --encrypt --in-place {} +; \
+	else \
+		$(SOPS) --encrypt --in-place $(SOPS_SECRETS_DIR)/$(get_env)/$(get_comp).yaml; \
+	fi
+
+sops-decrypt-%:
+	@if [ "$(get_comp)" = "all" ]; then \
+		$(FIND) $(SOPS_SECRETS_DIR)/$(get_env) -name "*.yaml" -type f ! -name ".sops.yaml" | while read file; do \
+			$(SOPS) --decrypt "$$file" > "$${file%.yaml}.decrypted.yaml"; \
+		done; \
+	else \
+		$(SOPS) --decrypt $(SOPS_SECRETS_DIR)/$(get_env)/$(get_comp).yaml > $(SOPS_SECRETS_DIR)/$(get_env)/$(get_comp).decrypted.yaml; \
+	fi
 
 #----------------------------------------------------------------
 # Utilities
 #----------------------------------------------------------------
 
-encrypt:
-	sops --encrypt --in-place $(SECRETS_FILE)
-
-decrypt:
-	sops --decrypt --in-place $(SECRETS_FILE)
-
 confirm-destroy:
-	@prompt=$(shell bash -c 'read -p "Are you sure you want to destroy the $(STACK) stack? Type \"yes\" to proceed: " prompt; echo $$prompt'); \
-	if [ "$$prompt" != "yes" ]; then echo "Destruction aborted."; exit 1; fi
+	@$(PRINTF) "Destroy $(get_comp) in $(get_env)? (yes/no): " && read prompt && [ "$$prompt" = "yes" ] || (echo "Aborted." && exit 1)
 
 help:
-	@echo "fabianpiper.com Platform Management"
-	@echo ""
-	@echo "Infra Targets:"
-	@echo "  make bootstrap      - Run the full Atmos workflow"
-	@echo "  make apply-[comp]   - Apply a specific Atmos component"
-	@echo "  make destroy        - Teardown the stack"
-	@echo ""
-	@echo "WWW Targets:"
-	@echo "  make www-dev        - Run portfolio locally"
-	@echo "  make www-docker-build   - Build & tag container"
-	@echo ""
-	@echo "Security:"
-	@echo "  make encrypt        - Encrypt secrets.yaml"
-	@echo "  make decrypt        - Decrypt secrets.yaml"
+	@$(PRINTF) "========================================================================\n"
+	@$(PRINTF) "fabianpiper.com | Version: $(DEPLOY_VERSION)\n"
+	@$(PRINTF) "========================================================================\n"
+	@$(PRINTF) "INFRASTRUCTURE (Pattern: [action]-[env]-[comp/all])\n"
+	@$(PRINTF) "  make bootstrap-[env]          Bootstrap full OCI+K3s stack\n"
+	@$(PRINTF) "  make plan-[env]               Plan full stack (Defaults to all)\n"
+	@$(PRINTF) "  make plan-[env]-[comp]        Plan specific component\n"
+	@$(PRINTF) "  make apply-[env]-[comp]       Apply specific component\n"
+	@$(PRINTF) "  make validate-[env]           Run full validation workflow\n"
+	@$(PRINTF) "  make destroy-[env]-all        Destroy full stack via workflow\n\n"
+	@$(PRINTF) "APPS (Pattern: [action]-[env]-[app] | Catalog: $(ALL_APPS))\n"
+	@$(PRINTF) "  make dev-local-[app]          Run local development (Bun)\n"
+	@$(PRINTF) "  make docker-build-prod-[app]  Build image with BuildKit secrets\n"
+	@$(PRINTF) "  make docker-tag-prod-[app]    Tag image as latest\n\n"
+	@$(PRINTF) "SECRETS (Pattern: sops-[action]-[env]-[file/all])\n"
+	@$(PRINTF) "  make sops-setup               Prepare .sops.key in secrets/\n"
+	@$(PRINTF) "  make sops-init-all            Initialize .sops.yaml for every env folder\n"
+	@$(PRINTF) "  make sops-init-[env]          Initialize .sops.yaml for specific env folder\n"
+	@$(PRINTF) "  make sops-init-[env]-[file]   Initialize .sops.yaml for specific file\n"
+	@$(PRINTF) "  make sops-encrypt-[env]-all   Encrypt all secrets in env folder\n"
+	@$(PRINTF) "  make sops-decrypt-[env]-[file]   Decrypt specific file for editing\n"
+	@$(PRINTF) "========================================================================\n"
 
 endif

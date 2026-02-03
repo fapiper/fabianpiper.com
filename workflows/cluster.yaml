@@ -1,18 +1,33 @@
 workflows:
-  provision-cluster:
-    description: "Full bootstrap of OCI Infrastructure and ArgoCD"
+  bootstrap:
+    description: "Full bootstrap of the OCI and K3s stack"
     steps:
-      - command: terraform apply networking -s {{.stack}}
-      - command: terraform apply iam -s {{.stack}}
-      - command: terraform apply vault -s {{.stack}}
-      - command: terraform apply k3s-cluster -s {{.stack}}
-      - command: terraform apply argocd-bootstrap -s {{.stack}}
-
-  destroy-cluster:
-    description: "Full teardown of OCI Infrastructure and ArgoCD"
+      - command: terraform apply networking
+      - command: terraform apply iam
+      - command: terraform apply vault
+      - command: terraform apply k3s-cluster
+      - command: terraform apply argocd-bootstrap
+  plan:
+    description: "Dry-run of all infrastructure components"
     steps:
-      - command: terraform destroy argocd-bootstrap -s {{.stack}}
-      - command: terraform destroy k3s-cluster -s {{.stack}}
-      - command: terraform destroy vault -s {{.stack}}
-      - command: terraform destroy iam -s {{.stack}}
-      - command: terraform destroy networking -s {{.stack}}
+      - command: terraform plan networking
+      - command: terraform plan iam
+      - command: terraform plan vault
+      - command: terraform plan k3s-cluster
+      - command: terraform plan argocd-bootstrap
+  destroy:
+    description: "Complete teardown of all resources"
+    steps:
+      - command: terraform destroy argocd-bootstrap
+      - command: terraform destroy k3s-cluster
+      - command: terraform destroy vault
+      - command: terraform destroy iam
+      - command: terraform destroy networking
+  validate:
+    description: "Linter and syntax check for all components"
+    steps:
+      - command: terraform validate networking
+      - command: terraform validate iam
+      - command: terraform validate vault
+      - command: terraform validate k3s-cluster
+      - command: terraform validate argocd-bootstrap

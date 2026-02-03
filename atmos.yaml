@@ -27,5 +27,8 @@ stacks:
     - "targets/**/*"
   name_pattern: "{stage}-{region}"
 
+workflows:
+  base_path: "workflows"
+
 settings:
   list_merge_strategy: replace
