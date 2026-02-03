@@ -22,8 +22,9 @@ terraform.rc
 # =============================================================================
 !secrets/
 secrets/.sops.key
+**/.sops.key
 secrets/**/*.decrypted.yaml
-*.pem
+**/*.decrypted.yaml*.pem
 *.key
 *.crt
 *.cert

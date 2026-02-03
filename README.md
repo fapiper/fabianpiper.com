@@ -11,44 +11,58 @@
 
 ---
 
+## Getting Started
 
-## Quick Start
+### Prerequisites
+- [Make (v4.3+)](https://www.gnu.org/software/make/)
+- [Terraform (v1.14+)](https://www.terraform.io/)
+- [Atmos (v0.23+)](https://atmos.tools) 
+- [SOPS (v3.11+)](https://github.com/mozilla/sops)
+- [age (v1.3+)](https://github.com/FiloSottile/age)
+- [Docker (v29.1+)](https://www.docker.com)
+- [Bun (v1.3+)](https://bun.sh)
 
-Ensure you have the following installed: `terraform`, `atmos`, `sops`, `age`, `docker`, and `bun`.
-
-### 1. Secret Initialization
-The repository uses SOPS with Age. You must initialize your local key before you can view or edit secrets.
-
+### Installation
+1. Create Oracle Cloud Infrastructure account
+2. Upgrade Free Tier account to a paid account. Paid accounts precede Free Tier accounts when it comes to resources (especially instances) provisioning by OCI. The resources used in this repository fit within the Free Tier limits
+3. [Optional] Create budgets to control costs
+4. Create a Cloudflare account and API token with appropriate permissions for DNS management
+5. Create a GitHub Personal Access Token with `repo` and `workflow` scopes
+6. Clone the repo
 ```bash
-# Generate your local .sops.key inside /secrets
-make sops-setup
+git clone https://github.com/fapiper/fabianpiper.com.git
+```
+7. Install the [Prerequisites](#prerequisites)
+8. Modify the `secrets/` files to add your OCI credentials, Cloudflare API token, and GitHub PAT
+9. Follow the [Quick Start](#quick-start) steps
 
-# Initialize SOPS configuration for all environments
-make sops-init-all
+### Quick Start
 
-# (Optional) Decrypt a file to add your OCI credentials/tokens
-make sops-decrypt-prod-infra
+Follow these steps to get started with the repository.
+
+#### Setup
+Validate the local environment, initialize the project, and set up secrets.
+```bash
+make setup
 ```
 
-### 2. Infrastructure Bootstrap
-Provision the entire OCI stack (Networking, IAM, Vault, K3s) in one command.
+#### Provisioning
+Create an entire OCI stack (Networking, IAM, Vault, K3s) in one command
 
 ```bash
-# Provision the full platform workflow
 make bootstrap-prod
-
 # Verify the health of all components
 make validate-prod
 ```
 
-### 3. Application Development
-Build and tag your applications for deployment.
+#### Application Development
+Build and tag your applications for deployment
 
 ```bash
-# Run the website locally (Bun)
+# Run the website in ./apps/www locally
 make dev-local-www
 
-# Build the production container with BuildKit secrets
+# Build the website's Docker image
 make docker-build-prod-www
 ```
 
@@ -87,24 +101,6 @@ Continuous Delivery is automated via Argo CD Image Updater. It monitors GHCR, de
 * Cloud: Sensitive values are provisioned into OCI Vault.
 * Cluster: External Secrets Operator retrieves values using Instance Principals.
 
-## Setup & Deployment
-
-Deployment and management is handled via the root `Makefile`. 
-For example:
-
-```bash
-# Provision the entire stack (Networking, IAM, Vault, K3s, ArgoCD)
-make bootstrap STACK=prod-fra1
-
-# Manage individual infrastructure components
-make apply-vault STACK=prod-fra1
-
-# Local application development (using Bun)
-make www-dev
-```
-
 ## License
 
 This project is open-source and available under the MIT License.
-
-#### Crafted by [Fabian Piper](https://fabianpiper.com)
