@@ -11,6 +11,7 @@ FIND       := find
 PRINTF     := printf
 SED        := sed
 GIT        := git
+AGE_KEYGEN := age-keygen
 
 #----------------------------------------------------------------
 # Metadata & Versioning
@@ -40,8 +41,10 @@ AGE_KEY_FILE        := $(SOPS_SECRETS_DIR)/.sops.key
 #----------------------------------------------------------------
 get_parts      = $(subst -, ,$@)
 total_words    = $(words $(get_parts))
-get_env        = $(word 2,$(get_parts))
-get_comp       = $(if $(filter 3,$(total_words)),$(word 3,$(get_parts)),all)
+get_comp       = $(if $(shell [ $(total_words) -gt 1 ] && echo true),$(lastword $(get_parts)),all)
+get_env        = $(if $(shell [ $(total_words) -ge 2 ] && echo true),\
+                   $(word $(shell expr $(total_words) - $(if $(filter $(total_words),2),0,1)),$(get_parts)),\
+                   local)
 get_stack      = $(get_env)-$(STACK_SUFFIX)
 
 #----------------------------------------------------------------
@@ -73,7 +76,8 @@ ifndef _SOPS_EXPORTED_REQUIRED_FILES
 %:
 	$(eval _ENV_NAME := $(get_env))
 	$(eval _SECRETS  := $(wildcard $(SOPS_SECRETS_DIR)/$(_ENV_NAME)/*.yaml))
-	@if [ "$@" = "help" ] || [ -z "$(_SECRETS)" ]; then \
+	@# don't wrap help, setup, or targets with no secrets
+	@if [ "$@" = "help" ] || [ "$@" = "sops-setup" ] || [ -z "$(_SECRETS)" ]; then \
 		$(MAKE) $@ _SOPS_EXPORTED_REQUIRED_FILES=1; \
 	else \
 		_SOPS_EXPORTED_REQUIRED_FILES=1 _SOPS_REQUIRED_FILES="$(_SECRETS)" $(MAKE) $@; \
@@ -86,6 +90,19 @@ else ifdef _PROCESS_SOPS_FILES
 	@$(SOPS) exec-env $(_CURRENT_SOPS_FILE) '$(MAKE) $@'
 else
 %: _SOPS_EXPORTED_REQUIRED_FILES :=
+
+#----------------------------------------------------------------
+# Initial Setup
+#----------------------------------------------------------------
+setup: check-tools sops-setup sops-init-all
+
+check-tools:
+	@for tool in $(ATMOS) $(TERRAFORM) $(SOPS) $(BUN) $(DOCKER) $(AGE_KEYGEN) $(GIT); do \
+		if ! command -v $$tool >/dev/null 2>&1; then \
+			$(PRINTF) -- "Error: '$$tool' is not installed or not in PATH.\n"; \
+			exit 1; \
+		fi \
+	done
 
 #----------------------------------------------------------------
 # Infrastructure Targets
@@ -143,31 +160,30 @@ docker-tag-%:
 #----------------------------------------------------------------
 # Secret Management (SOPS)
 #----------------------------------------------------------------
-
 sops-setup:
-	@if [ -f $(AGE_KEY_FILE) ]; then \
-		$(PRINTF) "--- [SOPS] Key exists: $(AGE_KEY_FILE) ---\n"; \
-	else \
-		$(AGE_KEYGEN) -o $(AGE_KEY_FILE); \
-		$(PRINTF) "--- [SOPS] Key generated: $(AGE_KEY_FILE) ---\n"; \
+	@if [ ! -f "$(AGE_KEY_FILE)" ]; then \
+		mkdir -p "$(SOPS_SECRETS_DIR)"; \
+		$(AGE_KEYGEN) -o "$(AGE_KEY_FILE)"; \
 	fi
-	@$(PRINTF) "--- [SOPS] Public Key: %s ---\n" "$$(grep 'public key' $(AGE_KEY_FILE) | cut -d' ' -f4)"
 
 sops-init-%:
 	$(eval _PUB_KEY := $(shell grep 'public key' $(AGE_KEY_FILE) | cut -d' ' -f4))
 	@if [ "$(get_env)" = "all" ]; then \
-		for dir in $(wildcard $(SOPS_SECRETS_DIR)/*/); do \
-			$(PRINTF) "creation_rules:\n  - path_regex: .*\.yaml$$\n    age: %s\n" "$(_PUB_KEY)" > $${dir}.sops.yaml; \
-			$(PRINTF) "--- [SOPS] Created $${dir}.sops.yaml ---\n"; \
+		for dir in $$(find $(SOPS_SECRETS_DIR) -maxdepth 1 -type d ! -path $(SOPS_SECRETS_DIR)); do \
+			echo "creation_rules:" > "$$dir/.sops.yaml"; \
+			echo "  - path_regex: .*\.yaml$$" >> "$$dir/.sops.yaml"; \
+			echo "    age: $(_PUB_KEY)" >> "$$dir/.sops.yaml"; \
 		done; \
 	elif [ "$(get_comp)" = "all" ]; then \
-		mkdir -p $(SOPS_SECRETS_DIR)/$(get_env); \
-		$(PRINTF) "creation_rules:\n  - path_regex: .*\.yaml$$\n    age: %s\n" "$(_PUB_KEY)" > $(SOPS_SECRETS_DIR)/$(get_env)/.sops.yaml; \
-		$(PRINTF) "--- [SOPS] Created $(get_env)/.sops.yaml ---\n"; \
+		mkdir -p "$(SOPS_SECRETS_DIR)/$(get_env)"; \
+		echo "creation_rules:" > "$(SOPS_SECRETS_DIR)/$(get_env)/.sops.yaml"; \
+		echo "  - path_regex: .*\.yaml$$" >> "$(SOPS_SECRETS_DIR)/$(get_env)/.sops.yaml"; \
+		echo "    age: $(_PUB_KEY)" >> "$(SOPS_SECRETS_DIR)/$(get_env)/.sops.yaml"; \
 	else \
-		mkdir -p $(SOPS_SECRETS_DIR)/$(get_env); \
-		$(PRINTF) "creation_rules:\n  - path_regex: $(get_comp)\.yaml$$\n    age: %s\n" "$(_PUB_KEY)" > $(SOPS_SECRETS_DIR)/$(get_env)/.sops.yaml; \
-		$(PRINTF) "--- [SOPS] Created $(get_env)/.sops.yaml targeting $(get_comp).yaml ---\n"; \
+		mkdir -p "$(SOPS_SECRETS_DIR)/$(get_env)"; \
+		echo "creation_rules:" > "$(SOPS_SECRETS_DIR)/$(get_env)/.sops.yaml"; \
+		echo "  - path_regex: $(get_comp)\.yaml$$" >> "$(SOPS_SECRETS_DIR)/$(get_env)/.sops.yaml"; \
+		echo "    age: $(_PUB_KEY)" >> "$(SOPS_SECRETS_DIR)/$(get_env)/.sops.yaml"; \
 	fi
 
 sops-encrypt-%:
@@ -189,7 +205,6 @@ sops-decrypt-%:
 #----------------------------------------------------------------
 # Utilities
 #----------------------------------------------------------------
-
 confirm-destroy:
 	@$(PRINTF) "Destroy $(get_comp) in $(get_env)? (yes/no): " && read prompt && [ "$$prompt" = "yes" ] || (echo "Aborted." && exit 1)
 

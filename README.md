@@ -11,6 +11,47 @@
 
 ---
 
+
+## Quick Start
+
+Ensure you have the following installed: `terraform`, `atmos`, `sops`, `age`, `docker`, and `bun`.
+
+### 1. Secret Initialization
+The repository uses SOPS with Age. You must initialize your local key before you can view or edit secrets.
+
+```bash
+# Generate your local .sops.key inside /secrets
+make sops-setup
+
+# Initialize SOPS configuration for all environments
+make sops-init-all
+
+# (Optional) Decrypt a file to add your OCI credentials/tokens
+make sops-decrypt-prod-infra
+```
+
+### 2. Infrastructure Bootstrap
+Provision the entire OCI stack (Networking, IAM, Vault, K3s) in one command.
+
+```bash
+# Provision the full platform workflow
+make bootstrap-prod
+
+# Verify the health of all components
+make validate-prod
+```
+
+### 3. Application Development
+Build and tag your applications for deployment.
+
+```bash
+# Run the website locally (Bun)
+make dev-local-www
+
+# Build the production container with BuildKit secrets
+make docker-build-prod-www
+```
+
 ## Stack
 
 * Infrastructure as Code: [Terraform](https://www.terraform.io/) + [Atmos](https://atmos.tools).
