@@ -1,5 +1,3 @@
-# K3s Cluster Module Variables
-
 variable "compartment_ocid" {
   description = "OCI Compartment OCID"
   type        = string

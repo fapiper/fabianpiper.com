@@ -1,7 +1,3 @@
-#cloud-config
-# Ingress/NAT Node Initialization
-# This node acts as both NAT gateway for private subnet and K3s agent for ingress traffic
-
 package_update: true
 packages:
   - curl

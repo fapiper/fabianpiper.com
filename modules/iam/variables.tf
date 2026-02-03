@@ -1,6 +1,3 @@
-# OCI IAM Module
-# Creates Dynamic Group and Policies for K3s nodes to access Vault
-
 variable "compartment_ocid" {
   description = "OCI Compartment OCID"
   type        = string

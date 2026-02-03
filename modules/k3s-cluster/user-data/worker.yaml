@@ -1,7 +1,3 @@
-#cloud-config
-# K3s Worker Node Initialization
-# Optional worker node that runs in the private subnet
-
 package_update: true
 packages:
   - curl

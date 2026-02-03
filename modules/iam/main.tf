@@ -1,5 +1,3 @@
-# OCI IAM Module - Main Configuration
-
 locals {
   enabled = var.enabled
   name    = var.name

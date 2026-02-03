@@ -1,5 +1,3 @@
-# OCI IAM Module - Outputs
-
 output "dynamic_group_id" {
   description = "OCID of the dynamic group"
   value       = try(oci_identity_dynamic_group.default[0].id, null)

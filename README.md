@@ -33,18 +33,30 @@
 git clone https://github.com/fapiper/fabianpiper.com.git
 ```
 7. Install the [Prerequisites](#prerequisites)
-8. Modify the `secrets/` files to add your OCI credentials, Cloudflare API token, and GitHub PAT
-9. Follow the [Quick Start](#quick-start) steps
+8. Copy the example secret files and fill in your values
+```bash
+# For each file in secrets/prod/:
+cp secrets/prod/argocd.example.yaml secrets/prod/argocd.decrypted.yaml
+# ... edit argocd.decrypted.yaml with your actual values ...
+```
+9. Encrypt your secrets before committing
+```bash
+make sops-encrypt-prod-all
+```
+10. Follow the [Quick Start](#quick-start) steps
 
 ### Quick Start
 
 Follow these steps to get started with the repository.
 
 #### Setup
-Validate the local environment, initialize the project, and set up secrets.
+Validate the local environment, generate the age encryption key, and initialize SOPS config for all secret files.
 ```bash
 make setup
 ```
+
+> [!NOTE]
+> This generates `secrets/.sops.key` and the `.sops.yaml` config files. To encrypt or decrypt secrets, use `make sops-encrypt-[env]-all` / `make sops-decrypt-[env]-[file]` — see [Secret Management](#secret-management).
 
 #### Provisioning
 Create an entire OCI stack (Networking, IAM, Vault, K3s) in one command

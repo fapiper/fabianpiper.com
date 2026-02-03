@@ -1,6 +1,3 @@
-# K3s Cluster Component - Main Configuration
-# Creates K3s cluster on OCI Free Tier with ingress, server, and optional worker nodes
-
 # Data Sources
 data "oci_identity_availability_domains" "ads" {
   compartment_id = var.compartment_ocid

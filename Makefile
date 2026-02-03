@@ -35,6 +35,7 @@ STACK_SUFFIX        := fra1
 SOPS_SECRETS_DIR    := ./secrets
 APPS_DIR            := ./apps
 AGE_KEY_FILE        := $(SOPS_SECRETS_DIR)/.sops.key
+SOPS_CONFIG_FILE    := .sops.yaml
 
 #----------------------------------------------------------------
 # Helper Functions
@@ -75,9 +76,10 @@ endif
 ifndef _SOPS_EXPORTED_REQUIRED_FILES
 %:
 	$(eval _ENV_NAME := $(get_env))
-	$(eval _SECRETS  := $(wildcard $(SOPS_SECRETS_DIR)/$(_ENV_NAME)/*.yaml))
+	$(eval _ALL_YAML := $(wildcard $(SOPS_SECRETS_DIR)/$(_ENV_NAME)/*.yaml))
+	$(eval _SECRETS  := $(filter-out $(wildcard $(SOPS_SECRETS_DIR)/$(_ENV_NAME)/*.example.yaml) $(wildcard $(SOPS_SECRETS_DIR)/$(_ENV_NAME)/*.decrypted.yaml),$(_ALL_YAML)))
 	@# don't wrap help, setup, or targets with no secrets
-	@if [ "$@" = "help" ] || [ "$@" = "sops-setup" ] || [ -z "$(_SECRETS)" ]; then \
+	@if [ "$@" = "help" ] || [ "$@" = "sops-setup" ] || echo "$@" | grep -qE "^sops-(encrypt|decrypt|init)-" || [ -z "$(_SECRETS)" ]; then \
 		$(MAKE) $@ _SOPS_EXPORTED_REQUIRED_FILES=1; \
 	else \
 		_SOPS_EXPORTED_REQUIRED_FILES=1 _SOPS_REQUIRED_FILES="$(_SECRETS)" $(MAKE) $@; \
@@ -158,48 +160,64 @@ docker-tag-%:
 	$(DOCKER) tag $(REGISTRY)/$(get_comp):$(DEPLOY_VERSION) $(REGISTRY)/$(get_comp):latest
 
 #----------------------------------------------------------------
-# Secret Management (SOPS)
+# Secret Management (SOPS - Windows-Robust)
 #----------------------------------------------------------------
 sops-setup:
 	@if [ ! -f "$(AGE_KEY_FILE)" ]; then \
 		mkdir -p "$(SOPS_SECRETS_DIR)"; \
-		$(AGE_KEYGEN) -o "$(AGE_KEY_FILE)"; \
+		$(AGE_KEY_GEN) -o "$(AGE_KEY_FILE)"; \
 	fi
 
 sops-init-%:
 	$(eval _PUB_KEY := $(shell grep 'public key' $(AGE_KEY_FILE) | cut -d' ' -f4))
-	@if [ "$(get_env)" = "all" ]; then \
-		for dir in $$(find $(SOPS_SECRETS_DIR) -maxdepth 1 -type d ! -path $(SOPS_SECRETS_DIR)); do \
-			echo "creation_rules:" > "$$dir/.sops.yaml"; \
-			echo "  - path_regex: .*\.yaml$$" >> "$$dir/.sops.yaml"; \
-			echo "    age: $(_PUB_KEY)" >> "$$dir/.sops.yaml"; \
+	$(eval _TARGET_ENV := $(get_env))
+	@if [ "$(_TARGET_ENV)" = "all" ]; then \
+		for dir in $$(ls -d $(SOPS_SECRETS_DIR)/*/ 2>/dev/null); do \
+			echo "creation_rules:" > "$$dir$(SOPS_CONFIG_FILE)"; \
+			echo "  - path_regex: .*\.yaml$$" >> "$$dir$(SOPS_CONFIG_FILE)"; \
+			echo "    age: $(_PUB_KEY)" >> "$$dir$(SOPS_CONFIG_FILE)"; \
 		done; \
 	elif [ "$(get_comp)" = "all" ]; then \
-		mkdir -p "$(SOPS_SECRETS_DIR)/$(get_env)"; \
-		echo "creation_rules:" > "$(SOPS_SECRETS_DIR)/$(get_env)/.sops.yaml"; \
-		echo "  - path_regex: .*\.yaml$$" >> "$(SOPS_SECRETS_DIR)/$(get_env)/.sops.yaml"; \
-		echo "    age: $(_PUB_KEY)" >> "$(SOPS_SECRETS_DIR)/$(get_env)/.sops.yaml"; \
+		mkdir -p "$(SOPS_SECRETS_DIR)/$(_TARGET_ENV)"; \
+		echo "creation_rules:" > "$(SOPS_SECRETS_DIR)/$(_TARGET_ENV)/$(SOPS_CONFIG_FILE)"; \
+		echo "  - path_regex: .*\.yaml$$" >> "$(SOPS_SECRETS_DIR)/$(_TARGET_ENV)/$(SOPS_CONFIG_FILE)"; \
+		echo "    age: $(_PUB_KEY)" >> "$(SOPS_SECRETS_DIR)/$(_TARGET_ENV)/$(SOPS_CONFIG_FILE)"; \
 	else \
-		mkdir -p "$(SOPS_SECRETS_DIR)/$(get_env)"; \
-		echo "creation_rules:" > "$(SOPS_SECRETS_DIR)/$(get_env)/.sops.yaml"; \
-		echo "  - path_regex: $(get_comp)\.yaml$$" >> "$(SOPS_SECRETS_DIR)/$(get_env)/.sops.yaml"; \
-		echo "    age: $(_PUB_KEY)" >> "$(SOPS_SECRETS_DIR)/$(get_env)/.sops.yaml"; \
+		mkdir -p "$(SOPS_SECRETS_DIR)/$(_TARGET_ENV)"; \
+		echo "creation_rules:" > "$(SOPS_SECRETS_DIR)/$(_TARGET_ENV)/$(SOPS_CONFIG_FILE)"; \
+		echo "  - path_regex: $(get_comp)\.yaml$$" >> "$(SOPS_SECRETS_DIR)/$(_TARGET_ENV)/$(SOPS_CONFIG_FILE)"; \
+		echo "    age: $(_PUB_KEY)" >> "$(SOPS_SECRETS_DIR)/$(_TARGET_ENV)/$(SOPS_CONFIG_FILE)"; \
 	fi
 
 sops-encrypt-%:
-	@if [ "$(get_comp)" = "all" ]; then \
-		$(FIND) $(SOPS_SECRETS_DIR)/$(get_env) -name "*.yaml" -type f ! -name ".sops.yaml" -exec $(SOPS) --encrypt --in-place {} +; \
+	$(eval _PUB_KEY := $(shell grep 'public key' $(AGE_KEY_FILE) | cut -d' ' -f4))
+	$(eval _TARGET_ENV := $(get_env))
+	@if [ "$(_TARGET_ENV)" = "all" ]; then \
+		for file in $$(ls $(SOPS_SECRETS_DIR)/*/*.decrypted.yaml 2>/dev/null); do \
+			outfile="$${file%.decrypted.yaml}.yaml"; \
+			$(SOPS) --encrypt --age $(_PUB_KEY) --output "$$outfile" "$$file"; \
+		done; \
+	elif [ "$(get_comp)" = "all" ]; then \
+		for file in $$(ls $(SOPS_SECRETS_DIR)/$(_TARGET_ENV)/*.decrypted.yaml 2>/dev/null); do \
+			outfile="$${file%.decrypted.yaml}.yaml"; \
+			$(SOPS) --encrypt --age $(_PUB_KEY) --output "$$outfile" "$$file"; \
+		done; \
 	else \
-		$(SOPS) --encrypt --in-place $(SOPS_SECRETS_DIR)/$(get_env)/$(get_comp).yaml; \
+		$(SOPS) --encrypt --age $(_PUB_KEY) --output $(SOPS_SECRETS_DIR)/$(_TARGET_ENV)/$(get_comp).yaml $(SOPS_SECRETS_DIR)/$(_TARGET_ENV)/$(get_comp).decrypted.yaml; \
 	fi
 
 sops-decrypt-%:
-	@if [ "$(get_comp)" = "all" ]; then \
-		$(FIND) $(SOPS_SECRETS_DIR)/$(get_env) -name "*.yaml" -type f ! -name ".sops.yaml" | while read file; do \
+	$(eval _TARGET_ENV := $(get_env))
+	@if [ "$(_TARGET_ENV)" = "all" ]; then \
+		for file in $$(ls $(SOPS_SECRETS_DIR)/*/*.yaml 2>/dev/null | grep -v "$(SOPS_CONFIG_FILE)"); do \
+			$(SOPS) --decrypt "$$file" > "$${file%.yaml}.decrypted.yaml"; \
+		done; \
+	elif [ "$(get_comp)" = "all" ]; then \
+		for file in $$(ls $(SOPS_SECRETS_DIR)/$(_TARGET_ENV)/*.yaml 2>/dev/null | grep -v "$(SOPS_CONFIG_FILE)"); do \
 			$(SOPS) --decrypt "$$file" > "$${file%.yaml}.decrypted.yaml"; \
 		done; \
 	else \
-		$(SOPS) --decrypt $(SOPS_SECRETS_DIR)/$(get_env)/$(get_comp).yaml > $(SOPS_SECRETS_DIR)/$(get_env)/$(get_comp).decrypted.yaml; \
+		$(SOPS) --decrypt $(SOPS_SECRETS_DIR)/$(_TARGET_ENV)/$(get_comp).yaml > $(SOPS_SECRETS_DIR)/$(_TARGET_ENV)/$(get_comp).decrypted.yaml; \
 	fi
 
 #----------------------------------------------------------------

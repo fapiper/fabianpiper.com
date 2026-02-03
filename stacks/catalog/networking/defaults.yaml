@@ -1,6 +1,3 @@
-# Networking Component Catalog Defaults
-# Base configuration for OCI VCN and networking resources
-
 components:
   terraform:
     networking/defaults:

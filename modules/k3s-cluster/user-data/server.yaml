@@ -1,7 +1,3 @@
-#cloud-config
-# K3s Server Node Initialization
-# This is the control plane node that runs in the private subnet
-
 package_update: true
 packages:
   - curl

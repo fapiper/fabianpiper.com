@@ -1,6 +1,3 @@
-# Load Balancer Component Catalog Defaults
-# OCI Network Load Balancer configuration for K3s
-
 components:
   terraform:
     load-balancer/defaults:
