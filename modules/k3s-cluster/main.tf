@@ -104,6 +104,30 @@ resource "oci_core_route_table" "private_rt" {
   }
 }
 
+# Security list for private subnet - allows all internal communication
+resource "oci_core_security_list" "private_subnet_sl" {
+  count = var.enabled ? 1 : 0
+
+  compartment_id = var.compartment_ocid
+  vcn_id         = var.vcn_id
+  display_name   = "k3s-private-subnet-sl"
+  freeform_tags  = var.common_tags
+
+  # Allow all egress
+  egress_security_rules {
+    destination = "0.0.0.0/0"
+    protocol    = "all"
+    description = "Allow all egress"
+  }
+
+  # Allow all ingress from VCN CIDR
+  ingress_security_rules {
+    source      = var.vcn_cidr_block
+    protocol    = "all"
+    description = "Allow all traffic from VCN"
+  }
+}
+
 resource "oci_core_subnet" "private_subnet" {
   count = var.enabled ? 1 : 0
 
@@ -113,7 +137,7 @@ resource "oci_core_subnet" "private_subnet" {
   display_name               = "k3s-private-subnet"
   dns_label                  = "private"
   route_table_id             = oci_core_route_table.private_rt[0].id
-  security_list_ids          = [var.private_security_list_id]
+  security_list_ids          = [oci_core_security_list.private_subnet_sl[0].id]
   prohibit_public_ip_on_vnic = true
   freeform_tags              = var.common_tags
 }
@@ -142,12 +166,10 @@ resource "oci_core_instance" "server" {
   metadata = {
     ssh_authorized_keys = local.ssh_public_key
     user_data = local.use_cloud_init ? base64encode(templatefile("${path.module}/user-data/server.yaml", {
-      public_ip            = oci_core_instance.ingress[0].public_ip
-      k3s_token            = var.k3s_token
-      git_repo_url         = var.git_repo_url
-      git_pat              = var.git_pat
-      git_username         = var.git_username
-      cloudflare_api_token = var.cloudflare_api_token
+      public_ip     = oci_core_instance.ingress[0].public_ip
+      k3s_token     = var.k3s_token
+      git_pat       = var.git_pat
+      git_username  = var.git_username
     })) : null
   }
 

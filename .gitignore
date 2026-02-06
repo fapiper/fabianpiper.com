@@ -18,13 +18,18 @@ terraform.rc
 .atmos/
 
 # =============================================================================
-# Secret
+# Configuration & Secrets
 # =============================================================================
+# User-specific configuration (contains OCIDs, usernames, domains)
+config.yaml
+
+# Secret management
 !secrets/
 secrets/.sops.key
 **/.sops.key
 secrets/**/*.decrypted.yaml
-**/*.decrypted.yaml*.pem
+**/*.decrypted.yaml
+*.pem
 *.key
 *.crt
 *.cert
@@ -36,8 +41,6 @@ secrets/**/*.decrypted.yaml
 !.envrc.example
 *.secret
 *.secrets
-secrets.yaml
-secrets.yml
 
 # OCI & Kubeconfig
 .oci/
@@ -92,6 +95,11 @@ $RECYCLE.BIN/
 *.bak
 *.swp
 *.swo
+
+# =============================================================================
+# Backups
+# =============================================================================
+backups/
 
 # =============================================================================
 # Python

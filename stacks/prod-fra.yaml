@@ -1,0 +1,136 @@
+import:
+  - mixins/stage/prod
+  - mixins/region/fra
+
+# Using local backend (terraform.tfstate files stored in component directories)
+# Benefits: Simple, no external dependencies, works immediately
+# Note: For team collaboration, consider configuring remote backend later
+
+vars:
+  # OCI Authentication (from environment variables or config)
+  tenancy_ocid: "${TF_VAR_OCI_TENANCY_OCID}"
+  user_ocid: "${TF_VAR_OCI_USER_OCID}"
+  fingerprint: "${TF_VAR_OCI_FINGERPRINT}"
+  private_key_path: "${TF_VAR_OCI_PRIVATE_KEY_PATH}"
+  compartment_ocid: ocid1.tenancy.oc1..aaaaaaaanilo3dpim4d2kxmjsjntm3lpibzshsytm6foem7ys67vjslpkcfa
+
+  # Environment configuration
+  tenant: "hs"
+  environment: "fra"
+  stage: prod
+  region: eu-frankfurt-1
+
+components:
+  terraform:
+    # Network infrastructure
+    networking:
+      metadata:
+        component: networking
+      vars:
+        name: network
+        vcn:
+          name: vcn
+          ipv4_cidr_blocks:
+            - 10.0.0.0/16
+          dns_label: default
+          default_security_list_deny_all: true
+          default_route_table_no_routes: true
+          internet_gateway_enabled: true
+        subnets:
+          name: public-subnet
+          ipv4_cidr_block: 10.0.1.0/24
+          dns_label: public
+          ssh_enabled: true
+          https_enabled: true
+          container_cluster_enabled: true
+          create_route_table: true
+          route_table_enabled: true
+
+    # IAM policies for K3s nodes to access Vault
+    iam:
+      metadata:
+        component: iam
+      vars:
+        name: iam
+
+    # OCI Vault for secrets storage
+    vault:
+      metadata:
+        component: vault
+      vars:
+        name: vault
+        vault:
+          name: vault
+
+    # K3s cluster (3 instances: ingress, server, worker)
+    k3s-cluster:
+      metadata:
+        component: k3s-cluster
+      vars:
+        name: k3s
+
+        # Networking configuration
+        # Note: vcn_id and public_subnet_id will be auto-populated by scripts/deploy-networking.sh
+        # Or run manually: make apply-prod-networking, then update these values
+        vcn_id: "" # Auto-filled after networking deployment
+        vcn_cidr_block: "10.0.0.0/16"
+        public_subnet_id: "" # Auto-filled after networking deployment
+        private_subnet_cidr: "10.0.2.0/24"
+
+        # SSH configuration
+        ssh_public_key_path: "~/.ssh/id_rsa.pub"
+
+        # Instance shapes (ARM free tier)
+        instance_shape: "VM.Standard.A1.Flex"
+        instance_os: "Canonical Ubuntu"
+        instance_os_version: "24.04"
+
+        # Ingress/NAT instance config
+        ingress_display_name: "k3s-ingress"
+        ingress_hostname_label: "ingress"
+        ingress_private_ip: "10.0.1.10"
+        ingress_shape_config:
+          ocpus: 1
+          memory_in_gbs: 6
+
+        # Server (control plane) instance config
+        server_display_name: "k3s-server"
+        server_hostname_label: "server"
+        server_private_ip: "10.0.2.10"
+        server_shape_config:
+          ocpus: 2
+          memory_in_gbs: 12
+
+        # Worker instance config
+        worker_display_name: "k3s-worker"
+        worker_hostname_label: "worker-1"
+        worker_shape_config:
+          ocpus: 1
+          memory_in_gbs: 6
+        enable_worker: true
+
+        # K3s configuration
+        k3s_version: "v1.30.0+k3s1"
+        k3s_token: "${TF_VAR_K3S_TOKEN}"
+        initialization_method: "cloud-init"
+
+        # GitHub container registry authentication
+        git_pat: "${TF_VAR_GITHUB_PAT}"
+        git_username: "${TF_VAR_GIT_USERNAME}"
+
+        # Common tags
+        common_tags:
+          Environment: "prod"
+          ManagedBy: "terraform"
+          Component: "k3s-cluster"
+
+    # ArgoCD GitOps bootstrap
+    argocd-bootstrap:
+      metadata:
+        component: argocd-bootstrap
+      vars:
+        name: argocd
+        enabled: true
+        argocd_namespace: "argocd"
+        git_repo_url: "${TF_VAR_GIT_REPO_URL}"
+        git_revision: "HEAD"

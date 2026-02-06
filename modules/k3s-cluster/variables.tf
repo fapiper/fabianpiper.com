@@ -31,12 +31,7 @@ variable "private_subnet_cidr" {
   default     = "10.0.2.0/24"
 }
 
-variable "private_security_list_id" {
-  description = "Security list ID for private subnet"
-  type        = string
-}
-
-# SSH Configuration
+variable "ssh_public_key_path" {
 variable "ssh_public_key_path" {
   description = "Path to SSH public key"
   type        = string
@@ -178,28 +173,18 @@ variable "initialization_method" {
 }
 
 # Application Configuration
-variable "git_repo_url" {
-  description = "Git repository URL for ArgoCD"
-  type        = string
-}
-
 variable "git_pat" {
-  description = "GitHub Personal Access Token"
+  description = "GitHub Personal Access Token for container registry authentication"
   type        = string
   sensitive   = true
 }
 
 variable "git_username" {
-  description = "GitHub username"
+  description = "GitHub username for container registry"
   type        = string
   default     = "git"
 }
 
-variable "cloudflare_api_token" {
-  description = "Cloudflare API token"
-  type        = string
-  sensitive   = true
-}
 
 variable "common_tags" {
   description = "Common tags to apply to all resources"

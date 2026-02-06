@@ -1,0 +1,8 @@
+components:
+  terraform:
+    argocd-bootstrap:
+      vars:
+        enabled: true
+        argocd_namespace: "argocd"
+        git_repo_url: "https://github.com/fapiper/fabianpiper.com.git"
+        git_revision: "HEAD"

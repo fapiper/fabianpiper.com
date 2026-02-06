@@ -1,58 +1,45 @@
-module "instance" {
-  source = "../../../modules/instance"
+module "k3s_cluster" {
+  source = "../../../modules/k3s-cluster"
 
-  compartment_ocid = var.compartment_ocid
-  name             = var.instance.name
-  subnet_id        = module.vcn_reference.outputs.subnet_id
-  shape            = var.instance.shape
-  public_key       = var.instance.public_key
-  load_balancers = {
-    external_cluster_api = {
-      id               = module.alb_reference.outputs.id
-      backend_set_name = module.alb_listener_ext_cluster_api_reference.outputs.backend_set_name
-      backend_port     = module.alb_listener_ext_cluster_api_reference.outputs.backend_port
-    }
-    cluster_api = {
-      id               = module.nlb_reference.outputs.id
-      backend_set_name = module.nlb_listener_cluster_api_reference.outputs.backend_set_name
-      backend_port     = module.nlb_listener_cluster_api_reference.outputs.backend_port
-    }
-    msg_publisher = {
-      id               = module.nlb_reference.outputs.id
-      backend_set_name = module.nlb_listener_msg_publisher_reference.outputs.backend_set_name
-      backend_port     = module.nlb_listener_msg_publisher_reference.outputs.backend_port
-    }
-    msg_subscriber = {
-      id               = module.nlb_reference.outputs.id
-      backend_set_name = module.nlb_listener_msg_subscriber_reference.outputs.backend_set_name
-      backend_port     = module.nlb_listener_msg_subscriber_reference.outputs.backend_port
-    }
-    external_https = {
-      id               = module.alb_reference.outputs.id
-      backend_set_name = module.alb_listener_ext_https_reference.outputs.backend_set_name
-      backend_port     = module.alb_listener_ext_https_reference.outputs.backend_port
-    }
-    external_video_stream = {
-      id               = module.alb_reference.outputs.id
-      backend_set_name = module.alb_listener_ext_video_stream_reference.outputs.backend_set_name
-      backend_port     = module.alb_listener_ext_video_stream_reference.outputs.backend_port
-    }
-  }
+  compartment_ocid         = var.compartment_ocid
+  vcn_id                   = var.vcn_id
+  vcn_cidr_block      = var.vcn_cidr_block
+  public_subnet_id    = var.public_subnet_id
+  private_subnet_cidr = var.private_subnet_cidr
+  ssh_public_key_path = var.ssh_public_key_path
 
-  # user-data script vars/secrets
-  vault_name              = module.vault_reference.outputs.name
-  secret_name             = module.secret.name
-  k3s_version             = var.instance.k3s_version
-  k3s_token               = var.k3s_token
-  internal_lb_domain_name = module.dns_nlb_reference.outputs.domain_name
-}
+  # Instance configuration
+  instance_shape      = var.instance_shape
+  instance_os         = var.instance_os
+  instance_os_version = var.instance_os_version
 
-module "secret" {
-  source = "../../../modules/secret"
+  # Ingress instance
+  ingress_display_name   = var.ingress_display_name
+  ingress_hostname_label = var.ingress_hostname_label
+  ingress_private_ip     = var.ingress_private_ip
+  ingress_shape_config   = var.ingress_shape_config
 
-  compartment_ocid  = var.compartment_ocid
-  name              = var.secret.name
-  value             = var.secret.value
-  vault_id          = module.vault_reference.outputs.id
-  encryption_key_id = module.vault_reference.outputs.encryption_key_id
+  # Server instance
+  server_display_name   = var.server_display_name
+  server_hostname_label = var.server_hostname_label
+  server_private_ip     = var.server_private_ip
+  server_shape_config   = var.server_shape_config
+
+  # Worker instance
+  worker_display_name   = var.worker_display_name
+  worker_hostname_label = var.worker_hostname_label
+  worker_shape_config   = var.worker_shape_config
+  enable_worker         = var.enable_worker
+
+  # K3s configuration
+  k3s_version            = var.k3s_version
+  k3s_token              = var.k3s_token
+  initialization_method  = var.initialization_method
+
+  # Git configuration for registry
+  git_pat      = var.git_pat
+  git_username = var.git_username
+
+  common_tags = var.common_tags
+  enabled     = var.enabled
 }

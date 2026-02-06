@@ -1,8 +1,0 @@
-import:
-  - orgs/hs/_defaults
-  - mixins/tenant/plat
-
-terraform:
-  settings:
-    spacelift:
-      space_name: plat

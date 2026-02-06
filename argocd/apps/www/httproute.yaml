@@ -8,7 +8,7 @@ spec:
     - name: public-gateway
       namespace: envoy-gateway-system
   hostnames:
-    - "fabianpiper.com"
+    - "glg.fabianpiper.com"
   rules:
     - matches:
         - path: { type: PathPrefix, value: / }
