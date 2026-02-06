@@ -1,0 +1,10 @@
+import:
+  - catalog/iam/defaults
+  - catalog/k3s-cluster/defaults
+  - catalog/vault/defaults
+  - catalog/load-balancer/defaults
+  - catalog/networking/defaults
+
+vars:
+  region: "eu-frankfurt-1"
+  environment: "fra"

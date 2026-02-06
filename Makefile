@@ -109,7 +109,7 @@ dev-%:
 build-%:
 	cd apps/$(get_comp) && $(BUN) install && $(BUN) run build
 
-## docker-build-[env]-[comp]: build oci image with buildkit secret injection
+## docker-build-[env]-[comp]: build docker image
 docker-build-%:
 	$(DOCKER) build --secret id=secrets,src=$(SECRETS_DIR)/$(get_env)/$(get_comp).yaml \
 		-t $(REGISTRY)/$(get_comp):$(DEPLOY_VER) apps/$(get_comp)
@@ -157,7 +157,7 @@ sops-decrypt-%:
 ## help: show this command menu with detailed target descriptions
 help:
 	@$(PRINTF) -- "========================================================================\n"
-	@$(PRINTF) -- " fabianpiper.com Orchestrator | Version: $(DEPLOY_VER)\n"
+	@$(PRINTF) -- " fabianpiper.com | Version: $(DEPLOY_VER)\n"
 	@$(PRINTF) -- "========================================================================\n"
 	@grep -E '^## .*' $(MAKEFILE_LIST) | sed 's/## //' | awk -F': ' '{printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 	@$(PRINTF) -- "========================================================================\n"

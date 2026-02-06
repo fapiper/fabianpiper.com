@@ -1,47 +1,43 @@
-# OCI KMS Vault
+locals {
+  enabled = data.context_config.main.enabled
+
+  compartment_ocid = var.compartment_ocid
+  name             = var.name
+}
+
+data "context_config" "main" {}
+
+data "context_label" "main" {
+  values = {
+    name = local.name
+  }
+}
+
+data "context_tags" "main" {
+  values = {
+    name = local.name
+  }
+}
+
 resource "oci_kms_vault" "default" {
-  count          = var.enabled ? 1 : 0
-  compartment_id = var.compartment_ocid
-  display_name   = var.vault_name
-  vault_type     = var.vault_type
+  count = local.enabled ? 1 : 0
+
+  compartment_id = local.compartment_ocid
+  display_name   = data.context_label.main.rendered
+  vault_type     = "DEFAULT"
+  freeform_tags  = data.context_tags.main.tags
 }
 
-# Master Encryption Key
 resource "oci_kms_key" "default" {
-  count               = var.enabled ? 1 : 0
-  compartment_id      = var.compartment_ocid
-  display_name        = var.master_key_name
-  management_endpoint = oci_kms_vault.default[0].management_endpoint
-  protection_mode     = var.master_key_protection_mode
+  count = local.enabled ? 1 : 0
 
+  compartment_id = local.compartment_ocid
+  display_name   = data.context_label.main.rendered
   key_shape {
-    algorithm = var.master_key_algorithm
-    length    = var.master_key_length
+    algorithm = "AES"
+    length    = 32
   }
-}
-
-# Dynamic Secret Provisioning
-resource "oci_vault_secret" "this" {
-  for_each = var.enabled ? { for s in var.secrets_config : s.name => s } : {}
-
-  compartment_id = var.compartment_ocid
-  vault_id       = oci_kms_vault.default[0].id
-  key_id         = oci_kms_key.default[0].id
-  secret_name    = each.key # 'each.key' is the string name (e.g. "github-pat")
-  description    = lookup(each.value, "description", "Managed by Atmos/Terraform")
-
-  secret_content {
-    content_type = "BASE64"
-
-    # We use a placeholder or the actual value from Atmos vars
-    content = base64encode(
-      lookup(var.secret_values, each.key, "placeholder-update-me")
-    )
-  }
-
-  lifecycle {
-    # This prevents Terraform from overwriting the secret value if we
-    # update it manually in the OCI Console or via another method
-    ignore_changes = [secret_content]
-  }
+  management_endpoint = oci_kms_vault.default[0].management_endpoint
+  protection_mode     = "SOFTWARE"
+  freeform_tags       = data.context_tags.main.tags
 }

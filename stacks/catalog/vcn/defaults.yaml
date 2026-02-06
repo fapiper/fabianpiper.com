@@ -1,0 +1,5 @@
+components:
+  terraform:
+    vcn:
+      vars:
+        enabled: true

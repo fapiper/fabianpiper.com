@@ -1,4 +1,28 @@
-# Data Sources
+locals {
+  enabled = data.context_config.main.enabled
+
+  compartment_ocid = var.compartment_ocid
+  name             = var.name
+  subnet_id        = var.subnet_id
+  shape            = var.shape
+  public_key       = var.public_key
+  load_balancers   = var.load_balancers
+
+  vault_name              = var.vault_name
+  secret_name             = var.secret_name
+  k3s_version             = var.k3s_version
+  k3s_token               = var.k3s_token
+  internal_lb_domain_name = var.internal_lb_domain_name
+}
+
+data "context_config" "main" {}
+
+data "context_label" "main" {
+  values = {
+    name = local.name
+  }
+}
+
 data "oci_identity_availability_domains" "ads" {
   compartment_id = var.compartment_ocid
 }
@@ -20,7 +44,6 @@ locals {
   use_cloud_init = var.initialization_method == "cloud-init"
 }
 
-# Ingress / NAT Instance (Public Subnet)
 resource "oci_core_instance" "ingress" {
   count = var.enabled ? 1 : 0
 
@@ -57,9 +80,6 @@ resource "oci_core_instance" "ingress" {
   }
 }
 
-# Private Network Configuration
-# Note: Route table must be created after ingress instance to get its private IP OCID
-
 data "oci_core_private_ips" "ingress_ips" {
   count = var.enabled ? 1 : 0
 
@@ -84,7 +104,6 @@ resource "oci_core_route_table" "private_rt" {
   }
 }
 
-# Private Subnet
 resource "oci_core_subnet" "private_subnet" {
   count = var.enabled ? 1 : 0
 
@@ -99,7 +118,6 @@ resource "oci_core_subnet" "private_subnet" {
   freeform_tags              = var.common_tags
 }
 
-# Server Instance (Private Subnet)
 resource "oci_core_instance" "server" {
   count = var.enabled ? 1 : 0
 
@@ -141,7 +159,6 @@ resource "oci_core_instance" "server" {
   depends_on = [oci_core_subnet.private_subnet]
 }
 
-# Worker Instance (Private Subnet) - Optional
 resource "oci_core_instance" "worker" {
   count = var.enabled && var.enable_worker ? 1 : 0
 

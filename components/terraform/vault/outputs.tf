@@ -1,11 +1,14 @@
-output "vault_id" {
-  value = module.vault.vault_id
+output "name" {
+  value       = module.vault.name
+  description = "The name of the vault"
 }
 
-output "vault_management_endpoint" {
-  value = module.vault.management_endpoint
+output "id" {
+  value       = module.vault.id
+  description = "The ID of the vault"
 }
 
-output "secret_ids" {
-  value = module.vault.secret_ids
+output "encryption_key_id" {
+  value       = module.vault.encryption_key_id
+  description = "The ID of the encryption key"
 }

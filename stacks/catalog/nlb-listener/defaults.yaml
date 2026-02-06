@@ -1,0 +1,11 @@
+components:
+  terraform:
+    nlb-listener/cluster-api:
+      vars:
+        enabled: true
+    nlb-listener/msg-publisher:
+      vars:
+        enabled: true
+    nlb-listener/msg-subscriber:
+      vars:
+        enabled: true

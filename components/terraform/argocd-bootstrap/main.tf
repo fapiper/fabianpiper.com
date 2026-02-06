@@ -23,7 +23,6 @@ provider "kubernetes" {
   config_path = var.kubeconfig_content != "" ? "/tmp/kubeconfig" : null
 }
 
-# Create temporary kubeconfig file
 resource "local_file" "kubeconfig" {
   count = var.enabled ? 1 : 0
 
@@ -31,7 +30,6 @@ resource "local_file" "kubeconfig" {
   filename = "/tmp/kubeconfig"
 }
 
-# Install Argo CD using Helm
 resource "helm_release" "argocd" {
   count = var.enabled ? 1 : 0
 
@@ -55,7 +53,6 @@ resource "helm_release" "argocd" {
   depends_on = [local_file.kubeconfig]
 }
 
-# Create the root App of Apps
 resource "kubernetes_manifest" "root_app" {
   count = var.enabled ? 1 : 0
 
@@ -73,7 +70,7 @@ resource "kubernetes_manifest" "root_app" {
       project = "default"
       source = {
         repoURL        = var.git_repo_url
-        path           = "provisioning/argocd/applications"
+        path           = "argocd/apps"
         targetRevision = var.git_revision
       }
       destination = {

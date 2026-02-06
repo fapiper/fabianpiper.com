@@ -1,0 +1,5 @@
+components:
+  terraform:
+    instance:
+      vars:
+        enabled: true

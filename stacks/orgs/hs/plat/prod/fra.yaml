@@ -1,0 +1,277 @@
+import:
+  - orgs/hs/plat/prod/_defaults
+  - mixins/region/fra
+
+components:
+  terraform:
+    vault:
+      metadata:
+        component: vault
+      vars:
+        name: vault
+        vault:
+          name: vault
+    storage-backup:
+      metadata:
+        component: storage-backup
+      vars:
+        name: storage-backup
+    vcn:
+      metadata:
+        component: vcn
+      vars:
+        name: network
+        vcn:
+          name: vcn
+          ipv4_cidr_blocks:
+            - 10.20.0.0/16
+          dns_label: default
+          default_security_list_deny_all: true
+          default_route_table_no_routes: true
+          internet_gateway_enabled: true
+        subnets:
+          name: servers-subnet
+          ipv4_cidr_block: 10.20.0.0/17
+          dns_label: servers
+          ssh_enabled: true
+          https_enabled: true
+          container_cluster_enabled: true
+          create_route_table: true
+          route_table_enabled: true
+    alb:
+      metadata:
+        component: alb
+      vars:
+        name: alb
+        alb:
+          name: alb
+          ca_certificate: |
+            -----BEGIN CERTIFICATE-----
+            MIIEWDCCA0CgAwIBAgIPMR1+3eSSAgi72F73Jiu6MA0GCSqGSIb3DQEBCwUAMIGD
+            MQswCQYDVQQGEwJQTDEiMCAGA1UEChMZVW5pemV0byBUZWNobm9sb2dpZXMgUy5B
+            LjEnMCUGA1UECxMeQ2VydHVtIENlcnRpZmljYXRpb24gQXV0aG9yaXR5MScwJQYD
+            VQQDEx5DZXJ0dW0gR2xvYmFsIFNlcnZpY2VzIENBIFNIQTIwHhcNMTYwNjA4MDgw
+            MTI5WhcNMjYwNjA2MDgwMTI5WjA9MQswCQYDVQQGEwJQTDEVMBMGA1UECgwMaG9t
+            ZS5wbCBTLkEuMRcwFQYDVQQDDA5DZXJ0eWZpa2F0IFNTTDCCASIwDQYJKoZIhvcN
+            AQEBBQADggEPADCCAQoCggEBALDozq2WteNT2CsyO5CY9rCN4neWGyj+26XUYS5o
+            oM+tzFlMrbdNk3J+aI7P8Ab29qlSuPRgpHMi++AopeaOYsiwuVJZqnN2W1PC6huf
+            b9mVMv3mcxYLCmuEiY4k9N7L4SUMLxPrRlb7ksD/ogaEgMEYHf5QJyEdp2z4Qy2u
+            C4K/+zpyKpsBeihk5NGnoqTL4LmKNZWyGvJXwq3INuhd4hCpdMgEtX1Mo2TYa8bc
+            amo02VhHHX875TjxC/l3nEKXNcddLN3VvlnYGu7xvIwmCB0P9VDIB53MofqlN+lM
+            zcx8XelCSSWiJKFKXCv4bsvqJOTHuejmi6yDZF8icM8zdVsCAwEAAaOCAQwwggEI
+            MBIGA1UdEwEB/wQIMAYBAf8CAQAwMgYDVR0fBCswKTAnoCWgI4YhaHR0cDovL2Ny
+            bC5jZXJ0dW0ucGwvZ3NjYXNoYTIuY3JsMG4GCCsGAQUFBwEBBGIwYDAoBggrBgEF
+            BQcwAYYcaHR0cDovL3N1YmNhLm9jc3AtY2VydHVtLmNvbTA0BggrBgEFBQcwAoYo
+            aHR0cDovL3JlcG9zaXRvcnkuY2VydHVtLnBsL2dzY2FzaGEyLmNlcjAfBgNVHSME
+            GDAWgBRUmd2b/+inDqMZnVu+QlffMPyPMjAdBgNVHQ4EFgQUPZG2zBF76+RmEazS
+            0gfLqaSAczEwDgYDVR0PAQH/BAQDAgEGMA0GCSqGSIb3DQEBCwUAA4IBAQBBGurH
+            V6ciSTVqiNgltiQilglZfJcBo9MpMYDIFUnPvZKLjeMYYgbySA77cEyevma053Nm
+            leNWr9burXQqbZ8P9n4iJh3n20E+A6048bsH+0mMY2Xyc1AGy4pclIUNRlPNtYpA
+            H2jndvUoZP+4RwUjiGLEtX1jhORw4rZb6j+UXVWTBssj7Y+8GBp9MXl9ShIpb3Vb
+            DIRnxv2KcydLRRAb4pP3mw0rHWLmAZ3UY1Aj6aeeoWh5sKZbmHOpjelwaGyiojSm
+            dg0GZufYhBeYxQNXpdhWxDRIzAT890wqp77PXKTFMZaS0QaZz7k4o/K/VGJVWWkY
+            1xuL4Zl8WvEcVWEK
+            -----END CERTIFICATE-----
+            -----BEGIN CERTIFICATE-----
+            MIIEzTCCA7WgAwIBAgIRANBLb+XdW9Ih58dM9kaLMUYwDQYJKoZIhvcNAQELBQAw
+            fjELMAkGA1UEBhMCUEwxIjAgBgNVBAoTGVVuaXpldG8gVGVjaG5vbG9naWVzIFMu
+            QS4xJzAlBgNVBAsTHkNlcnR1bSBDZXJ0aWZpY2F0aW9uIEF1dGhvcml0eTEiMCAG
+            A1UEAxMZQ2VydHVtIFRydXN0ZWQgTmV0d29yayBDQTAeFw0xNDA5MTExMjAwMDBa
+            Fw0yNzA2MDkxMDQ2MzlaMIGDMQswCQYDVQQGEwJQTDEiMCAGA1UEChMZVW5pemV0
+            byBUZWNobm9sb2dpZXMgUy5BLjEnMCUGA1UECxMeQ2VydHVtIENlcnRpZmljYXRp
+            b24gQXV0aG9yaXR5MScwJQYDVQQDEx5DZXJ0dW0gR2xvYmFsIFNlcnZpY2VzIENB
+            IFNIQTIwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDHhvLXeA4kyBVY
+            Dr12JusjW+/HPPWpBmWnSZC9gadbNXCD/GlHrGruRWrKn0YBasbonXi5FLRon717
+            aCCDt2+7URnJx4mLGt3X73yH3I+T+COuyTFOuLId68jYV4vfBm1N/N1/KohGr8+R
+            7eT4f4agfXVQ+gDZT3pGTywqc9IId4uHaFjW+mr5vVfu7WjL8A20jOawvlqV2K4/
+            qSrjPZsqHlzf46LHgbQEK1EjTPsFrfvAQxvGpHiEIAFsS+1d2xPIEJVIxvq+KyGb
+            W/0SJIj7/SfYo+ItvJ2a4/G2JfoPF9wTCC0N8U5I/KXxjYYXBcIE9pQ16T24T+dr
+            MfPG2mYtAgMBAAGjggE+MIIBOjAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBRU
+            md2b/+inDqMZnVu+QlffMPyPMjAfBgNVHSMEGDAWgBQIds3LB/8k9sXN7buQvOKE
+            N0Z19zAOBgNVHQ8BAf8EBAMCAQYwLwYDVR0fBCgwJjAkoCKgIIYeaHR0cDovL2Ny
+            bC5jZXJ0dW0ucGwvY3RuY2EuY3JsMGsGCCsGAQUFBwEBBF8wXTAoBggrBgEFBQcw
+            AYYcaHR0cDovL3N1YmNhLm9jc3AtY2VydHVtLmNvbTAxBggrBgEFBQcwAoYlaHR0
+            cDovL3JlcG9zaXRvcnkuY2VydHVtLnBsL2N0bmNhLmNlcjA5BgNVHSAEMjAwMC4G
+            BFUdIAAwJjAkBggrBgEFBQcCARYYaHR0cDovL3d3dy5jZXJ0dW0ucGwvQ1BTMA0G
+            CSqGSIb3DQEBCwUAA4IBAQDRhC+yVHfF/IFcNNKbkxX1aVsCZ0fa2t+MxyFcs7KO
+            qW1fGpOOycughOFnbM+lz4Y3gt5RaOFJTm7YVUZZ3751s5tv8nhXeXfrRIpQN7Cu
+            +Nei457HlDxEUItPlkYnDbdDes/96T19cICd1TmIPekYRXiyuPW4Wgx6vykmk91x
+            LkJ0y74TzVtUofVF446qXvea95zNpzYCVMg+AOX3ZZyy9XfST6g4um+cw/Idv31d
+            bnJdBzMOgHH3uw2YMiZQgDqvNRE+wAs+PTFEIKHmBc/t1n3Shvg9e68M+5ZRM8bE
+            WGqgLqfreTgCsCQcv9MDYw9TFUbS17RdE6NtiPfszTky
+            -----END CERTIFICATE-----
+            -----BEGIN CERTIFICATE-----
+            MIIDuzCCAqOgAwIBAgIDBETAMA0GCSqGSIb3DQEBBQUAMH4xCzAJBgNVBAYTAlBM
+            MSIwIAYDVQQKExlVbml6ZXRvIFRlY2hub2xvZ2llcyBTLkEuMScwJQYDVQQLEx5D
+            ZXJ0dW0gQ2VydGlmaWNhdGlvbiBBdXRob3JpdHkxIjAgBgNVBAMTGUNlcnR1bSBU
+            cnVzdGVkIE5ldHdvcmsgQ0EwHhcNMDgxMDIyMTIwNzM3WhcNMjkxMjMxMTIwNzM3
+            WjB+MQswCQYDVQQGEwJQTDEiMCAGA1UEChMZVW5pemV0byBUZWNobm9sb2dpZXMg
+            Uy5BLjEnMCUGA1UECxMeQ2VydHVtIENlcnRpZmljYXRpb24gQXV0aG9yaXR5MSIw
+            IAYDVQQDExlDZXJ0dW0gVHJ1c3RlZCBOZXR3b3JrIENBMIIBIjANBgkqhkiG9w0B
+            AQEFAAOCAQ8AMIIBCgKCAQEA4/t9o3K6wvDJFIf1awFO4W5AB7ptJ11/91sts1rH
+            UV+rpDKmYYe2bg+G0jACl/jXaVehGDldamR5xgFZrDwxSjh80gTSSyjoIF87B6LM
+            TXPb865Px1bVWqeWifrzq2jUI4ZZJ88JJ7ysbnKDHDBy3+Ci6dLhdHUZvSqeexVU
+            BBvXQzmtVSjF4hq79MDkrjhJM8x2hZ85RdKknvISjFH4fOQtf/WsX+sWn7Et0brM
+            kUJ3TCXJkDhv2/DM+44el1k+1WBO5gUo7Ul5E0u6SNsv+XLTOcr+H9g0cvW0QM8x
+            AcPs3hEtF10fuFDRXhmnad4HMyjKUJX5p1TLVIZQRan5SQIDAQABo0IwQDAPBgNV
+            HRMBAf8EBTADAQH/MB0GA1UdDgQWBBQIds3LB/8k9sXN7buQvOKEN0Z19zAOBgNV
+            HQ8BAf8EBAMCAQYwDQYJKoZIhvcNAQEFBQADggEBAKaorSLOAT2mo/9i0Eidi15y
+            sHhE49wcrwn9I0j6vSrEuVUEtRCjjSfeC4Jj0O7eDDd5QVsisrCaQVymcODU0HfL
+            I9MA4GxWL+FpDQ3Zqr8hgVDZBqWo/5U30Kr+4rP1mS1FhIrlQgnXdAIv94nYmem8
+            J9RHjboNRhx3zxSkHLmkMcScKHQDNP8zGSal6Q10tz6XxnboJ5ajZt3hrvJBW8qY
+            VoNzcOSGGtIxQbovvi0TWnZvTuhOgQ4/WwMioBK+ZlgRSssDxLQqKi2WF+A5VLxI
+            03YnnZotBqbJ7DnSq9ufmgsnAjUpsUCV5/nonFWIGUbWtzT1fs45mtk48VH3Tyw=
+            -----END CERTIFICATE-----
+          public_certificate: |
+            -----BEGIN CERTIFICATE-----
+            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
+            s/XawtETFUdGZrBfWPUJ4eU=
+            -----END CERTIFICATE-----
+    alb-listener/ext-cluster-api:
+      metadata:
+        component: alb-listener
+      vars:
+        name: alb-listener
+        alb_listener:
+          name: ext-cluster-api
+          port: 6443
+          health_check_port: 6443
+          use_ssl: false
+    alb-listener/ext-https:
+      metadata:
+        component: alb-listener
+      vars:
+        name: alb-listener
+        alb_listener:
+          name: ext-https
+          port: 443
+          health_check_port: 80
+          use_ssl: true
+    alb-listener/ext-video-stream:
+      metadata:
+        component: alb-listener
+      vars:
+        name: alb-listener
+        alb_listener:
+          name: ext-video-stream
+          port: 1935
+          # Currently, cloud provider's load balancer isn't integrated with K8s, therefore specifying nodePort is required.
+          # After the integration of external cloud controller manager, external load balancer will forward traffic to the node port automatically, while keeping both ports in sync.
+          # For the time being, edit nodePort manually in K3s spec to the value below
+          health_check_port: 32217
+          use_ssl: false
+    nlb:
+      metadata:
+        component: nlb
+      vars:
+        name: nlb
+        nlb:
+          name: nlb
+    nlb-listener/cluster-api:
+      metadata:
+        component: nlb-listener
+      vars:
+        name: nlb-listener
+        nlb_listener:
+          name: cluster-api
+          port: 6443
+          health_check_port: 6443
+    nlb-listener/msg-publisher:
+      metadata:
+        component: nlb-listener
+      vars:
+        name: nlb-listener
+        nlb_listener:
+          name: msg-publisher
+          port: 1883
+          # Currently, cloud provider's load balancer isn't integrated with K8s, therefore specifying nodePort is required.
+          # After the integration of external cloud controller manager, external load balancer will forward traffic to the node port automatically, while keeping both ports in sync.
+          # For the time being, edit nodePort manually in K3s spec to the value below
+          health_check_port: 30487
+    nlb-listener/msg-subscriber:
+      metadata:
+        component: nlb-listener
+      vars:
+        name: nlb-listener
+        nlb_listener:
+          name: msg-subscriber
+          port: 8084
+          # Currently, cloud provider's load balancer isn't integrated with K8s, therefore specifying nodePort is required.
+          # After the integration of external cloud controller manager, external load balancer will forward traffic to the node port automatically, while keeping both ports in sync.
+          # For the time being, edit nodePort manually in K3s spec to the value below
+          health_check_port: 32652
+    dns/alb:
+      metadata:
+        component: dns
+      vars:
+        name: alb
+        lb:
+          - alb
+    dns/nlb:
+      metadata:
+        component: dns
+      vars:
+        name: nlb
+        lb:
+          - nlb
+    dns/ext-https:
+      metadata:
+        component: dns
+      vars:
+        name: ext-https
+        dns:
+          private: false
+          domain_name: hajle-silesia.online
+        lb:
+          - alb
+          - nlb
+    iam-dynamic-group:
+      metadata:
+        component: iam-dynamic-group
+      vars:
+        name: iam-dynamic-group
+    instance:
+      metadata:
+        component: instance
+      vars:
+        name: instance
+        instance:
+          name: instance
+          shape: VM.Standard.A1.Flex
+          public_key: |
+            ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCafkXOuGWQfAZvmDyRcWi/HmTh8DJqRicGmFOammZe7oJAvK7YAOoBMlVvODwYA83dAh7YitbAW+RkQKbGDV5Gcz9/aXP+6AMC64wWprwgonGP6DjvRCH3GZBSo4PZfDohao/OelKBKmXVb8XMFDYE5Lu7Edw+Z/o093OBJFU6J12sO8IJNgU9iOnfZl9M4dr4XSf9HGiMlx1INN8+NBgVCySeTpRkmWGKoSwb5MGEBuZ+f1OWg5VARFe2nPbMLryBH7jOvHN0z71C9/W9ztSeejiy37f7TqC1GyHHkzR5+C6WtCyNAOaa3JBNV7W5ngFSb81mA5779PGd3vqUwCHD ssh-key-2024-03-16
+          k3s_version: v1.30.0+k3s1
+        secret:
+          name: cluster-initiated
+          value: false
