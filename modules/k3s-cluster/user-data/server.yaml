@@ -31,3 +31,56 @@ runcmd:
       --disable traefik \
       --disable servicelb \
       --node-label role=server
+
+  # Wait for K3s to be ready
+  - sleep 30
+  - k3s kubectl wait --for=condition=Ready nodes --all --timeout=300s
+
+  # Install ArgoCD
+  - k3s kubectl create namespace argocd || true
+  - k3s kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+  # Wait for ArgoCD to be ready
+  - k3s kubectl wait --for=condition=available --timeout=600s deployment/argocd-server -n argocd
+
+  # Configure ArgoCD to use Git repository
+  - |
+    k3s kubectl apply -f - <<EOF
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: argocd-github-repo
+      namespace: argocd
+      labels:
+        argocd.argoproj.io/secret-type: repository
+    type: Opaque
+    stringData:
+      type: git
+      url: ${git_repo_url}
+      username: ${git_username}
+      password: ${git_pat}
+    EOF
+
+  # Deploy root ArgoCD application (App of Apps pattern)
+  - |
+    k3s kubectl apply -f - <<EOF
+    apiVersion: argoproj.io/v1alpha1
+    kind: Application
+    metadata:
+      name: root
+      namespace: argocd
+    spec:
+      project: default
+      source:
+        repoURL: ${git_repo_url}
+        targetRevision: HEAD
+        path: argocd/apps
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+    EOF
+

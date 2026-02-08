@@ -216,6 +216,11 @@ variable "git_username" {
   default     = "git"
 }
 
+variable "git_repo_url" {
+  description = "Git repository URL for ArgoCD bootstrap"
+  type        = string
+}
+
 variable "common_tags" {
   description = "Common tags to apply to all resources"
   type        = map(string)

@@ -1,8 +1,0 @@
-components:
-  terraform:
-    argocd-bootstrap:
-      vars:
-        enabled: true
-        argocd_namespace: "argocd"
-        # git_repo_url and git_revision should be set in stack config
-        git_revision: "HEAD"

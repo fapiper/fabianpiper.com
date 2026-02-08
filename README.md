@@ -5,7 +5,7 @@
 
 # fabianpiper.com
 
-*A portfolio using K3s, Terraform, Atmos, Argo CD on OCI Free Tier*
+*A portfolio using K3s, Terraform, Atmos, and Argo CD on OCI Free Tier*
 
 </div>
 
@@ -58,10 +58,11 @@ make setup
 > This generates `secrets/.sops.key` and `.sops.yaml` config. To encrypt or decrypt secrets, use `make sops-encrypt-prod` / `make sops-decrypt-prod`.
 
 #### Provisioning
-Create an entire OCI stack (Networking, IAM, Vault, K3s) in one command
+Create an entire OCI stack (Networking, IAM, Vault, K3s with ArgoCD) in one command
 
 ```bash
 make bootstrap-prod
+# ArgoCD is automatically installed on K3s server via cloud-init
 # Verify the health of all components
 make validate-prod
 ```
@@ -94,8 +95,7 @@ components/terraform/       # Infrastructure components
   ├── networking/          # VCN + subnets
   ├── iam/                 # IAM policies  
   ├── vault/               # OCI Vault
-  ├── k3s-cluster/         # 3 ARM instances
-  └── argocd-bootstrap/    # ArgoCD Helm deployment
+  └── k3s-cluster/         # 3 ARM instances (ArgoCD auto-installed)
 argocd/                     # GitOps applications
   └── apps/                # Application definitions
 apps/www/                   # Website source code
@@ -104,16 +104,18 @@ apps/www/                   # Website source code
 ## Commands
 
 ```bash
+# Infrastructure
 make plan-prod-all                     # Plan all components
 make apply-prod-networking             # Deploy network
 make apply-prod-iam                    # Deploy IAM policies
 make apply-prod-vault                  # Deploy OCI Vault
-make apply-prod-k3s-cluster            # Deploy K3s cluster
-make apply-prod-argocd-bootstrap       # Deploy ArgoCD
+make apply-prod-k3s-cluster            # Deploy K3s cluster (includes ArgoCD)
 
+# Secrets
 make sops-encrypt-prod                 # Encrypt secrets
 make sops-decrypt-prod                 # Decrypt secrets for editing
 
+# Development
 make dev-www                           # Start local dev server
 make build-www                         # Build production bundle
 ```

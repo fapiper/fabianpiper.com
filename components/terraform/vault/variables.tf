@@ -42,8 +42,3 @@ variable "name" {
   type = string
 }
 
-variable "vault" {
-  type = object({
-    name = string
-  })
-}

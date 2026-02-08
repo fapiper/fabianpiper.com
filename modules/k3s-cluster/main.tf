@@ -164,6 +164,7 @@ resource "oci_core_instance" "server" {
       k3s_token     = var.k3s_token
       git_pat       = var.git_pat
       git_username  = var.git_username
+      git_repo_url  = var.git_repo_url
     })) : null
   }
 

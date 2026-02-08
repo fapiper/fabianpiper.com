@@ -77,8 +77,6 @@ components:
         region: eu-frankfurt-1
 
         name: vault
-        vault:
-          name: vault
 
     # K3s cluster
     k3s-cluster:
@@ -135,29 +133,9 @@ components:
 
         # GitHub PAT from secrets
         git_pat: "${TF_VAR_GITHUB_PAT}"
+        git_repo_url: "${TF_VAR_GIT_REPO_URL}"
 
         common_tags:
           Environment: "${environment}"
           ManagedBy: "terraform"
           Component: "k3s-cluster"
-
-    # ArgoCD GitOps bootstrap
-    argocd-bootstrap:
-      metadata:
-        component: argocd-bootstrap
-      vars:
-        # OCI Authentication (from secrets via SOPS)
-        tenancy_ocid: "${TF_VAR_tenancy_ocid}"
-        user_ocid: "${TF_VAR_user_ocid}"
-        compartment_ocid: "${TF_VAR_compartment_ocid}"
-        fingerprint: "${TF_VAR_fingerprint}"
-        private_key_path: "${TF_VAR_private_key_path}"
-        region: eu-frankfurt-1
-
-        name: argocd
-        enabled: false  # Enable after K3s cluster is deployed and kubeconfig is available
-        argocd_namespace: "argocd"
-
-        # User-specific - read from environment (TF_VAR_GIT_REPO_URL)
-        # DO NOT set here - Terraform reads automatically from secrets.yaml
-        git_revision: "HEAD"
