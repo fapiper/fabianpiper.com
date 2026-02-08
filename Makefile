@@ -46,63 +46,23 @@ ifndef _SOPS_READY
 		$(SOPS) exec-env "$$SECRETS_FILE" "$(MAKE) $@ _SOPS_READY=1"; \
 	fi
 else
-%: _SOPS_READY :=
-endif # _SOPS_READY
 
 #----------------------------------------------------------------
 # Targets (Setup, Secrets, Infra, Apps)
 #----------------------------------------------------------------
 
-## init: initialize project from examples (first-time setup)
-init:
-	@chmod +x $(SCRIPTS_DIR)/*.sh
-	@$(SCRIPTS_DIR)/init.sh
-
-## setup-oci: configure OCI credentials and API keys
-setup-oci:
-	@chmod +x $(SCRIPTS_DIR)/*.sh
-	@$(SCRIPTS_DIR)/setup-oci.sh
-
 ## setup: validate tools and initialize SOPS encryption
 setup: check-tools sops-setup sops-init-prod
 
 check-tools:
-	@for tool in $(ATMOS) terraform $(SOPS) $(BUN) $(DOCKER) $(AGE_KEYGEN) git jq yq; do \
-		command -v $$tool >/dev/null 2>&1 || { $(PRINTF) -- "$$tool not found (optional for some features)\n"; }; \
+	@for tool in $(ATMOS) terraform $(SOPS) $(AGE_KEYGEN); do \
+		command -v $$tool >/dev/null 2>&1 || { $(PRINTF) -- "$$tool not found (required)\n"; exit 1; }; \
 	done
-	@command -v $(ATMOS) >/dev/null 2>&1 || { $(PRINTF) -- "atmos is required\n"; exit 1; }
-	@command -v terraform >/dev/null 2>&1 || { $(PRINTF) -- "terraform is required\n"; exit 1; }
-	@command -v $(SOPS) >/dev/null 2>&1 || { $(PRINTF) -- "sops is required\n"; exit 1; }
-	@$(PRINTF) -- "All required tools are installed\n"
+	@$(PRINTF) -- "✓ All required tools are installed\n"
 
-## bootstrap-[env]: automated full deployment
-bootstrap-%:
-	@$(PRINTF) -- "Starting automated bootstrap for $(get_env)...\n"
-	@$(PRINTF) -- "\nStep 1/5: Deploying networking infrastructure...\n"
-	@$(SCRIPTS_DIR)/deploy-networking.sh
-	@$(PRINTF) -- "\nStep 2/5: Deploying IAM (policies)...\n"
-	@$(ATMOS) terraform apply iam -s $(get_stack) -auto-approve
-	@$(PRINTF) -- "\nStep 3/5: Deploying Vault (secrets)...\n"
-	@$(ATMOS) terraform apply vault -s $(get_stack) -auto-approve
-	@$(PRINTF) -- "\nStep 4/5: Deploying K3s cluster (3 instances)...\n"
-	@$(ATMOS) terraform apply k3s-cluster -s $(get_stack) -auto-approve
-	@$(PRINTF) -- "\nStep 5/5: Extracting kubeconfig...\n"
-	@$(SCRIPTS_DIR)/get-kubeconfig.sh
-	@$(PRINTF) -- "\nBootstrap complete!\n"
-	@$(PRINTF) -- "\nNext steps:\n"
-	@$(PRINTF) -- "  1. Configure kubectl: export KUBECONFIG=./kubeconfig\n"
-	@$(PRINTF) -- "  2. Deploy ArgoCD: make apply-$(get_env)-argocd-bootstrap\n"
-	@$(PRINTF) -- "  3. Access your app at: https://glg.yourdomain.com\n"
-
-## get-kubeconfig: extract kubeconfig from k3s cluster
-get-kubeconfig:
-	@chmod +x $(SCRIPTS_DIR)/*.sh
-	@$(SCRIPTS_DIR)/get-kubeconfig.sh
-
-## backup-state: backup all terraform state files locally
-backup-state:
-	@chmod +x $(SCRIPTS_DIR)/*.sh
-	@$(SCRIPTS_DIR)/backup-state.sh
+## deploy-[env]: deploy all infrastructure components
+deploy-%:
+	@$(ATMOS) workflow bootstrap -s $(get_stack)
 
 ## plan-[env]-[comp/all]: generate terraform plan for a component or full stack
 plan-%:
@@ -181,6 +141,8 @@ sops-decrypt-prod:
 	fi
 	@$(SOPS) --decrypt "$(SECRETS_DIR)/secrets.yaml" > "$(SECRETS_DIR)/secrets.decrypted.yaml"
 	@$(PRINTF) -- "Secrets decrypted to $(SECRETS_DIR)/secrets.decrypted.yaml\n"
+%: _SOPS_READY :=
+endif # _SOPS_READY
 
 #----------------------------------------------------------------
 # Docs

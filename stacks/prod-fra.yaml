@@ -1,18 +1,13 @@
 import:
   - mixins/stage/prod
   - mixins/region/fra
+  - mixins/secrets
 
 # Using local backend (terraform.tfstate files stored in component directories)
 # Benefits: Simple, no external dependencies, works immediately
 # Note: For team collaboration, consider configuring remote backend later
 
 vars:
-  # OCI Authentication (from environment variables or config)
-  tenancy_ocid: "${TF_VAR_OCI_TENANCY_OCID}"
-  user_ocid: "${TF_VAR_OCI_USER_OCID}"
-  fingerprint: "${TF_VAR_OCI_FINGERPRINT}"
-  private_key_path: "${TF_VAR_OCI_PRIVATE_KEY_PATH}"
-  compartment_ocid: ocid1.tenancy.oc1..aaaaaaaanilo3dpim4d2kxmjsjntm3lpibzshsytm6foem7ys67vjslpkcfa
 
   # Environment configuration
   tenant: "hs"
