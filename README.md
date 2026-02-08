@@ -5,7 +5,7 @@
 
 # fabianpiper.com
 
-*Another overengineered portfolio using K3s, Terraform, Atmos, Argo CD on OCI Free Tier*
+*A portfolio using K3s, Terraform, Atmos, Argo CD on OCI Free Tier*
 
 </div>
 
@@ -86,14 +86,6 @@ make docker-build-prod-www
 * GitOps: Argo CD using the "App of Apps" pattern.
 * Automation: Argo CD Image Updater for CD via GHCR.
 
-## Overview
-
-The infrastructure is managed following a component-based setup using Atmos:
-
-* Modules: Reusable, environment-agnostic Terraform logic
-* Components: Functional wrappers for specific configurations
-* Stacks: Multi-environment configuration (Dev, Prod)
-
 ## Structure
 
 ```
@@ -109,12 +101,6 @@ argocd/                     # GitOps applications
   └── apps/                # Application definitions
 apps/www/                   # Website source code
 ```
-
-### Networking
-
-A secure, private-first VCN on OCI. 
-K3s control plane and workers reside in private subnets, with traffic entering through a Cloudflare Tunnel.
-
 
 ## Commands
 
