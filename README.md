@@ -94,24 +94,44 @@ The infrastructure is managed following a component-based setup using Atmos:
 * Components: Functional wrappers for specific configurations
 * Stacks: Multi-environment configuration (Dev, Prod)
 
+## Structure
+
+```
+secrets/prod/               # SOPS-encrypted secrets
+stacks/prod-fra.yaml        # Main stack configuration
+components/terraform/       # Infrastructure components
+  ├── networking/          # VCN + subnets
+  ├── iam/                 # IAM policies  
+  ├── vault/               # OCI Vault
+  ├── k3s-cluster/         # 3 ARM instances
+  └── argocd-bootstrap/    # ArgoCD Helm deployment
+argocd/                     # GitOps applications
+  └── apps/                # Application definitions
+apps/www/                   # Website source code
+```
+
 ### Networking
 
 A secure, private-first VCN on OCI. 
 K3s control plane and workers reside in private subnets, with traffic entering through a Cloudflare Tunnel.
 
-## GitOps & Delivery
 
-The repository follows the App of Apps pattern:
-1. Infrastructure Apps: Cluster-wide tools (`cert-manager`, `external-dns`, `external-secrets`, `envoy-gateway`)
-2. Business Apps: The portfolio application (`www`, *more to come...*)
+## Commands
 
-Continuous Delivery is automated via Argo CD Image Updater. It monitors GHCR, detects new tags, and commits the update back to this repository to trigger a rollout.
+```bash
+make plan-prod-all                     # Plan all components
+make apply-prod-networking             # Deploy network
+make apply-prod-iam                    # Deploy IAM policies
+make apply-prod-vault                  # Deploy OCI Vault
+make apply-prod-k3s-cluster            # Deploy K3s cluster
+make apply-prod-argocd-bootstrap       # Deploy ArgoCD
 
-## Secret Management
+make sops-encrypt-prod                 # Encrypt secrets
+make sops-decrypt-prod                 # Decrypt secrets for editing
 
-* At Rest: Secrets are encrypted in Git using SOPS + age.
-* Cloud: Sensitive values are provisioned into OCI Vault.
-* Cluster: External Secrets Operator retrieves values using Instance Principals.
+make dev-www                           # Start local dev server
+make build-www                         # Build production bundle
+```
 
 ## License
 
