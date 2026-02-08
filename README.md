@@ -33,15 +33,14 @@
 git clone https://github.com/fapiper/fabianpiper.com.git
 ```
 7. Install the [Prerequisites](#prerequisites)
-8. Copy the example secret files and fill in your values
+8. Copy the example secret file and fill in your values
 ```bash
-# For each file in secrets/prod/:
-cp secrets/prod/argocd.example.yaml secrets/prod/argocd.decrypted.yaml
-# ... edit argocd.decrypted.yaml with your actual values ...
+cp secrets/prod/secrets.example.yaml secrets/prod/secrets.decrypted.yaml
+# Edit secrets/prod/secrets.decrypted.yaml with your actual values
 ```
 9. Encrypt your secrets before committing
 ```bash
-make sops-encrypt-prod-all
+make sops-encrypt-prod
 ```
 10. Follow the [Quick Start](#quick-start) steps
 
@@ -56,7 +55,7 @@ make setup
 ```
 
 > [!NOTE]
-> This generates `secrets/.sops.key` and the `.sops.yaml` config files. To encrypt or decrypt secrets, use `make sops-encrypt-[env]-all` / `make sops-decrypt-[env]-[file]` — see [Secret Management](#secret-management).
+> This generates `secrets/.sops.key` and `.sops.yaml` config. To encrypt or decrypt secrets, use `make sops-encrypt-prod` / `make sops-decrypt-prod`.
 
 #### Provisioning
 Create an entire OCI stack (Networking, IAM, Vault, K3s) in one command

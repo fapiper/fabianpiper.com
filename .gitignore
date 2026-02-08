@@ -20,9 +20,6 @@ terraform.rc
 # =============================================================================
 # Configuration & Secrets
 # =============================================================================
-# User-specific configuration (git username, ssh path, domain)
-config.yaml
-stacks/user-config.yaml
 
 # Secret management
 !secrets/
