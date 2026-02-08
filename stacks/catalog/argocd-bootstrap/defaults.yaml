@@ -4,5 +4,5 @@ components:
       vars:
         enabled: true
         argocd_namespace: "argocd"
-        git_repo_url: "https://github.com/fapiper/fabianpiper.com.git"
+        # git_repo_url and git_revision should be set in stack config
         git_revision: "HEAD"

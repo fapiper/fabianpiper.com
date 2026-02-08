@@ -97,9 +97,10 @@ components:
         public_subnet_id: ""
         private_subnet_cidr: "10.0.2.0/24"
 
-        # === USER-SPECIFIC: Update these values for your setup ===
-        ssh_public_key_path: "~/.ssh/id_rsa.pub"
-        # === End USER-SPECIFIC ===
+        # User-specific values read from environment (TF_VAR_*)
+        # DO NOT set here - Terraform reads automatically from:
+        # - TF_VAR_ssh_public_key_path (from secrets.yaml)
+        # - TF_VAR_git_username (from secrets.yaml)
 
         # Infrastructure defaults (standardized, not user-configurable)
         instance_shape: "VM.Standard.A1.Flex"
@@ -156,5 +157,7 @@ components:
         name: argocd
         enabled: false  # Enable after K3s cluster is deployed and kubeconfig is available
         argocd_namespace: "argocd"
-        git_repo_url: "${TF_VAR_GIT_REPO_URL}"
+
+        # User-specific - read from environment (TF_VAR_GIT_REPO_URL)
+        # DO NOT set here - Terraform reads automatically from secrets.yaml
         git_revision: "HEAD"
