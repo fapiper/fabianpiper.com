@@ -22,7 +22,14 @@ components:
       metadata:
         component: networking
       vars:
-        name: network
+        # OCI Authentication (from environment via Makefile SOPS injection)
+        tenancy_ocid: "${TF_VAR_tenancy_ocid}"
+        user_ocid: "${TF_VAR_user_ocid}"
+        compartment_ocid: "${TF_VAR_compartment_ocid}"
+        fingerprint: "${TF_VAR_fingerprint}"
+        private_key_path: "${TF_VAR_private_key_path}"
+
+        name: argocd
         vcn:
           name: vcn
           ipv4_cidr_blocks:
@@ -46,6 +53,14 @@ components:
       metadata:
         component: iam
       vars:
+        # OCI Authentication (from environment via Makefile SOPS injection)
+        tenancy_ocid: "${TF_VAR_tenancy_ocid}"
+        user_ocid: "${TF_VAR_user_ocid}"
+        compartment_ocid: "${TF_VAR_compartment_ocid}"
+        fingerprint: "${TF_VAR_fingerprint}"
+        private_key_path: "${TF_VAR_private_key_path}"
+        region: "${TF_VAR_region}"
+
         name: iam
 
     # OCI Vault for secrets storage
@@ -53,6 +68,14 @@ components:
       metadata:
         component: vault
       vars:
+        # OCI Authentication (from environment via Makefile SOPS injection)
+        tenancy_ocid: "${TF_VAR_tenancy_ocid}"
+        user_ocid: "${TF_VAR_user_ocid}"
+        compartment_ocid: "${TF_VAR_compartment_ocid}"
+        fingerprint: "${TF_VAR_fingerprint}"
+        private_key_path: "${TF_VAR_private_key_path}"
+        region: "${TF_VAR_region}"
+
         name: vault
         vault:
           name: vault
@@ -62,6 +85,14 @@ components:
       metadata:
         component: k3s-cluster
       vars:
+        # OCI Authentication (from environment via Makefile SOPS injection)
+        tenancy_ocid: "${TF_VAR_tenancy_ocid}"
+        user_ocid: "${TF_VAR_user_ocid}"
+        compartment_ocid: "${TF_VAR_compartment_ocid}"
+        fingerprint: "${TF_VAR_fingerprint}"
+        private_key_path: "${TF_VAR_private_key_path}"
+        region: "${TF_VAR_region}"
+
         name: k3s
 
         # Networking configuration
@@ -124,6 +155,13 @@ components:
       metadata:
         component: argocd-bootstrap
       vars:
+        # OCI Authentication (from environment via Makefile SOPS injection)
+        tenancy_ocid: "${TF_VAR_tenancy_ocid}"
+        user_ocid: "${TF_VAR_user_ocid}"
+        compartment_ocid: "${TF_VAR_compartment_ocid}"
+        fingerprint: "${TF_VAR_fingerprint}"
+        private_key_path: "${TF_VAR_private_key_path}"
+
         name: argocd
         enabled: true
         argocd_namespace: "argocd"

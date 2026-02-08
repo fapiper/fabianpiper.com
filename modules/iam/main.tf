@@ -3,7 +3,6 @@ locals {
   name    = var.name
 }
 
-# Dynamic Group for K3s Nodes
 resource "oci_identity_dynamic_group" "default" {
   count = local.enabled ? 1 : 0
 
@@ -13,7 +12,6 @@ resource "oci_identity_dynamic_group" "default" {
   matching_rule  = "ALL {instance.compartment.id = '${var.compartment_ocid}'}"
 }
 
-# Policy for Vault Access
 resource "oci_identity_policy" "default" {
   count = local.enabled ? 1 : 0
 

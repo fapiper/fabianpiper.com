@@ -1,27 +1,28 @@
 locals {
-  enabled = data.context_config.main.enabled
+  enabled = var.enabled
 
   compartment_ocid = var.compartment_ocid
-  name             = var.name
-  subnet_id        = var.subnet_id
-  shape            = var.shape
-  public_key       = var.public_key
-  load_balancers   = var.load_balancers
 
-  vault_name              = var.vault_name
-  secret_name             = var.secret_name
-  k3s_version             = var.k3s_version
-  k3s_token               = var.k3s_token
-  internal_lb_domain_name = var.internal_lb_domain_name
+  # Networking
+  vcn_id              = var.vcn_id
+  vcn_cidr_block      = var.vcn_cidr_block
+  public_subnet_id    = var.public_subnet_id
+  private_subnet_cidr = var.private_subnet_cidr
+
+  # SSH and instance config
+  ssh_public_key = file(pathexpand(var.ssh_public_key_path))
+  selected_ad    = data.oci_identity_availability_domains.ads.availability_domains[var.availability_domain].name
+
+  # K3s configuration
+  k3s_version = var.k3s_version
+  k3s_token   = var.k3s_token
+
+  # Cloud-init templates based on initialization method
+  use_cloud_init = var.initialization_method == "cloud-init"
 }
 
 data "context_config" "main" {}
 
-data "context_label" "main" {
-  values = {
-    name = local.name
-  }
-}
 
 data "oci_identity_availability_domains" "ads" {
   compartment_id = var.compartment_ocid
@@ -36,13 +37,6 @@ data "oci_core_images" "ubuntu" {
   sort_order               = "DESC"
 }
 
-locals {
-  ssh_public_key = file(var.ssh_public_key_path)
-  selected_ad    = data.oci_identity_availability_domains.ads.availability_domains[var.availability_domain].name
-
-  # Cloud-init templates based on initialization method
-  use_cloud_init = var.initialization_method == "cloud-init"
-}
 
 resource "oci_core_instance" "ingress" {
   count = var.enabled ? 1 : 0

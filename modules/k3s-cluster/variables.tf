@@ -32,7 +32,6 @@ variable "private_subnet_cidr" {
 }
 
 variable "ssh_public_key_path" {
-variable "ssh_public_key_path" {
   description = "Path to SSH public key"
   type        = string
 }

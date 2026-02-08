@@ -1,14 +1,14 @@
 output "dynamic_group_id" {
   description = "OCID of the dynamic group"
-  value       = module.iam.dynamic_group_id
+  value       = oci_identity_dynamic_group.default.id
 }
 
 output "dynamic_group_name" {
   description = "Name of the dynamic group"
-  value       = module.iam.dynamic_group_name
+  value       = oci_identity_dynamic_group.default.name
 }
 
 output "policy_id" {
   description = "OCID of the policy"
-  value       = module.iam.policy_id
+  value       = oci_identity_policy.default.id
 }
