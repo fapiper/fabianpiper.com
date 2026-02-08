@@ -3,13 +3,8 @@ import:
   - mixins/region/fra
   - mixins/secrets
 
-# Using local backend (terraform.tfstate files stored in component directories)
-# Benefits: Simple, no external dependencies, works immediately
-# Note: For team collaboration, consider configuring remote backend later
-
+# Stack-specific configuration
 vars:
-
-  # Environment configuration
   tenant: "hs"
   environment: "fra"
   stage: prod
@@ -22,14 +17,17 @@ components:
       metadata:
         component: networking
       vars:
-        # OCI Authentication (from environment via Makefile SOPS injection)
+        # OCI Authentication (from secrets via SOPS)
         tenancy_ocid: "${TF_VAR_tenancy_ocid}"
         user_ocid: "${TF_VAR_user_ocid}"
         compartment_ocid: "${TF_VAR_compartment_ocid}"
         fingerprint: "${TF_VAR_fingerprint}"
         private_key_path: "${TF_VAR_private_key_path}"
+        region: eu-frankfurt-1
 
-        name: argocd
+        name: network
+
+        # VCN configuration (infrastructure defaults)
         vcn:
           name: vcn
           ipv4_cidr_blocks:
@@ -38,6 +36,8 @@ components:
           default_security_list_deny_all: true
           default_route_table_no_routes: true
           internet_gateway_enabled: true
+
+        # Subnet configuration (infrastructure defaults)
         subnets:
           name: public-subnet
           ipv4_cidr_block: 10.0.1.0/24
@@ -59,7 +59,7 @@ components:
         compartment_ocid: "${TF_VAR_compartment_ocid}"
         fingerprint: "${TF_VAR_fingerprint}"
         private_key_path: "${TF_VAR_private_key_path}"
-        region: "${TF_VAR_region}"
+        region: eu-frankfurt-1
 
         name: iam
 
@@ -74,44 +74,38 @@ components:
         compartment_ocid: "${TF_VAR_compartment_ocid}"
         fingerprint: "${TF_VAR_fingerprint}"
         private_key_path: "${TF_VAR_private_key_path}"
-        region: "${TF_VAR_region}"
+        region: eu-frankfurt-1
 
         name: vault
         vault:
           name: vault
 
-    # K3s cluster (3 instances: ingress, server, worker)
+    # K3s cluster
     k3s-cluster:
       metadata:
         component: k3s-cluster
       vars:
-        # OCI Authentication (from environment via Makefile SOPS injection)
-        tenancy_ocid: "${TF_VAR_tenancy_ocid}"
-        user_ocid: "${TF_VAR_user_ocid}"
-        compartment_ocid: "${TF_VAR_compartment_ocid}"
-        fingerprint: "${TF_VAR_fingerprint}"
-        private_key_path: "${TF_VAR_private_key_path}"
-        region: "${TF_VAR_region}"
+        # OCI Authentication - automatically read from environment variables
+        # SOPS injects: TF_VAR_tenancy_ocid, TF_VAR_user_ocid, TF_VAR_compartment_ocid, etc.
+        region: eu-frankfurt-1
 
         name: k3s
 
-        # Networking configuration
-        # Note: vcn_id and public_subnet_id will be auto-populated by scripts/deploy-networking.sh
-        # Or run manually: make apply-prod-networking, then update these values
-        vcn_id: "" # Auto-filled after networking deployment
+        # Networking (to be filled after networking deployment)
+        vcn_id: ""
         vcn_cidr_block: "10.0.0.0/16"
-        public_subnet_id: "" # Auto-filled after networking deployment
+        public_subnet_id: ""
         private_subnet_cidr: "10.0.2.0/24"
 
-        # SSH configuration
+        # === USER-SPECIFIC: Update these values for your setup ===
         ssh_public_key_path: "~/.ssh/id_rsa.pub"
+        # === End USER-SPECIFIC ===
 
-        # Instance shapes (ARM free tier)
+        # Infrastructure defaults (standardized, not user-configurable)
         instance_shape: "VM.Standard.A1.Flex"
         instance_os: "Canonical Ubuntu"
         instance_os_version: "24.04"
 
-        # Ingress/NAT instance config
         ingress_display_name: "k3s-ingress"
         ingress_hostname_label: "ingress"
         ingress_private_ip: "10.0.1.10"
@@ -119,7 +113,6 @@ components:
           ocpus: 1
           memory_in_gbs: 6
 
-        # Server (control plane) instance config
         server_display_name: "k3s-server"
         server_hostname_label: "server"
         server_private_ip: "10.0.2.10"
@@ -127,7 +120,6 @@ components:
           ocpus: 2
           memory_in_gbs: 12
 
-        # Worker instance config
         worker_display_name: "k3s-worker"
         worker_hostname_label: "worker-1"
         worker_shape_config:
@@ -140,13 +132,11 @@ components:
         k3s_token: "${TF_VAR_K3S_TOKEN}"
         initialization_method: "cloud-init"
 
-        # GitHub container registry authentication
+        # GitHub PAT from secrets
         git_pat: "${TF_VAR_GITHUB_PAT}"
-        git_username: "${TF_VAR_GIT_USERNAME}"
 
-        # Common tags
         common_tags:
-          Environment: "prod"
+          Environment: "${environment}"
           ManagedBy: "terraform"
           Component: "k3s-cluster"
 
@@ -155,15 +145,16 @@ components:
       metadata:
         component: argocd-bootstrap
       vars:
-        # OCI Authentication (from environment via Makefile SOPS injection)
+        # OCI Authentication (from secrets via SOPS)
         tenancy_ocid: "${TF_VAR_tenancy_ocid}"
         user_ocid: "${TF_VAR_user_ocid}"
         compartment_ocid: "${TF_VAR_compartment_ocid}"
         fingerprint: "${TF_VAR_fingerprint}"
         private_key_path: "${TF_VAR_private_key_path}"
+        region: eu-frankfurt-1
 
         name: argocd
-        enabled: true
+        enabled: false  # Enable after K3s cluster is deployed and kubeconfig is available
         argocd_namespace: "argocd"
         git_repo_url: "${TF_VAR_GIT_REPO_URL}"
         git_revision: "HEAD"

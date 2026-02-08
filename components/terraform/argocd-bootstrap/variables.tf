@@ -2,6 +2,7 @@ variable "kubeconfig_content" {
   description = "Content of the kubeconfig file"
   type        = string
   sensitive   = true
+  default     = ""  # Empty by default - provided after K3s cluster is deployed
 }
 
 variable "git_repo_url" {

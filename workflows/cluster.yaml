@@ -14,7 +14,8 @@ workflows:
       - command: terraform plan iam
       - command: terraform plan vault
       - command: terraform plan k3s-cluster
-      - command: terraform plan argocd-bootstrap
+      # Note: argocd-bootstrap requires K3s cluster to be deployed first
+      # Run separately: atmos terraform plan argocd-bootstrap -s prod-fra
   destroy:
     description: "Complete teardown of all resources"
     steps:

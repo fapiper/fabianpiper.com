@@ -25,11 +25,11 @@ data "context_config" "main" {}
 
 
 data "oci_identity_availability_domains" "ads" {
-  compartment_id = var.compartment_ocid
+  compartment_id = local.compartment_ocid
 }
 
 data "oci_core_images" "ubuntu" {
-  compartment_id           = var.compartment_ocid
+  compartment_id           = local.compartment_ocid
   operating_system         = var.instance_os
   operating_system_version = var.instance_os_version
   shape                    = var.instance_shape
@@ -41,7 +41,7 @@ data "oci_core_images" "ubuntu" {
 resource "oci_core_instance" "ingress" {
   count = var.enabled ? 1 : 0
 
-  compartment_id      = var.compartment_ocid
+  compartment_id      = local.compartment_ocid
   availability_domain = local.selected_ad
   display_name        = var.ingress_display_name
   shape               = var.instance_shape
@@ -86,7 +86,7 @@ data "oci_core_private_ips" "ingress_ips" {
 resource "oci_core_route_table" "private_rt" {
   count = var.enabled ? 1 : 0
 
-  compartment_id = var.compartment_ocid
+  compartment_id = local.compartment_ocid
   vcn_id         = var.vcn_id
   display_name   = "k3s-private-rt"
   freeform_tags  = var.common_tags
@@ -102,7 +102,7 @@ resource "oci_core_route_table" "private_rt" {
 resource "oci_core_security_list" "private_subnet_sl" {
   count = var.enabled ? 1 : 0
 
-  compartment_id = var.compartment_ocid
+  compartment_id = local.compartment_ocid
   vcn_id         = var.vcn_id
   display_name   = "k3s-private-subnet-sl"
   freeform_tags  = var.common_tags
@@ -125,7 +125,7 @@ resource "oci_core_security_list" "private_subnet_sl" {
 resource "oci_core_subnet" "private_subnet" {
   count = var.enabled ? 1 : 0
 
-  compartment_id             = var.compartment_ocid
+  compartment_id             = local.compartment_ocid
   vcn_id                     = var.vcn_id
   cidr_block                 = var.private_subnet_cidr
   display_name               = "k3s-private-subnet"
@@ -139,7 +139,7 @@ resource "oci_core_subnet" "private_subnet" {
 resource "oci_core_instance" "server" {
   count = var.enabled ? 1 : 0
 
-  compartment_id      = var.compartment_ocid
+  compartment_id      = local.compartment_ocid
   availability_domain = local.selected_ad
   display_name        = var.server_display_name
   shape               = var.instance_shape
@@ -178,7 +178,7 @@ resource "oci_core_instance" "server" {
 resource "oci_core_instance" "worker" {
   count = var.enabled && var.enable_worker ? 1 : 0
 
-  compartment_id      = var.compartment_ocid
+  compartment_id      = local.compartment_ocid
   availability_domain = local.selected_ad
   display_name        = var.worker_display_name
   shape               = var.instance_shape

@@ -1,11 +1,16 @@
 module "k3s_cluster" {
   source = "../../../modules/k3s-cluster"
 
-  compartment_ocid         = var.compartment_ocid
-  vcn_id                   = var.vcn_id
+  # OCI Configuration - from TF_VAR environment variables
+  compartment_ocid    = var.compartment_ocid
+
+  # Network Configuration
+  vcn_id              = var.vcn_id
   vcn_cidr_block      = var.vcn_cidr_block
   public_subnet_id    = var.public_subnet_id
   private_subnet_cidr = var.private_subnet_cidr
+
+  # SSH Configuration
   ssh_public_key_path = var.ssh_public_key_path
 
   # Instance configuration
