@@ -6,22 +6,10 @@ components:
       vars:
         enabled: true
         name: network
+        vcn_cidr_blocks:
+          - 10.0.0.0/16
+        vcn_dns_label: default
+        subnet_name: public-subnet
+        subnet_cidr_block: 10.0.1.0/24
+        subnet_dns_label: public
 
-        vcn:
-          name: vcn
-          ipv4_cidr_blocks:
-            - 10.0.0.0/16
-          dns_label: default
-          default_security_list_deny_all: true
-          default_route_table_no_routes: true
-          internet_gateway_enabled: true
-
-        subnets:
-          name: public-subnet
-          ipv4_cidr_block: 10.0.1.0/24
-          dns_label: public
-          ssh_enabled: true
-          https_enabled: true
-          container_cluster_enabled: true
-          create_route_table: true
-          route_table_enabled: true

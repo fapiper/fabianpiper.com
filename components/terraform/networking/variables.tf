@@ -1,67 +1,86 @@
 variable "tenancy_ocid" {
-  type = string
+  type        = string
+  description = "OCI tenancy OCID"
 }
 
 variable "user_ocid" {
-  type = string
+  type        = string
+  description = "OCI user OCID"
 }
 
 variable "private_key_path" {
-  type = string
+  type        = string
+  description = "Path to OCI API private key"
 }
 
 variable "fingerprint" {
-  type = string
+  type        = string
+  description = "OCI API key fingerprint"
 }
 
 variable "region" {
-  type = string
+  type        = string
+  description = "OCI region"
 }
 
 variable "compartment_ocid" {
-  type = string
+  type        = string
+  description = "OCI compartment OCID"
 }
 
 variable "enabled" {
-  type = bool
+  type        = bool
+  description = "Enable/disable this component"
+  default     = true
 }
 
 variable "tenant" {
-  type = string
+  type        = string
+  description = "Tenant name"
 }
 
 variable "environment" {
-  type = string
+  type        = string
+  description = "Environment name"
 }
 
 variable "stage" {
-  type = string
+  type        = string
+  description = "Stage name"
 }
 
 variable "name" {
-  type = string
+  type        = string
+  description = "Resource name"
 }
 
-variable "vcn" {
-  type = object({
-    name                           = string
-    ipv4_cidr_blocks               = list(string)
-    dns_label                      = string
-    default_security_list_deny_all = bool
-    default_route_table_no_routes  = bool
-    internet_gateway_enabled       = bool
-  })
+variable "vcn_cidr_blocks" {
+  type        = list(string)
+  description = "CIDR blocks for the VCN"
+  default     = ["10.0.0.0/16"]
 }
 
-variable "subnets" {
-  type = object({
-    name                      = string
-    ipv4_cidr_block           = string
-    dns_label                 = string
-    ssh_enabled               = bool
-    https_enabled             = bool
-    container_cluster_enabled = bool
-    create_route_table        = bool
-    route_table_enabled       = bool
-  })
+variable "vcn_dns_label" {
+  type        = string
+  description = "DNS label for the VCN"
+  default     = "default"
 }
+
+variable "subnet_name" {
+  type        = string
+  description = "Name of the subnet"
+  default     = "public-subnet"
+}
+
+variable "subnet_cidr_block" {
+  type        = string
+  description = "CIDR block for the subnet"
+  default     = "10.0.1.0/24"
+}
+
+variable "subnet_dns_label" {
+  type        = string
+  description = "DNS label for the subnet"
+  default     = "public"
+}
+

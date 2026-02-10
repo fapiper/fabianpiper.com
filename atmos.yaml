@@ -11,12 +11,12 @@ components:
 stacks:
   base_path: "stacks"
   included_paths:
-    - "*.yaml"
+    - "orgs/**/*.yaml"
   excluded_paths:
     - "catalog/**/*"
     - "mixins/**/*"
     - "workflows/**/*"
-
+  name_template: "{{.vars.tenant}}-{{.vars.stage}}-{{.vars.environment}}"
 workflows:
   base_path: "stacks/workflows"
 

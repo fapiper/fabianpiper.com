@@ -3,7 +3,6 @@ locals {
 
   compartment_ocid = var.compartment_ocid
 
-  # Networking
   vcn_id              = var.vcn_id
   vcn_cidr_block      = var.vcn_cidr_block
   public_subnet_id    = var.public_subnet_id
