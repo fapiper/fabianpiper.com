@@ -83,14 +83,22 @@ data "oci_dns_resolver" "default" {
 
   resolver_id = data.oci_core_vcn_dns_resolver_association.default[0].dns_resolver_id
   scope       = "PRIVATE"
+
+  depends_on = [
+    data.oci_core_vcn_dns_resolver_association.default
+  ]
 }
 
 resource "oci_dns_resolver" "default" {
   count = local.enabled ? 1 : 0
 
-  resolver_id  = data.oci_dns_resolver.default[0].id
-  display_name = data.context_label.vcn.rendered
+  resolver_id   = data.oci_dns_resolver.default[0].id
+  display_name  = data.context_label.vcn.rendered
   freeform_tags = data.context_tags.vcn.tags
+
+  depends_on = [
+    data.oci_dns_resolver.default
+  ]
 }
 
 resource "oci_core_subnet" "default" {

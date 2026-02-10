@@ -71,7 +71,8 @@ plan-%:
 
 ## apply-[env]-[comp]: deploy a specific terraform component to an environment
 apply-%:
-	$(ATMOS) terraform apply $(get_comp) -s $(get_stack)
+	@if [ "$(get_comp)" = "all" ]; then $(ATMOS) workflow apply -s $(get_stack); \
+	else $(ATMOS) terraform apply $(get_comp) -s $(get_stack); fi
 
 ## validate-[env]-[comp/all]: run static analysis and linting on the stack
 validate-%:

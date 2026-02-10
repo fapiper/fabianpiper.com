@@ -1,5 +1,5 @@
 workflows:
-  bootstrap:
+  apply:
     description: "Bootstrap of the OCI and K3s stack (includes ArgoCD)"
     steps:
       - command: terraform apply networking
