@@ -1,35 +1,16 @@
 import:
   - mixins/stage/prod
   - mixins/region/fra
-  - mixins/secrets
 
-# Stack-specific configuration
 vars:
   tenant: "hs"
-
-# Components: Inherit everything from catalog/* defaults
-# Only override what's specific to THIS stack
 components:
   terraform:
-    # Networking: inherits all from catalog/networking/defaults.yaml
-    networking: {}
-
-    # IAM: inherits all from catalog/iam/defaults.yaml
-    iam: {}
-
-    # Vault: inherits all from catalog/vault/defaults.yaml
-    vault: {}
-
-    # K3s: inherits all from catalog/k3s-cluster/defaults.yaml
-    # Override only what needs to be filled AFTER networking deployment
     k3s-cluster:
       vars:
         # These will be set after `make apply-prod-networking`:
         # vcn_id: "ocid1.vcn.oc1.eu-frankfurt-1.xxx"
         # public_subnet_id: "ocid1.subnet.oc1.eu-frankfurt-1.xxx"
 
-
-        # Environment-specific tag
         common_tags:
           Environment: "${environment}"
-

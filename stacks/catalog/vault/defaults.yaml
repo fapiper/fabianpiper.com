@@ -1,5 +1,8 @@
 components:
   terraform:
     vault:
+      metadata:
+        component: vault
       vars:
         enabled: true
+        name: vault

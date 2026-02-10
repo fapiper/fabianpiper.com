@@ -1,5 +1,8 @@
 components:
   terraform:
     iam:
+      metadata:
+        component: iam
       vars:
         enabled: true
+        name: iam

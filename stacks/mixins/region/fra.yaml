@@ -1,10 +1,24 @@
 import:
   - catalog/iam/defaults
-  - catalog/k3s-cluster/defaults
   - catalog/vault/defaults
   - catalog/networking/defaults
+  - catalog/k3s-cluster/defaults
 
 vars:
   region: "eu-frankfurt-1"
   environment: "fra"
 
+components:
+  terraform:
+    networking:
+      vars:
+        region: "eu-frankfurt-1"
+    iam:
+      vars:
+        region: "eu-frankfurt-1"
+    vault:
+      vars:
+        region: "eu-frankfurt-1"
+    k3s-cluster:
+      vars:
+        region: "eu-frankfurt-1"
