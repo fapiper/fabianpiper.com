@@ -90,7 +90,11 @@ make docker-build-prod-www
 
 ```
 secrets/prod/               # SOPS-encrypted secrets
-stacks/prod-fra.yaml        # Main stack configuration
+stacks/
+  ├── deploy/              # Stack definitions
+  ├── catalog/             # Component defaults
+  ├── mixins/              # Reusable configuration
+  └── workflows/           # Atmos workflows
 components/terraform/       # Infrastructure components
   ├── networking/          # VCN + subnets
   ├── iam/                 # IAM policies  

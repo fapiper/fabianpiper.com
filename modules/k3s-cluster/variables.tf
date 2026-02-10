@@ -9,7 +9,6 @@ variable "availability_domain" {
   default     = 0
 }
 
-# Networking
 variable "vcn_id" {
   description = "VCN OCID from networking component"
   type        = string
@@ -36,7 +35,6 @@ variable "ssh_public_key_path" {
   type        = string
 }
 
-# Instance Configuration
 variable "instance_shape" {
   description = "OCI instance shape"
   type        = string
@@ -55,7 +53,6 @@ variable "instance_os_version" {
   default     = "24.04"
 }
 
-# Ingress Instance
 variable "ingress_display_name" {
   description = "Display name for ingress instance"
   type        = string
@@ -86,7 +83,6 @@ variable "ingress_shape_config" {
   }
 }
 
-# Server Instance
 variable "server_display_name" {
   description = "Display name for server instance"
   type        = string
@@ -117,7 +113,6 @@ variable "server_shape_config" {
   }
 }
 
-# Worker Instance
 variable "worker_display_name" {
   description = "Display name for worker instance"
   type        = string
@@ -148,7 +143,6 @@ variable "enable_worker" {
   default     = true
 }
 
-# K3s Configuration
 variable "k3s_version" {
   description = "K3s version to install"
   type        = string
@@ -171,7 +165,6 @@ variable "initialization_method" {
   }
 }
 
-# Application Configuration
 variable "git_pat" {
   description = "GitHub Personal Access Token for container registry authentication"
   type        = string
@@ -179,9 +172,9 @@ variable "git_pat" {
 }
 
 variable "git_username" {
-  description = "GitHub username for container registry"
+  description = "GitHub username"
   type        = string
-  default     = "git"
+  default     = ""
 }
 
 variable "git_repo_url" {

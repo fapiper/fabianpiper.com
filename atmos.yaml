@@ -15,10 +15,10 @@ stacks:
   excluded_paths:
     - "catalog/**/*"
     - "mixins/**/*"
-    - "orgs/**/*"
+    - "workflows/**/*"
 
 workflows:
-  base_path: "workflows"
+  base_path: "stacks/workflows"
 
 settings:
   list_merge_strategy: replace

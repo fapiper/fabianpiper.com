@@ -6,136 +6,30 @@ import:
 # Stack-specific configuration
 vars:
   tenant: "hs"
-  environment: "fra"
-  stage: prod
-  region: eu-frankfurt-1
 
+# Components: Inherit everything from catalog/* defaults
+# Only override what's specific to THIS stack
 components:
   terraform:
-    # Network infrastructure
-    networking:
-      metadata:
-        component: networking
-      vars:
-        # OCI Authentication (from secrets via SOPS)
-        tenancy_ocid: "${TF_VAR_tenancy_ocid}"
-        user_ocid: "${TF_VAR_user_ocid}"
-        compartment_ocid: "${TF_VAR_compartment_ocid}"
-        fingerprint: "${TF_VAR_fingerprint}"
-        private_key_path: "${TF_VAR_private_key_path}"
-        region: eu-frankfurt-1
+    # Networking: inherits all from catalog/networking/defaults.yaml
+    networking: {}
 
-        name: network
+    # IAM: inherits all from catalog/iam/defaults.yaml
+    iam: {}
 
-        # VCN configuration (infrastructure defaults)
-        vcn:
-          name: vcn
-          ipv4_cidr_blocks:
-            - 10.0.0.0/16
-          dns_label: default
-          default_security_list_deny_all: true
-          default_route_table_no_routes: true
-          internet_gateway_enabled: true
+    # Vault: inherits all from catalog/vault/defaults.yaml
+    vault: {}
 
-        # Subnet configuration (infrastructure defaults)
-        subnets:
-          name: public-subnet
-          ipv4_cidr_block: 10.0.1.0/24
-          dns_label: public
-          ssh_enabled: true
-          https_enabled: true
-          container_cluster_enabled: true
-          create_route_table: true
-          route_table_enabled: true
-
-    # IAM policies for K3s nodes to access Vault
-    iam:
-      metadata:
-        component: iam
-      vars:
-        # OCI Authentication (from environment via Makefile SOPS injection)
-        tenancy_ocid: "${TF_VAR_tenancy_ocid}"
-        user_ocid: "${TF_VAR_user_ocid}"
-        compartment_ocid: "${TF_VAR_compartment_ocid}"
-        fingerprint: "${TF_VAR_fingerprint}"
-        private_key_path: "${TF_VAR_private_key_path}"
-        region: eu-frankfurt-1
-
-        name: iam
-
-    # OCI Vault for secrets storage
-    vault:
-      metadata:
-        component: vault
-      vars:
-        # OCI Authentication (from environment via Makefile SOPS injection)
-        tenancy_ocid: "${TF_VAR_tenancy_ocid}"
-        user_ocid: "${TF_VAR_user_ocid}"
-        compartment_ocid: "${TF_VAR_compartment_ocid}"
-        fingerprint: "${TF_VAR_fingerprint}"
-        private_key_path: "${TF_VAR_private_key_path}"
-        region: eu-frankfurt-1
-
-        name: vault
-
-    # K3s cluster
+    # K3s: inherits all from catalog/k3s-cluster/defaults.yaml
+    # Override only what needs to be filled AFTER networking deployment
     k3s-cluster:
-      metadata:
-        component: k3s-cluster
       vars:
-        # OCI Authentication - automatically read from environment variables
-        # SOPS injects: TF_VAR_tenancy_ocid, TF_VAR_user_ocid, TF_VAR_compartment_ocid, etc.
-        region: eu-frankfurt-1
+        # These will be set after `make apply-prod-networking`:
+        # vcn_id: "ocid1.vcn.oc1.eu-frankfurt-1.xxx"
+        # public_subnet_id: "ocid1.subnet.oc1.eu-frankfurt-1.xxx"
 
-        name: k3s
 
-        # Networking (to be filled after networking deployment)
-        vcn_id: ""
-        vcn_cidr_block: "10.0.0.0/16"
-        public_subnet_id: ""
-        private_subnet_cidr: "10.0.2.0/24"
-
-        # User-specific values read from environment (TF_VAR_*)
-        # DO NOT set here - Terraform reads automatically from:
-        # - TF_VAR_ssh_public_key_path (from secrets.yaml)
-        # - TF_VAR_git_username (from secrets.yaml)
-
-        # Infrastructure defaults (standardized, not user-configurable)
-        instance_shape: "VM.Standard.A1.Flex"
-        instance_os: "Canonical Ubuntu"
-        instance_os_version: "24.04"
-
-        ingress_display_name: "k3s-ingress"
-        ingress_hostname_label: "ingress"
-        ingress_private_ip: "10.0.1.10"
-        ingress_shape_config:
-          ocpus: 1
-          memory_in_gbs: 6
-
-        server_display_name: "k3s-server"
-        server_hostname_label: "server"
-        server_private_ip: "10.0.2.10"
-        server_shape_config:
-          ocpus: 2
-          memory_in_gbs: 12
-
-        worker_display_name: "k3s-worker"
-        worker_hostname_label: "worker-1"
-        worker_shape_config:
-          ocpus: 1
-          memory_in_gbs: 6
-        enable_worker: true
-
-        # K3s configuration
-        k3s_version: "v1.30.0+k3s1"
-        k3s_token: "${TF_VAR_K3S_TOKEN}"
-        initialization_method: "cloud-init"
-
-        # GitHub PAT from secrets
-        git_pat: "${TF_VAR_GITHUB_PAT}"
-        git_repo_url: "${TF_VAR_GIT_REPO_URL}"
-
+        # Environment-specific tag
         common_tags:
           Environment: "${environment}"
-          ManagedBy: "terraform"
-          Component: "k3s-cluster"
+

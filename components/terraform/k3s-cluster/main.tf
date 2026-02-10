@@ -40,8 +40,6 @@ module "k3s_cluster" {
   k3s_version            = var.k3s_version
   k3s_token              = var.k3s_token
   initialization_method  = var.initialization_method
-
-  # Git configuration for registry and ArgoCD
   git_pat      = var.git_pat
   git_username = var.git_username
   git_repo_url = var.git_repo_url
