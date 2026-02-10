@@ -73,6 +73,78 @@ resource "oci_core_default_security_list" "internal" {
 }
 
 
+# Consolidated K3s security list
+resource "oci_core_security_list" "k3s" {
+  count = local.enabled ? 1 : 0
+
+  compartment_id = local.compartment_ocid
+  vcn_id         = oci_core_vcn.default[0].id
+  display_name   = "${data.context_label.subnet.rendered}-k3s"
+  freeform_tags  = data.context_tags.subnet.tags
+
+  # Allow all egress
+  egress_security_rules {
+    destination = "0.0.0.0/0"
+    protocol    = "all"
+    description = "Allow all egress"
+  }
+
+  # SSH ingress
+  ingress_security_rules {
+    source      = "0.0.0.0/0"
+    protocol    = "6"  # TCP
+    description = "Allow SSH ingress"
+
+    tcp_options {
+      min = 22
+      max = 22
+    }
+  }
+
+  # HTTP ingress
+  ingress_security_rules {
+    source      = "0.0.0.0/0"
+    protocol    = "6"  # TCP
+    description = "Allow HTTP ingress"
+
+    tcp_options {
+      min = 80
+      max = 80
+    }
+  }
+
+  # HTTPS ingress
+  ingress_security_rules {
+    source      = "0.0.0.0/0"
+    protocol    = "6"  # TCP
+    description = "Allow HTTPS ingress"
+
+    tcp_options {
+      min = 443
+      max = 443
+    }
+  }
+
+  # K3s API ingress
+  ingress_security_rules {
+    source      = "0.0.0.0/0"
+    protocol    = "6"  # TCP
+    description = "Allow K3s API ingress"
+
+    tcp_options {
+      min = 6443
+      max = 6443
+    }
+  }
+
+  # Allow all internal VCN traffic
+  ingress_security_rules {
+    source      = local.vcn_cidr_blocks[0]
+    protocol    = "all"
+    description = "Allow all internal VCN traffic"
+  }
+}
+
 resource "oci_core_subnet" "default" {
   count = local.enabled ? 1 : 0
 
@@ -84,9 +156,7 @@ resource "oci_core_subnet" "default" {
   freeform_tags  = data.context_tags.subnet.tags
 
   security_list_ids = [
-    oci_core_security_list.ssh_ipv4[0].id,
-    oci_core_security_list.node_ipv4[0].id,
-    oci_core_security_list.container_cluster_ipv4[0].id
+    oci_core_security_list.k3s[0].id
   ]
 }
 
@@ -109,137 +179,4 @@ resource "oci_core_route_table_attachment" "default" {
 
   subnet_id      = oci_core_subnet.default[0].id
   route_table_id = oci_core_route_table.default[0].id
-}
-
-resource "oci_core_security_list" "ssh_ipv4" {
-  count = local.enabled ? 1 : 0
-
-  compartment_id = local.compartment_ocid
-  vcn_id         = oci_core_vcn.default[0].id
-  display_name   = "${data.context_label.subnet.rendered}-ssh-ipv4"
-  freeform_tags  = data.context_tags.subnet.tags
-
-  # Allow all egress - simpler and more reliable
-  egress_security_rules {
-    destination = "0.0.0.0/0"
-    protocol    = "all"
-    description = "Allow all egress"
-  }
-
-  ingress_security_rules {
-    source      = "0.0.0.0/0"
-    protocol    = "6"  # TCP
-    description = "Allow SSH ingress"
-
-    tcp_options {
-      min = 22
-      max = 22
-    }
-  }
-
-  # Allow HTTP ingress
-  ingress_security_rules {
-    source      = "0.0.0.0/0"
-    protocol    = "6"  # TCP
-    description = "Allow HTTP ingress"
-
-    tcp_options {
-      min = 80
-      max = 80
-    }
-  }
-
-  # Allow HTTPS ingress
-  ingress_security_rules {
-    source      = "0.0.0.0/0"
-    protocol    = "6"  # TCP
-    description = "Allow HTTPS ingress"
-
-    tcp_options {
-      min = 443
-      max = 443
-    }
-  }
-
-  # Allow internal VCN traffic
-  ingress_security_rules {
-    source      = "10.0.0.0/16"
-    protocol    = "all"
-    description = "Allow all internal VCN traffic"
-  }
-}
-
-resource "oci_core_security_list" "node_ipv4" {
-  count = local.enabled ? 1 : 0
-
-  compartment_id = local.compartment_ocid
-  vcn_id         = oci_core_vcn.default[0].id
-  display_name   = "${data.context_label.subnet.rendered}-node-ipv4"
-  freeform_tags  = data.context_tags.subnet.tags
-
-  # Allow all egress
-  egress_security_rules {
-    destination = "0.0.0.0/0"
-    protocol    = "all"
-    description = "Allow all egress"
-  }
-
-  # Allow HTTPS ingress
-  ingress_security_rules {
-    source      = "0.0.0.0/0"
-    protocol    = "6"  # TCP
-    description = "Allow HTTPS ingress"
-
-    tcp_options {
-      min = 443
-      max = 443
-    }
-  }
-
-  # Allow HTTP ingress
-  ingress_security_rules {
-    source      = "0.0.0.0/0"
-    protocol    = "6"  # TCP
-    description = "Allow HTTP ingress"
-
-    tcp_options {
-      min = 80
-      max = 80
-    }
-  }
-}
-
-resource "oci_core_security_list" "container_cluster_ipv4" {
-  count = local.enabled ? 1 : 0
-
-  compartment_id = local.compartment_ocid
-  vcn_id         = oci_core_vcn.default[0].id
-  display_name   = "${data.context_label.subnet.rendered}-container-cluster-ipv4"
-  freeform_tags  = data.context_tags.subnet.tags
-
-  # Allow all egress
-  egress_security_rules {
-    destination = "0.0.0.0/0"
-    protocol    = "all"
-    description = "Allow all egress"
-  }
-
-  # K3s API ingress
-  ingress_security_rules {
-    source      = "0.0.0.0/0"
-    protocol    = "6"  # TCP
-    description = "Allow K3s API ingress"
-
-    tcp_options {
-      min = 6443
-      max = 6443
-    }
-  }
-
-  # Allow all internal VCN traffic
-  ingress_security_rules {
-    source      = "10.0.0.0/16"
-    protocol    = "all"
-    description = "Allow all internal VCN traffic"
-  }
 }
