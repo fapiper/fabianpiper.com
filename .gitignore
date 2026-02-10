@@ -1,109 +1,82 @@
 # =============================================================================
-# Terraform & Atmos
+# Infrastructure (Terraform, Atmos, OCI)
 # =============================================================================
 .terraform/
-.terraform.lock.hcl
+.terraform.*
 *.tfstate
 *.tfstate.*
-*.tfstate.backup
-terraform.tfvars
-terraform.tfvars.json
-override.tf
-override.tf.json
-*_override.tf
-*_override.tf.json
+*.tfvars
+*.tfvars.json
+*.tfplan
+*.planfile
+*.tfplan
+plan.out.atmos/
 .terraformrc
 terraform.rc
-**/tfplan
-.atmos/
+
+# OCI & Kubernetes
+.oci/
+oci_api_key.pem
+*config
+k3s.yaml
+.kube/
 
 # =============================================================================
-# Configuration & Secrets
+# Build Systems & Languages
 # =============================================================================
+# Bazel (Crucial for Monorepos)
+/bazel-*
 
-# Secret management
-!secrets/
-secrets/.sops.key
-**/.sops.key
-secrets/**/*.decrypted.yaml
-**/*.decrypted.yaml
-*.pem
-*.key
-*.crt
-*.cert
-*.p12
-*.pfx
+# Go
+bin/
+obj/
+/vendor/
+*.exe
+*.test
+*.prof
+
+# Node & Astro
+node_modules/
+dist/
+.astro/
+.cache/
+.npm/
+
+# =============================================================================
+# Secrets & Security
+# =============================================================================
+**/*.pem
+**/*.key
+**/*.decrypted.*
 .env
 .env.*
 .envrc
 !.envrc.example
-*.secret
-*.secrets
+secrets/
+!secrets/.sops.yaml
 
-# OCI & Kubeconfig
-.oci/
-oci_api_key.pem
-oci_config
-kubeconfig
-kubeconfig.*
-*.kubeconfig
-k3s.yaml
-
+# =============================================================================
+# IDEs & Editors
 # =============================================================================
 # IntelliJ
-# =============================================================================
 .idea/
 *.iml
 *.iws
 *.ipr
 out/
-# For Gradle-based IntelliJ projects (if applicable)
-.gradle/
-build/
 
-# VSCode
-.vscode/
-*.code-workspace
+# VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
 .history/
+*.code-workspace
 
 # =============================================================================
-# Apps & JavaScript
-# =============================================================================
-node_modules/
-**/node_modules/
-dist/
-build/
-.astro/
-**/.astro/
-# Keep bun.lockb as it's meant to be committed for reproducibility
-
-# =============================================================================
-# Logs & System Files
+# System & Logs
 # =============================================================================
 *.log
-logs/
-log/
 .DS_Store
 Thumbs.db
-Desktop.ini
-$RECYCLE.BIN/
-*~
 *.tmp
-*.temp
 *.bak
-*.swp
-*.swo
-
-# =============================================================================
-# Backups
-# =============================================================================
-backups/
-
-# =============================================================================
-# Python
-# =============================================================================
-__pycache__/
-*.py[cod]
-*$py.class
-venv/
-.Python
