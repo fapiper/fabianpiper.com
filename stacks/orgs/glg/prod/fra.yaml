@@ -3,7 +3,7 @@ import:
   - mixins/region/fra
 
 vars:
-  tenant: "hs"
+  tenant: "glg"
 
 components:
   terraform:

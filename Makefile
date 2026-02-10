@@ -28,7 +28,7 @@ SCRIPTS_DIR   := ./scripts
 parse_stem = $(subst -, ,$*)
 get_env    = $(word 1,$(parse_stem))
 get_comp   = $(if $(word 2,$(parse_stem)),$(lastword $(parse_stem)),all)
-get_stack  = hs-$(get_env)-fra
+get_stack  = glg-$(get_env)-fra
 
 #----------------------------------------------------------------
 # SOPS Recursive Injection
