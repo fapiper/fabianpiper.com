@@ -8,15 +8,12 @@ locals {
   public_subnet_id    = var.public_subnet_id
   private_subnet_cidr = var.private_subnet_cidr
 
-  # SSH and instance config
   ssh_public_key = file(pathexpand(var.ssh_public_key_path))
   selected_ad    = data.oci_identity_availability_domains.ads.availability_domains[var.availability_domain].name
 
-  # K3s configuration
   k3s_version = var.k3s_version
   k3s_token   = var.k3s_token
 
-  # Cloud-init templates based on initialization method
   use_cloud_init = var.initialization_method == "cloud-init"
 }
 

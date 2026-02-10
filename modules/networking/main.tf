@@ -1,6 +1,3 @@
-# Networking Module
-# Combines VCN and Subnets into a single, cohesive module
-
 locals {
   enabled = var.enabled
 
@@ -37,10 +34,6 @@ data "context_tags" "subnet" {
     name = var.subnet_name
   }
 }
-
-#----------------------------------------------------------------
-# VCN Resources
-#----------------------------------------------------------------
 
 resource "oci_core_vcn" "default" {
   count = local.enabled ? 1 : 0
@@ -100,10 +93,6 @@ resource "oci_dns_resolver" "default" {
   freeform_tags = data.context_tags.vcn.tags
 }
 
-#----------------------------------------------------------------
-# Subnet Resources
-#----------------------------------------------------------------
-
 resource "oci_core_subnet" "default" {
   count = local.enabled ? 1 : 0
 
@@ -135,8 +124,6 @@ resource "oci_core_route_table_attachment" "default" {
   subnet_id      = oci_core_subnet.default[0].id
   route_table_id = oci_core_route_table.default[0].id
 }
-
-# Security Lists for K3s
 
 resource "oci_core_security_list" "ssh_ipv4" {
   count = local.enabled ? 1 : 0

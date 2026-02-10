@@ -1,8 +1,8 @@
 import:
-  - catalog/iam/defaults.yaml
-  - catalog/vault/defaults.yaml
-  - catalog/networking/defaults.yaml
-  - catalog/k3s-cluster/defaults.yaml
+  - catalog/iam/defaults
+  - catalog/vault/defaults
+  - catalog/networking/defaults
+  - catalog/k3s-cluster/defaults
 
 vars:
   region: "eu-frankfurt-1"

@@ -1,7 +1,6 @@
 module "k3s_cluster" {
   source = "../../../modules/k3s-cluster"
 
-  # OCI Configuration - from TF_VAR environment variables
   compartment_ocid    = var.compartment_ocid
 
   # Network Configuration

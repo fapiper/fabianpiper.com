@@ -9,10 +9,6 @@ variable "compartment_ocid" {
   description = "OCI compartment OCID"
 }
 
-#----------------------------------------------------------------
-# VCN Variables
-#----------------------------------------------------------------
-
 variable "vcn_cidr_blocks" {
   type        = list(string)
   description = "CIDR blocks for the VCN"
@@ -24,10 +20,6 @@ variable "vcn_dns_label" {
   description = "DNS label for the VCN"
   default     = "default"
 }
-
-#----------------------------------------------------------------
-# Subnet Variables
-#----------------------------------------------------------------
 
 variable "subnet_name" {
   type        = string

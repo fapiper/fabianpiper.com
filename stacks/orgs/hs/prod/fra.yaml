@@ -1,24 +1,12 @@
 import:
-  - mixins/stage/prod.yaml
-  - mixins/region/fra.yaml
+  - mixins/stage/prod
+  - mixins/region/fra
 
 vars:
   tenant: "hs"
 
-# Components: Inherit everything from catalog/* defaults via mixins/region/fra.yaml
-# Only override what's specific to THIS stack
 components:
   terraform:
-    # Networking: inherits all from catalog/networking/defaults.yaml
-    networking: {}
-
-    # IAM: inherits all from catalog/iam/defaults.yaml
-    iam: {}
-
-    # Vault: inherits all from catalog/vault/defaults.yaml
-    vault: {}
-
-    # K3s: inherits all from catalog/k3s-cluster/defaults.yaml
     k3s-cluster:
       vars:
         common_tags:
