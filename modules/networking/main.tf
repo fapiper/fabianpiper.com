@@ -72,26 +72,6 @@ resource "oci_core_default_security_list" "internal" {
   freeform_tags              = data.context_tags.vcn.tags
 }
 
-data "oci_core_vcn_dns_resolver_association" "default" {
-  count = local.enabled ? 1 : 0
-
-  vcn_id = oci_core_vcn.default[0].id
-}
-
-data "oci_dns_resolver" "default" {
-  count = local.enabled ? 1 : 0
-
-  resolver_id = data.oci_core_vcn_dns_resolver_association.default[0].dns_resolver_id
-  scope       = "PRIVATE"
-}
-
-resource "oci_dns_resolver" "default" {
-  count = local.enabled ? 1 : 0
-
-  resolver_id   = data.oci_dns_resolver.default[0].id
-  display_name  = data.context_label.vcn.rendered
-  freeform_tags = data.context_tags.vcn.tags
-}
 
 resource "oci_core_subnet" "default" {
   count = local.enabled ? 1 : 0
@@ -139,25 +119,29 @@ resource "oci_core_security_list" "ssh_ipv4" {
   display_name   = "${data.context_label.subnet.rendered}-ssh-ipv4"
   freeform_tags  = data.context_tags.subnet.tags
 
+  # Allow all egress - simpler and more reliable
   egress_security_rules {
     destination = "0.0.0.0/0"
+    protocol    = "all"
+    description = "Allow all egress"
+  }
+
+  ingress_security_rules {
+    source      = "0.0.0.0/0"
     protocol    = "6"  # TCP
-    stateless   = false
-    description = "Allow SSH egress"
+    description = "Allow SSH ingress"
 
     tcp_options {
-      source_port_range {
-        min = 22
-        max = 22
-      }
+      min = 22
+      max = 22
     }
   }
 
-  egress_security_rules {
-    destination = "0.0.0.0/0"
+  # Allow HTTP ingress
+  ingress_security_rules {
+    source      = "0.0.0.0/0"
     protocol    = "6"  # TCP
-    stateless   = false
-    description = "Allow HTTP egress for package downloads"
+    description = "Allow HTTP ingress"
 
     tcp_options {
       min = 80
@@ -165,11 +149,11 @@ resource "oci_core_security_list" "ssh_ipv4" {
     }
   }
 
-  egress_security_rules {
-    destination = "0.0.0.0/0"
+  # Allow HTTPS ingress
+  ingress_security_rules {
+    source      = "0.0.0.0/0"
     protocol    = "6"  # TCP
-    stateless   = false
-    description = "Allow HTTPS egress for package downloads"
+    description = "Allow HTTPS ingress"
 
     tcp_options {
       min = 443
@@ -177,16 +161,11 @@ resource "oci_core_security_list" "ssh_ipv4" {
     }
   }
 
+  # Allow internal VCN traffic
   ingress_security_rules {
-    source      = "0.0.0.0/0"
-    protocol    = "6"  # TCP
-    stateless   = false
-    description = "Allow SSH ingress"
-
-    tcp_options {
-      min = 22
-      max = 22
-    }
+    source      = "10.0.0.0/16"
+    protocol    = "all"
+    description = "Allow all internal VCN traffic"
   }
 }
 
@@ -198,11 +177,18 @@ resource "oci_core_security_list" "node_ipv4" {
   display_name   = "${data.context_label.subnet.rendered}-node-ipv4"
   freeform_tags  = data.context_tags.subnet.tags
 
+  # Allow all egress
   egress_security_rules {
     destination = "0.0.0.0/0"
-    protocol    = "6"
-    stateless   = true
-    description = "Allow HTTPS egress"
+    protocol    = "all"
+    description = "Allow all egress"
+  }
+
+  # Allow HTTPS ingress
+  ingress_security_rules {
+    source      = "0.0.0.0/0"
+    protocol    = "6"  # TCP
+    description = "Allow HTTPS ingress"
 
     tcp_options {
       min = 443
@@ -210,43 +196,15 @@ resource "oci_core_security_list" "node_ipv4" {
     }
   }
 
-  egress_security_rules {
-    destination = "0.0.0.0/0"
-    protocol    = "6"
-    stateless   = true
-    description = "Allow HTTP egress for package repos"
+  # Allow HTTP ingress
+  ingress_security_rules {
+    source      = "0.0.0.0/0"
+    protocol    = "6"  # TCP
+    description = "Allow HTTP ingress"
 
     tcp_options {
       min = 80
       max = 80
-    }
-  }
-
-  ingress_security_rules {
-    source      = "0.0.0.0/0"
-    protocol    = "6"  # TCP
-    stateless   = true
-    description = "Allow HTTPS ingress"
-
-    tcp_options {
-      source_port_range {
-        min = 443
-        max = 443
-      }
-    }
-  }
-
-  ingress_security_rules {
-    source      = "0.0.0.0/0"
-    protocol    = "6"  # TCP
-    stateless   = true
-    description = "Allow HTTP ingress"
-
-    tcp_options {
-      source_port_range {
-        min = 80
-        max = 80
-      }
     }
   }
 }
@@ -259,122 +217,18 @@ resource "oci_core_security_list" "container_cluster_ipv4" {
   display_name   = "${data.context_label.subnet.rendered}-container-cluster-ipv4"
   freeform_tags  = data.context_tags.subnet.tags
 
-  # DNS egress (UDP)
+  # Allow all egress
   egress_security_rules {
     destination = "0.0.0.0/0"
-    protocol    = "17"  # UDP
-    stateless   = true
-    description = "Allow DNS egress"
-
-    udp_options {
-      min = 53
-      max = 53
-    }
-  }
-
-  # DNS egress (TCP)
-  egress_security_rules {
-    destination = "0.0.0.0/0"
-    protocol    = "6"  # TCP
-    stateless   = true
-    description = "Allow DNS egress"
-
-    tcp_options {
-      min = 53
-      max = 53
-    }
-  }
-
-  # K3s API egress
-  egress_security_rules {
-    destination = "0.0.0.0/0"
-    protocol    = "6"  # TCP
-    stateless   = true
-    description = "Allow container cluster API egress"
-
-    tcp_options {
-      source_port_range {
-        min = 6443
-        max = 6443
-      }
-    }
-  }
-
-  egress_security_rules {
-    destination = "0.0.0.0/0"
-    protocol    = "6"  # TCP
-    stateless   = true
-    description = "Allow container cluster API requests egress"
-
-    tcp_options {
-      min = 6443
-      max = 6443
-    }
-  }
-
-  # etcd egress
-  egress_security_rules {
-    destination = "0.0.0.0/0"
-    protocol    = "6"  # TCP
-    stateless   = true
-    description = "Allow container cluster key value store egress"
-
-    tcp_options {
-      source_port_range {
-        min = 2379
-        max = 2380
-      }
-    }
-  }
-
-  egress_security_rules {
-    destination = "0.0.0.0/0"
-    protocol    = "6"  # TCP
-    stateless   = true
-    description = "Allow container cluster key value store requests egress"
-
-    tcp_options {
-      min = 2379
-      max = 2380
-    }
-  }
-
-  # DNS ingress (UDP)
-  ingress_security_rules {
-    source      = "0.0.0.0/0"
-    protocol    = "17"  # UDP
-    stateless   = true
-    description = "Allow DNS ingress"
-
-    udp_options {
-      source_port_range {
-        min = 53
-        max = 53
-      }
-    }
-  }
-
-  # DNS ingress (TCP)
-  ingress_security_rules {
-    source      = "0.0.0.0/0"
-    protocol    = "6"  # TCP
-    stateless   = true
-    description = "Allow DNS ingress"
-
-    tcp_options {
-      source_port_range {
-        min = 53
-        max = 53
-      }
-    }
+    protocol    = "all"
+    description = "Allow all egress"
   }
 
   # K3s API ingress
   ingress_security_rules {
     source      = "0.0.0.0/0"
     protocol    = "6"  # TCP
-    stateless   = true
-    description = "Allow container cluster API ingress"
+    description = "Allow K3s API ingress"
 
     tcp_options {
       min = 6443
@@ -382,45 +236,10 @@ resource "oci_core_security_list" "container_cluster_ipv4" {
     }
   }
 
+  # Allow all internal VCN traffic
   ingress_security_rules {
-    source      = "0.0.0.0/0"
-    protocol    = "6"  # TCP
-    stateless   = true
-    description = "Allow container cluster API requests ingress"
-
-    tcp_options {
-      source_port_range {
-        min = 6443
-        max = 6443
-      }
-    }
-  }
-
-  # etcd ingress
-  ingress_security_rules {
-    source      = "0.0.0.0/0"
-    protocol    = "6"  # TCP
-    stateless   = true
-    description = "Allow container cluster key value store ingress"
-
-    tcp_options {
-      min = 2379
-      max = 2380
-    }
-  }
-
-  ingress_security_rules {
-    source      = "0.0.0.0/0"
-    protocol    = "6"  # TCP
-    stateless   = true
-    description = "Allow container cluster key value store requests ingress"
-
-    tcp_options {
-      source_port_range {
-        min = 2379
-        max = 2380
-      }
-    }
+    source      = "10.0.0.0/16"
+    protocol    = "all"
+    description = "Allow all internal VCN traffic"
   }
 }
-
