@@ -4,9 +4,9 @@ module "k3s_cluster" {
   compartment_ocid    = var.compartment_ocid
 
   # Network Configuration
-  vcn_id              = var.vcn_id
+  vcn_id              = data.terraform_remote_state.networking.outputs.vcn_id
   vcn_cidr_block      = var.vcn_cidr_block
-  public_subnet_id    = var.public_subnet_id
+  public_subnet_id    = data.terraform_remote_state.networking.outputs.subnet_id
   private_subnet_cidr = var.private_subnet_cidr
 
   # SSH Configuration

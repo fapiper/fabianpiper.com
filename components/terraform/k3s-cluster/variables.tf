@@ -44,10 +44,8 @@ variable "name" {
 }
 
 # Networking variables
-variable "vcn_id" {
-  description = "VCN OCID from networking component"
-  type        = string
-}
+# Note: vcn_id and public_subnet_id are now fetched via terraform_remote_state
+# from the networking component - see remote-state.tf
 
 variable "vcn_cidr_block" {
   description = "VCN CIDR block"
@@ -55,10 +53,6 @@ variable "vcn_cidr_block" {
   default     = "10.0.0.0/16"
 }
 
-variable "public_subnet_id" {
-  description = "Public subnet OCID from networking component"
-  type        = string
-}
 
 variable "private_subnet_cidr" {
   description = "CIDR block for private subnet"

@@ -83,10 +83,6 @@ data "oci_dns_resolver" "default" {
 
   resolver_id = data.oci_core_vcn_dns_resolver_association.default[0].dns_resolver_id
   scope       = "PRIVATE"
-
-  depends_on = [
-    data.oci_core_vcn_dns_resolver_association.default
-  ]
 }
 
 resource "oci_dns_resolver" "default" {
@@ -95,10 +91,6 @@ resource "oci_dns_resolver" "default" {
   resolver_id   = data.oci_dns_resolver.default[0].id
   display_name  = data.context_label.vcn.rendered
   freeform_tags = data.context_tags.vcn.tags
-
-  depends_on = [
-    data.oci_dns_resolver.default
-  ]
 }
 
 resource "oci_core_subnet" "default" {
@@ -110,6 +102,12 @@ resource "oci_core_subnet" "default" {
   display_name   = data.context_label.subnet.rendered
   dns_label      = local.subnet_dns_label
   freeform_tags  = data.context_tags.subnet.tags
+
+  security_list_ids = [
+    oci_core_security_list.ssh_ipv4[0].id,
+    oci_core_security_list.node_ipv4[0].id,
+    oci_core_security_list.container_cluster_ipv4[0].id
+  ]
 }
 
 resource "oci_core_route_table" "default" {
@@ -144,7 +142,7 @@ resource "oci_core_security_list" "ssh_ipv4" {
   egress_security_rules {
     destination = "0.0.0.0/0"
     protocol    = "6"  # TCP
-    stateless   = true
+    stateless   = false
     description = "Allow SSH egress"
 
     tcp_options {
@@ -155,10 +153,34 @@ resource "oci_core_security_list" "ssh_ipv4" {
     }
   }
 
+  egress_security_rules {
+    destination = "0.0.0.0/0"
+    protocol    = "6"  # TCP
+    stateless   = false
+    description = "Allow HTTP egress for package downloads"
+
+    tcp_options {
+      min = 80
+      max = 80
+    }
+  }
+
+  egress_security_rules {
+    destination = "0.0.0.0/0"
+    protocol    = "6"  # TCP
+    stateless   = false
+    description = "Allow HTTPS egress for package downloads"
+
+    tcp_options {
+      min = 443
+      max = 443
+    }
+  }
+
   ingress_security_rules {
     source      = "0.0.0.0/0"
     protocol    = "6"  # TCP
-    stateless   = true
+    stateless   = false
     description = "Allow SSH ingress"
 
     tcp_options {
@@ -178,13 +200,25 @@ resource "oci_core_security_list" "node_ipv4" {
 
   egress_security_rules {
     destination = "0.0.0.0/0"
-    protocol    = "6"  # TCP
+    protocol    = "6"
     stateless   = true
     description = "Allow HTTPS egress"
 
     tcp_options {
       min = 443
       max = 443
+    }
+  }
+
+  egress_security_rules {
+    destination = "0.0.0.0/0"
+    protocol    = "6"
+    stateless   = true
+    description = "Allow HTTP egress for package repos"
+
+    tcp_options {
+      min = 80
+      max = 80
     }
   }
 
@@ -198,6 +232,20 @@ resource "oci_core_security_list" "node_ipv4" {
       source_port_range {
         min = 443
         max = 443
+      }
+    }
+  }
+
+  ingress_security_rules {
+    source      = "0.0.0.0/0"
+    protocol    = "6"  # TCP
+    stateless   = true
+    description = "Allow HTTP ingress"
+
+    tcp_options {
+      source_port_range {
+        min = 80
+        max = 80
       }
     }
   }
