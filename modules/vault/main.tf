@@ -89,3 +89,22 @@ resource "oci_vault_secret" "git_pat" {
   depends_on = [oci_kms_key.default]
 }
 
+# Secret for Mixpanel token
+resource "oci_vault_secret" "mixpanel_token" {
+  count = local.enabled ? 1 : 0
+
+  compartment_id = local.compartment_ocid
+  vault_id       = oci_kms_vault.default[0].id
+  key_id         = oci_kms_key.default[0].id
+  secret_name    = "mixpanel-token"
+
+  secret_content {
+    content_type = "BASE64"
+    content      = base64encode(var.mixpanel_token)
+  }
+
+  freeform_tags = data.context_tags.main.tags
+
+  depends_on = [oci_kms_key.default]
+}
+

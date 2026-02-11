@@ -53,3 +53,10 @@ variable "git_pat" {
   description = "GitHub Personal Access Token"
   sensitive   = true
 }
+
+variable "mixpanel_token" {
+  type        = string
+  description = "Mixpanel token for analytics"
+  sensitive   = true
+}
+

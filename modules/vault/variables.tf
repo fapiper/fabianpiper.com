@@ -22,3 +22,8 @@ variable "git_pat" {
   sensitive   = true
 }
 
+variable "mixpanel_token" {
+  type        = string
+  description = "Mixpanel token"
+  sensitive   = true
+}

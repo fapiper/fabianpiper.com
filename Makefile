@@ -135,25 +135,25 @@ sops-init-prod:
 	@$(PRINTF) "creation_rules:\n  - path_regex: .*\\.yaml$$\n    age: $(PK)\n" > "$(SECRETS_DIR)/$(SOPS_CONFIG)"
 	@$(PRINTF) -- "SOPS configuration created\n"
 
-## sops-encrypt-prod: encrypt secrets.decrypted.yaml into secrets.yaml
+## sops-encrypt-prod: encrypt all *.decrypted.yaml files in secrets dir
 sops-encrypt-prod:
-	$(eval PK := $(shell grep 'public key' $(AGE_KEY_FILE) | cut -d' ' -f4))
-	@if [ ! -f "$(SECRETS_DIR)/secrets.decrypted.yaml" ]; then \
-		$(PRINTF) -- "$(SECRETS_DIR)/secrets.decrypted.yaml not found\n"; \
-		$(PRINTF) -- "   Run 'make init' first\n"; \
-		exit 1; \
+	@PK=$$(grep 'public key' $(AGE_KEY_FILE) | cut -d' ' -f4); \
+	for f in $(SECRETS_DIR)/*.decrypted.yaml; do \
+		[ -f "$$f" ] || continue; \
+		$(SOPS) --encrypt --age "$$PK" --output "$${f%.decrypted.yaml}.yaml" "$$f"; \
+	done
 	fi
 	@$(SOPS) --encrypt --age $(PK) --output "$(SECRETS_DIR)/secrets.yaml" "$(SECRETS_DIR)/secrets.decrypted.yaml"
 	@$(PRINTF) -- "Secrets encrypted to $(SECRETS_DIR)/secrets.yaml\n"
 
-## sops-decrypt-prod: decrypt secrets.yaml into secrets.decrypted.yaml for editing
+## sops-decrypt-prod: decrypt all *.yaml files (excluding *.decrypted.yaml and config)
 sops-decrypt-prod:
-	@if [ ! -f "$(SECRETS_DIR)/secrets.yaml" ]; then \
-		$(PRINTF) -- "$(SECRETS_DIR)/secrets.yaml not found\n"; \
-		exit 1; \
-	fi
-	@$(SOPS) --decrypt "$(SECRETS_DIR)/secrets.yaml" > "$(SECRETS_DIR)/secrets.decrypted.yaml"
-	@$(PRINTF) -- "Secrets decrypted to $(SECRETS_DIR)/secrets.decrypted.yaml\n"
+	@for f in $(SECRETS_DIR)/*.yaml; do \
+		[ -f "$$f" ] || continue; \
+		[[ "$$f" == *".decrypted.yaml" || "$$f" == *"$(SOPS_CONFIG)" ]] && continue; \
+		$(SOPS) --decrypt "$$f" > "$${f%.yaml}.decrypted.yaml"; \
+	done
+
 %: _SOPS_READY :=
 endif # _SOPS_READY
 

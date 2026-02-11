@@ -23,3 +23,7 @@ output "git_pat_secret_id" {
   description = "The OCID of the GitHub PAT secret"
 }
 
+output "mixpanel_token_secret_id" {
+  value       = join("", oci_vault_secret.mixpanel_token[*].id)
+  description = "The OCID of the Mixpanel token secret"
+}

@@ -1,0 +1,9 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vault-config
+  namespace: external-secrets
+data:
+  VAULT_OCID: "${VAULT_OCID}"
+

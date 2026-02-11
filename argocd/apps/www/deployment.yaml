@@ -20,6 +20,12 @@ spec:
           image: ghcr.io/fapiper/fabianpiper.com/www:main-latest
           ports:
             - containerPort: 80
+          env:
+            - name: PUBLIC_MIXPANEL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: www-secrets
+                  key: PUBLIC_MIXPANEL_TOKEN
           resources:
             requests:
               memory: "128Mi"
