@@ -12,6 +12,5 @@ provider "context" {
     tenant      = var.tenant
     environment = var.environment
     stage       = var.stage
-    name        = var.name
   }
 }

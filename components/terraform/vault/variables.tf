@@ -42,3 +42,14 @@ variable "name" {
   type = string
 }
 
+variable "git_username" {
+  type        = string
+  description = "Git username for GitHub authentication"
+  sensitive   = true
+}
+
+variable "git_pat" {
+  type        = string
+  description = "GitHub Personal Access Token"
+  sensitive   = true
+}

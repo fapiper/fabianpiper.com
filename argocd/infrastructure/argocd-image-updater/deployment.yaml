@@ -14,7 +14,7 @@ data:
     - name: GitHub Container Registry
       prefix: ghcr.io
       api_url: https://ghcr.io
-      credentials: secret:argocd/regcred#creds
+      credentials: env:GITHUB_CREDENTIALS
       default: true
 ---
 apiVersion: apps/v1
@@ -50,6 +50,21 @@ spec:
               value: argocd-server.argocd.svc.cluster.local:443
             - name: ARGOCD_INSECURE
               value: "true"
+            - name: GITHUB_CREDENTIALS
+              valueFrom:
+                secretKeyRef:
+                  name: argocd-image-updater-github-creds
+                  key: credentials
+            - name: GIT_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: argocd-image-updater-github-creds
+                  key: git_username
+            - name: GIT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: argocd-image-updater-github-creds
+                  key: git_pat
           volumeMounts:
             - name: config
               mountPath: /app/config

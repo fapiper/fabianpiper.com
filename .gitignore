@@ -46,14 +46,19 @@ dist/
 # Secrets & Security
 # =============================================================================
 **/*.pem
-**/*.key
-**/*.decrypted.*
+*.key
 .env
 .env.*
 .envrc
 !.envrc.example
-secrets/
-!secrets/.sops.yaml
+
+# Ignore all decrypted files
+**/*.decrypted.*
+# Ensure SOPS keys and local-only files are ignored
+.sops.key
+**/*.tmp
+!**/secrets/**/*.example.yaml
+!**/secrets/**/.sops.yaml
 
 # =============================================================================
 # IDEs & Editors

@@ -106,6 +106,18 @@ docker-build-%:
 docker-tag-%:
 	$(DOCKER) tag $(REGISTRY)/$(get_comp):$(DEPLOY_VER) $(REGISTRY)/$(get_comp):latest
 
+## vault-import-secrets-[app]: fetch secrets from OCI vault and generate .env
+vault-import-secrets-%:
+	@oci vault secret list --compartment-id $(TF_VAR_compartment_ocid) --name-contains "$*" \
+		--query 'data[*].{name:name, id:id}' --output json > .tmp_ids.json
+	@jq -c '.[]' .tmp_ids.json | while read i; do \
+		NAME=$$(echo $$i | jq -r '.name'); \
+		ID=$$(echo $$i | jq -r '.id'); \
+		VALUE=$$(oci secrets secret-bundle get --secret-id $$ID --query 'data."secret-bundle-content".content' --raw | base64 -d); \
+		echo "$${NAME#$*_}=$$VALUE" >> apps/$*/.env; \
+	done
+	@rm .tmp_ids.json
+
 ## sops-setup: generate master age private key if it does not exist
 sops-setup:
 	@mkdir -p $(SECRETS_DIR)

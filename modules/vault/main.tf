@@ -51,3 +51,41 @@ resource "oci_kms_key" "default" {
 
   depends_on = [time_sleep.wait_for_vault_dns]
 }
+
+# Secrets for Git credentials
+resource "oci_vault_secret" "git_username" {
+  count = local.enabled ? 1 : 0
+
+  compartment_id = local.compartment_ocid
+  vault_id       = oci_kms_vault.default[0].id
+  key_id         = oci_kms_key.default[0].id
+  secret_name    = "git-username"
+
+  secret_content {
+    content_type = "BASE64"
+    content      = base64encode(var.git_username)
+  }
+
+  freeform_tags = data.context_tags.main.tags
+
+  depends_on = [oci_kms_key.default]
+}
+
+resource "oci_vault_secret" "git_pat" {
+  count = local.enabled ? 1 : 0
+
+  compartment_id = local.compartment_ocid
+  vault_id       = oci_kms_vault.default[0].id
+  key_id         = oci_kms_key.default[0].id
+  secret_name    = "git-pat"
+
+  secret_content {
+    content_type = "BASE64"
+    content      = base64encode(var.git_pat)
+  }
+
+  freeform_tags = data.context_tags.main.tags
+
+  depends_on = [oci_kms_key.default]
+}
+

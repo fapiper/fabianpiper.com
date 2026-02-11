@@ -1,6 +1,3 @@
-> [!WARNING]  
-> WIP: This repository is currently undergoing some refactorings
-
 <div align="center">
 
 # fabianpiper.com
@@ -86,6 +83,18 @@ make docker-build-prod-www
 * GitOps: Argo CD using the "App of Apps" pattern.
 * Automation: Argo CD Image Updater for CD via GHCR.
 
+## CI/CD Pipeline
+
+This repository features a fully automated CI/CD pipeline with minimal secrets:
+
+1. **Push code** to `main` branch → triggers GitHub Actions
+2. **GitHub Actions** builds Docker image using native `GITHUB_TOKEN`
+3. **Build & Push** Docker image to GHCR (GitHub Container Registry)
+4. **ArgoCD Image Updater** detects new image → updates deployment
+5. **ArgoCD** syncs changes → deploys to K3s cluster
+
+**GitHub Secrets Required**: Only `SOPS_AGE_KEY` (for decrypting config during infrastructure changes)
+
 ## Structure
 
 ```
@@ -98,10 +107,12 @@ stacks/
 components/terraform/       # Infrastructure components
   ├── networking/          # VCN + subnets
   ├── iam/                 # IAM policies  
-  ├── vault/               # OCI Vault
+  ├── vault/               # OCI Vault (stores runtime secrets)
+  ├── oidc/                # Service account for CI/CD
   └── k3s-cluster/         # 3 ARM instances (ArgoCD auto-installed)
 argocd/                     # GitOps applications
-  └── apps/                # Application definitions
+  ├── infrastructure/      # Cluster infrastructure apps
+  └── apps/                # Business applications
 apps/www/                   # Website source code
 ```
 
@@ -113,6 +124,7 @@ make plan-prod-all                     # Plan all components
 make apply-prod-networking             # Deploy network
 make apply-prod-iam                    # Deploy IAM policies
 make apply-prod-vault                  # Deploy OCI Vault
+make apply-prod-oidc                   # Deploy OIDC provider for GitHub Actions
 make apply-prod-k3s-cluster            # Deploy K3s cluster (includes ArgoCD)
 
 # Secrets
