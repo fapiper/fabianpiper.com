@@ -1,0 +1,8 @@
+components:
+  terraform:
+    oidc:
+      metadata:
+        component: oidc
+      vars:
+        enabled: true
+

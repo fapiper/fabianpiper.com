@@ -11,3 +11,7 @@ components:
       vars:
         common_tags:
           Environment: "prod"
+
+    oidc:
+      vars: {}
+

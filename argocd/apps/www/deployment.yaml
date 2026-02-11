@@ -17,7 +17,7 @@ spec:
         - name: regcred
       containers:
         - name: www
-          image: ghcr.io/fapiper/fabianpiper.com/www:latest
+          image: ghcr.io/fapiper/fabianpiper.com/www:main-latest
           ports:
             - containerPort: 80
           resources:
