@@ -12,6 +12,7 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
@@ -28,12 +29,10 @@ jobs:
           BASE_SHA="${{ github.event.before }}"
           HEAD_SHA="$GITHUB_SHA"
 
-          # Fallback for first push or manual trigger (no before SHA)
           if [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ] || [ -z "$BASE_SHA" ]; then
             BASE_SHA="HEAD^"
           fi
 
-          # Validate SHA is safe before using in git command
           if ! echo "$BASE_SHA" | grep -qE '^[0-9a-f]{40}$|^HEAD\^$'; then
             echo "::error::Unexpected BASE_SHA format: $BASE_SHA"
             exit 1
@@ -48,6 +47,7 @@ jobs:
           if [ -z "$DIFF" ]; then
             echo "apps=[]" >> "$GITHUB_OUTPUT"
           else
+
             SAFE_APPS=""
             while IFS= read -r app; do
               if echo "$app" | grep -qE '^[a-zA-Z0-9_-]+$'; then
@@ -113,93 +113,91 @@ jobs:
           echo "$OCI_PRIVATE_KEY" > ~/.oci/key.pem
           chmod 600 ~/.oci/key.pem
 
-          cat > ~/.oci/config <<EOF
-          [DEFAULT]
-          user=$OCI_USER
-          fingerprint=$OCI_FINGERPRINT
-          tenancy=$OCI_TENANCY
-          region=$OCI_REGION
-          key_file=$HOME/.oci/key.pem
-  EOF
-  chmod 600 ~/.oci/config
-  
-  echo "OCI_COMPARTMENT_ID=$OCI_COMPARTMENT" >> "$GITHUB_ENV"
-  
-  unset SECRETS_JSON OCI_PRIVATE_KEY
+          printf '[DEFAULT]\nuser=%s\nfingerprint=%s\ntenancy=%s\nregion=%s\nkey_file=%s/.oci/key.pem\n' \
+            "$OCI_USER" "$OCI_FINGERPRINT" "$OCI_TENANCY" "$OCI_REGION" "$HOME" \
+            > ~/.oci/config
+          chmod 600 ~/.oci/config
 
-- name: Resolve Vault Secrets
-  id: vault_secrets
-  run: |
-    set -euo pipefail
-    
-    VAULT_SECRETS=$(oci vault secret list \
-      --compartment-id "$OCI_COMPARTMENT_ID" \
-      --all \
-      --lifecycle-state ACTIVE \
-      --query "data[].{name: \"secret-name\", id: id}" \
-      2>/dev/null)
-    
-    {
-      echo "secret_envs<<EOF_SECRETS"
-    
-      if [ -n "$VAULT_SECRETS" ] && [ "$VAULT_SECRETS" != "[]" ]; then
-        while IFS= read -r secret; do
-          NAME=$(echo "$secret" | jq -r '.name')
-          ID=$(echo "$secret" | jq -r '.id')
-    
-          # Validate secret name is safe
-          if ! echo "$NAME" | grep -qE '^[a-zA-Z0-9_-]+$'; then
-            echo "::warning::Skipping secret with unsafe name: $NAME"
-            continue
-          fi
-    
-          BUNDLE=$(oci secrets secret-bundle get --secret-id "$ID" --stage CURRENT 2>/dev/null) || {
-            echo "::warning::Could not fetch secret: $NAME" >&2
-            continue
-          }
-    
-          VAL=$(echo "$BUNDLE" | jq -r '.data."secret-bundle-content".content' | base64 -d 2>/dev/null) || {
-            echo "::warning::Could not decode secret: $NAME" >&2
-            continue
-          }
-    
-          if [ -n "$VAL" ]; then
-            while IFS= read -r line; do
-              [ -n "$line" ] && echo "::add-mask::$line"
-            done <<< "$VAL"
-    
-            ARG_NAME=$(echo "$NAME" | tr '-' '_' | tr '[:lower:]' '[:upper:]')
-            echo "${ARG_NAME}=${VAL}"
-          fi
-        done < <(echo "$VAULT_SECRETS" | jq -c '.[]')
-      fi
-    
-      echo "SITE_URL=https://glg.fabianpiper.com"
-      echo "EOF_SECRETS"
-    } >> "$GITHUB_OUTPUT"
+          echo "OCI_COMPARTMENT_ID=$OCI_COMPARTMENT" >> "$GITHUB_ENV"
 
-- uses: docker/setup-buildx-action@v3
+          unset SECRETS_JSON OCI_PRIVATE_KEY
 
-- uses: docker/login-action@v3
-  with:
-    registry: ${{ env.REGISTRY }}
-    username: ${{ github.actor }}
-    password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Resolve Vault Secrets
+        id: vault_secrets
+        run: |
+          set -euo pipefail
 
-- name: Build and Push
-  uses: docker/build-push-action@v6
-  with:
-    context: apps/${{ matrix.app }}
-    push: true
-    tags: |
-      ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.app }}:latest
-      ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.app }}:${{ github.sha }}
-    secrets: ${{ steps.vault_secrets.outputs.secret_envs }}
-    cache-from: type=gha
-    cache-to: type=gha,mode=max
+          VAULT_SECRETS=$(oci vault secret list \
+            --compartment-id "$OCI_COMPARTMENT_ID" \
+            --all \
+            --lifecycle-state ACTIVE \
+            --query "data[].{name: \"secret-name\", id: id}" \
+            2>/dev/null)
 
-- name: Cleanup
-  if: always()
-  run: |
-    rm -f ~/.oci/key.pem ~/.oci/config
-    rmdir ~/.oci 2>/dev/null || true
+          {
+            echo "secret_envs<<EOF_SECRETS"
+
+            if [ -n "$VAULT_SECRETS" ] && [ "$VAULT_SECRETS" != "[]" ]; then
+              while IFS= read -r secret; do
+                NAME=$(echo "$secret" | jq -r '.name')
+                ID=$(echo "$secret" | jq -r '.id')
+
+                if ! echo "$NAME" | grep -qE '^[a-zA-Z0-9_-]+$'; then
+                  echo "::warning::Skipping secret with unsafe name: $NAME"
+                  continue
+                fi
+
+                BUNDLE=$(oci secrets secret-bundle get --secret-id "$ID" --stage CURRENT 2>/dev/null) || {
+                  echo "::warning::Could not fetch secret: $NAME" >&2
+                  continue
+                }
+
+                VAL=$(echo "$BUNDLE" | jq -r '.data."secret-bundle-content".content' | base64 -d 2>/dev/null) || {
+                  echo "::warning::Could not decode secret: $NAME" >&2
+                  continue
+                }
+
+                if [ -n "$VAL" ]; then
+
+                  while IFS= read -r line; do
+                    [ -n "$line" ] && echo "::add-mask::$line"
+                  done <<< "$VAL"
+
+                  ARG_NAME=$(echo "$NAME" | tr '-' '_' | tr '[:lower:]' '[:upper:]')
+                  echo "${ARG_NAME}=${VAL}"
+                fi
+              done < <(echo "$VAULT_SECRETS" | jq -c '.[]')
+            fi
+
+            echo "SITE_URL=https://glg.fabianpiper.com"
+            echo "EOF_SECRETS"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/${{ matrix.app }}
+          push: true
+
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.app }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.app }}:${{ github.sha }}
+
+          secrets: ${{ steps.vault_secrets.outputs.secret_envs }}
+
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f ~/.oci/key.pem ~/.oci/config
+          rmdir ~/.oci 2>/dev/null || true
