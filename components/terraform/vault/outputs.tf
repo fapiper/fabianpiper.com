@@ -27,3 +27,8 @@ output "mixpanel_token_secret_id" {
   value       = module.vault.mixpanel_token_secret_id
   description = "The OCID of the Mixpanel token secret"
 }
+
+output "site_url_secret_id" {
+  value       = module.vault.site_url_secret_id
+  description = "The OCID of the site URL secret"
+}

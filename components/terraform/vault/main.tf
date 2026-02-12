@@ -6,4 +6,5 @@ module "vault" {
   git_username     = var.git_username
   git_pat          = var.git_pat
   mixpanel_token   = var.mixpanel_token
+  site_url         = var.site_url
 }

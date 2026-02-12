@@ -60,3 +60,8 @@ variable "mixpanel_token" {
   sensitive   = true
 }
 
+variable "site_url" {
+  type        = string
+  description = "Site URL for the application"
+  sensitive   = true
+}

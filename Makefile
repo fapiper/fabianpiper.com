@@ -21,13 +21,11 @@ AGE_KEY_FILE  := $(SECRETS_DIR)/.sops.key
 SOPS_CONFIG   := .sops.yaml
 
 # Configuration
-# Patterns to exclude from secret injection
 SOPS_EXCLUDES      := %.decrypted.yaml %$(SOPS_CONFIG) %.example.yaml
-# Targets that do not require secrets
 NO_SECRETS_TARGETS := help setup check-tools sops-% init
 
 .DEFAULT_GOAL := help
-.PHONY: setup check-tools sops-setup help init debug-env
+.PHONY: setup check-tools sops-setup help init debug-env dev build
 
 #----------------------------------------------------------------
 # Context Helpers
@@ -38,12 +36,12 @@ get_app   = $(if $(word 2,$(get_stem)),$(lastword $(get_stem)),all)
 get_stack = glg-$(get_env)-fra
 
 #----------------------------------------------------------------
-# SOPS Injection (Index-Based Recursion)
+# SOPS Injection
 #----------------------------------------------------------------
 export SOPS_AGE_KEY_FILE := $(AGE_KEY_FILE)
 
 # Detect environment from target (default to prod)
-ENV_MATCH   := $(shell echo "$(firstword $(MAKECMDGOALS))" | grep -oE '(prod|dev|staging)' || echo "prod")
+ENV_MATCH    := $(shell echo "$(firstword $(MAKECMDGOALS))" | grep -oE '(prod|dev|staging)' || echo "prod")
 SECRETS_LIST := $(sort $(filter-out $(SOPS_EXCLUDES), $(wildcard $(SECRETS_DIR)/$(ENV_MATCH)/*.yaml)))
 SECRETS_LEN  := $(words $(SECRETS_LIST))
 
@@ -68,6 +66,7 @@ else ifneq ($(shell test $(SOPS_IDX) -le $(SECRETS_LEN) && echo yes),)
 	@if [ -f "$(CURRENT_FILE)" ]; then \
 	    $(SOPS) exec-env "$(CURRENT_FILE)" "$(MAKE) --no-print-directory $@ SOPS_IDX=$(NEXT_IDX)"; \
 	else \
+	    >&2 echo " ! Warning: $(CURRENT_FILE) not found. Skipping."; \
 	    $(MAKE) --no-print-directory $@ SOPS_IDX=$(NEXT_IDX); \
 	fi
 
@@ -118,30 +117,9 @@ _destroy-%:
 dev-%:
 	cd apps/$(get_app) && $(BUN) install && $(BUN) run dev
 
-## build-[comp]: build production bundle
+## build-[comp]: build production bundle locally
 build-%:
 	cd apps/$(get_app) && $(BUN) install && $(BUN) run build
-
-## docker-build-[env]-[comp]: build image with secrets
-docker-build-%:
-	$(DOCKER) build --secret id=secrets,src=$(SECRETS_DIR)/$(get_env)/$(get_app).yaml \
-	   -t $(REGISTRY)/$(get_app):$(DEPLOY_VER) apps/$(get_app)
-
-## docker-tag-[comp]: tag as latest
-docker-tag-%:
-	$(DOCKER) tag $(REGISTRY)/$(get_app):$(DEPLOY_VER) $(REGISTRY)/$(get_app):latest
-
-## vault-import-secrets-[app]: oci vault sync
-vault-import-secrets-%:
-	@oci vault secret list --compartment-id $(TF_VAR_compartment_ocid) --name-contains "$*" \
-	   --query 'data[*].{name:name, id:id}' --output json > .tmp_ids.json
-	@jq -c '.[]' .tmp_ids.json | while read i; do \
-	   NAME=$$(echo $$i | jq -r '.name'); \
-	   ID=$$(echo $$i | jq -r '.id'); \
-	   VALUE=$$(oci secrets secret-bundle get --secret-id $$ID --query 'data."secret-bundle-content".content' --raw | base64 -d); \
-	   echo "$${NAME#$*_}=$$VALUE" >> apps/$*/.env; \
-	done
-	@rm .tmp_ids.json
 
 ## sops-setup: generate age key
 sops-setup:

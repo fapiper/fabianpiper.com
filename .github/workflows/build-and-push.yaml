@@ -2,79 +2,154 @@ name: Build and Push Docker Images
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
     paths:
       - 'apps/**'
-      - '.github/workflows/build-and-push.yaml'
-  pull_request:
-    paths:
-      - 'apps/**'
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  # Detect which apps have changed
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
-      apps: ${{ steps.filter.outputs.changes }}
+      apps: ${{ steps.set-matrix.outputs.apps }}
     steps:
       - uses: actions/checkout@v4
-
-      - uses: dorny/paths-filter@v3
-        id: filter
         with:
-          filters: |
-            www:
-              - 'apps/www/**'
+          fetch-depth: 0
 
-  # Build and push each changed app
+      - id: set-matrix
+        run: |
+          BASE_SHA=${{ github.event.before }}
+          [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ] && BASE_SHA="HEAD^"
+          
+          DIFF=$(git diff --name-only $BASE_SHA ${{ github.sha }} | grep '^apps/' | cut -d/ -f2 | sort -u || true)
+          
+          if [ -z "$DIFF" ]; then
+            echo "apps=[]" >> $GITHUB_OUTPUT
+          else
+            APPS_JSON=$(echo "$DIFF" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+            echo "apps=$APPS_JSON" >> $GITHUB_OUTPUT
+          fi
+
   build-and-push:
     needs: detect-changes
-    if: ${{ needs.detect-changes.outputs.apps != '[]' }}
+    if: needs.detect-changes.outputs.apps != '[]'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-
     strategy:
       matrix:
         app: ${{ fromJSON(needs.detect-changes.outputs.apps) }}
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - uses: nhedger/setup-sops@v2
 
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+      - name: Decrypt Bootstrap Secrets
+        env:
+          SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+        run: |
+          mkdir -p secrets
+          echo "$SOPS_AGE_KEY" > secrets/.sops.key
+          export SOPS_AGE_KEY_FILE=$(pwd)/secrets/.sops.key
+          sops -d --output-type dotenv secrets/prod/secrets.yaml > secrets.env
+          
+          while IFS='=' read -r key value; do
+            [ -n "$value" ] && echo "::add-mask::${value}"
+          done < secrets.env
+
+      - name: Configure OCI CLI
+        run: |
+          set -a && source secrets.env && set +a
+          
+          mkdir -p ~/.oci
+          echo "$TF_VAR_private_key_content" > ~/.oci/key.pem
+          chmod 600 ~/.oci/key.pem
+          
+          cat > ~/.oci/config <<EOF
+          [DEFAULT]
+          user=$TF_VAR_user_ocid
+          fingerprint=$TF_VAR_fingerprint
+          tenancy=$TF_VAR_tenancy_ocid
+          region=$TF_VAR_region
+          key_file=$HOME/.oci/key.pem
+          EOF
+          
+          echo "OCI_COMPARTMENT_ID=$TF_VAR_compartment_ocid" >> $GITHUB_ENV
+
+      - uses: oracle-actions/run-oci-cli-command@v1.3.2
+        with:
+          command: "--version"
+          silent: true
+
+      - name: Resolve Vault Secrets
+        id: vault_secrets
+        run: |
+          set -euo pipefail
+          
+          SECRETS_JSON=$(oci vault secret list \
+            --compartment-id "$OCI_COMPARTMENT_ID" \
+            --all \
+            --lifecycle-state ACTIVE \
+            2>/dev/null | jq -c '[.data[] | {name: .["secret-name"], id: .id}]')
+          
+          if [ "$SECRETS_JSON" = "[]" ] || [ -z "$SECRETS_JSON" ]; then
+            echo "::warning::No active secrets found in vault"
+            echo "build_args=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          {
+            echo "build_args<<EOF_BUILD_ARGS"
+          
+            while read -r secret; do
+              VAULT_NAME=$(echo "$secret" | jq -r '.name')
+              VAULT_ID=$(echo "$secret" | jq -r '.id')
+          
+              [ "$VAULT_NAME" = "null" ] || [ "$VAULT_ID" = "null" ] && continue
+          
+              ARG_NAME=$(echo "$VAULT_NAME" | tr '-' '_' | tr '[:lower:]' '[:upper:]')
+          
+              BUNDLE=$(oci secrets secret-bundle get \
+                --secret-id "$VAULT_ID" \
+                --stage CURRENT 2>&1)
+          
+              [ $? -ne 0 ] && continue
+          
+              VALUE=$(echo "$BUNDLE" | jq -r '.data."secret-bundle-content".content' 2>/dev/null | base64 -d 2>/dev/null)
+          
+              if [ -n "$VALUE" ]; then
+                echo "::add-mask::${VALUE}"
+                echo "${ARG_NAME}=${VALUE}"
+              fi
+            done < <(echo "$SECRETS_JSON" | jq -c '.[]')
+          
+            echo "EOF_BUILD_ARGS"
+          } >> $GITHUB_OUTPUT
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
+      - uses: docker/build-push-action@v6
         with:
-          images: ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.app }}
-          tags: |
-            type=ref,event=pr
-            type=sha,prefix=sha-
-            type=raw,value=latest,enable={{is_default_branch}}
+          context: apps/${{ matrix.app }}
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.app }}:latest
+          build-args: ${{ steps.vault_secrets.outputs.build_args }}
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./apps/${{ matrix.app }}
-          file: ./apps/${{ matrix.app }}/Dockerfile
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          platforms: linux/amd64,linux/arm64
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f secrets.env secrets/.sops.key ~/.oci/key.pem
+          rm -rf secrets/ ~/.oci/
