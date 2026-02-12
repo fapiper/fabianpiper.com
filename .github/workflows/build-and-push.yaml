@@ -59,13 +59,10 @@ jobs:
           echo "$SOPS_AGE_KEY" > secrets/.sops.key
           export SOPS_AGE_KEY_FILE=$(pwd)/secrets/.sops.key
           
-          # Entschlüsseln
           sops -d --output-type dotenv secrets/prod/secrets.yaml > secrets.env
           
-          # Sanity Check: Existiert die Datei und hat sie Inhalt?
           if [ ! -s secrets.env ]; then echo "ERROR: secrets.env is empty or not found"; exit 1; fi
           
-          # Maskieren
           while IFS='=' read -r key value; do
             [ -n "$value" ] && echo "::add-mask::${value}"
           done < secrets.env
@@ -73,22 +70,18 @@ jobs:
       - name: Configure OCI CLI
         run: |
           set -euo pipefail
-          # Variablen in die Shell laden
           set -a && source secrets.env && set +a
           
           mkdir -p ~/.oci
           
-          # FIX 1: Den Key absolut sicher schreiben (tr löscht Windows-Zeilenenden)
           printf "%s" "$TF_VAR_private_key_content" | tr -d '\r' > ~/.oci/key.pem
           chmod 600 ~/.oci/key.pem
           
-          # FIX 2: Check ob der Key mit dem richtigen Header beginnt
           if ! head -n 1 ~/.oci/key.pem | grep -q "BEGIN"; then
             echo "ERROR: Key file does not start with BEGIN header. Check your SOPS secret format."
             exit 1
           fi
           
-          # FIX 3: Config schreiben (KEINE Einrückung beim EOF!)
           cat <<EOF > ~/.oci/config
   [DEFAULT]
   user=$TF_VAR_user_ocid
@@ -111,7 +104,6 @@ jobs:
   run: |
     set -euo pipefail
     
-    # OCI Login Test
     oci iam compartment get --compartment-id "$OCI_COMPARTMENT_ID" > /dev/null || (echo "ERROR: OCI Login failed or Compartment ID invalid" && exit 1)
     
     echo "Fetching secrets..."
