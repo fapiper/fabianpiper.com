@@ -5,4 +5,4 @@ components:
         component: oidc
       vars:
         enabled: true
-
+        name: oidc

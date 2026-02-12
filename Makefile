@@ -1,167 +1,178 @@
 #----------------------------------------------------------------
-# Tooling & Metadata
+# Tooling & Configuration
 #----------------------------------------------------------------
-SHELL      := /bin/bash
-BUN        := bun
-DOCKER     := docker
-SOPS       := sops
-ATMOS      := atmos
-AGE_KEYGEN := age-keygen
-PRINTF     := printf
+SHELL         := /bin/bash
+BUN           := bun
+DOCKER        := docker
+SOPS          := sops
+ATMOS         := atmos
+AGE_KEYGEN    := age-keygen
+PRINTF        := printf
 
+# Metadata
 REGISTRY      := ghcr.io/fapiper/fabianpiper.com
 COMMIT_HASH   := $(shell git rev-parse --short=10 HEAD 2>/dev/null || echo "dev")
 BRANCH        := $(shell git rev-parse --abbrev-ref HEAD 2>/dev/null | sed 's/[^a-zA-Z0-9]/-/g' || echo "local")
 DEPLOY_VER    := $(BRANCH)-$(COMMIT_HASH)
 
-SECRETS_DIR   := ./secrets/prod
-AGE_KEY_FILE  := ./secrets/.sops.key
+# Paths & Files
+SECRETS_DIR   := ./secrets
+AGE_KEY_FILE  := $(SECRETS_DIR)/.sops.key
 SOPS_CONFIG   := .sops.yaml
-SCRIPTS_DIR   := ./scripts
+
+# Configuration
+# Patterns to exclude from secret injection
+SOPS_EXCLUDES      := %.decrypted.yaml %$(SOPS_CONFIG) %.example.yaml
+# Targets that do not require secrets
+NO_SECRETS_TARGETS := help setup check-tools sops-% init
 
 .DEFAULT_GOAL := help
-.PHONY: setup check-tools sops-setup help init
+.PHONY: setup check-tools sops-setup help init debug-env
 
 #----------------------------------------------------------------
 # Context Helpers
 #----------------------------------------------------------------
-parse_stem = $(subst -, ,$*)
-get_env    = $(word 1,$(parse_stem))
-get_comp   = $(if $(word 2,$(parse_stem)),$(lastword $(parse_stem)),all)
-get_stack  = glg-$(get_env)-fra
+get_stem  = $(subst -, ,$*)
+get_env   = $(word 1,$(get_stem))
+get_app   = $(if $(word 2,$(get_stem)),$(lastword $(get_stem)),all)
+get_stack = glg-$(get_env)-fra
 
 #----------------------------------------------------------------
-# SOPS Recursive Injection
+# SOPS Injection (Index-Based Recursion)
 #----------------------------------------------------------------
 export SOPS_AGE_KEY_FILE := $(AGE_KEY_FILE)
-export _SOPS_FILES
-export _SOPS_READY
 
-ifndef _SOPS_READY
+# Detect environment from target (default to prod)
+ENV_MATCH   := $(shell echo "$(firstword $(MAKECMDGOALS))" | grep -oE '(prod|dev|staging)' || echo "prod")
+SECRETS_LIST := $(sort $(filter-out $(SOPS_EXCLUDES), $(wildcard $(SECRETS_DIR)/$(ENV_MATCH)/*.yaml)))
+SECRETS_LEN  := $(words $(SECRETS_LIST))
+
+ifndef SOPS_IDX
+SOPS_IDX := 0
+endif
+
+# Init (Index 0)
+ifeq ($(SOPS_IDX), 0)
 %:
-	@SECRETS_FILE="$(SECRETS_DIR)/secrets.yaml"; \
-	if echo "$@" | grep -qE "^(help|setup|check|sops-|init)" || [ ! -f "$$SECRETS_FILE" ]; then \
-		$(MAKE) $@ _SOPS_READY=1; \
+	@if echo "$@" | grep -qE "^($(subst $(space),|,$(NO_SECRETS_TARGETS)))"; then \
+	    $(MAKE) --no-print-directory $@ SOPS_IDX=1; \
 	else \
-		$(SOPS) exec-env "$$SECRETS_FILE" "$(MAKE) $@ _SOPS_READY=1"; \
+	    $(MAKE) --no-print-directory $@ SOPS_IDX=1; \
 	fi
+
+# Recursion (Index 1..N)
+else ifneq ($(shell test $(SOPS_IDX) -le $(SECRETS_LEN) && echo yes),)
+%:
+	$(eval CURRENT_FILE := $(word $(SOPS_IDX), $(SECRETS_LIST)))
+	$(eval NEXT_IDX     := $(shell expr $(SOPS_IDX) + 1))
+	@if [ -f "$(CURRENT_FILE)" ]; then \
+	    $(SOPS) exec-env "$(CURRENT_FILE)" "$(MAKE) --no-print-directory $@ SOPS_IDX=$(NEXT_IDX)"; \
+	else \
+	    $(MAKE) --no-print-directory $@ SOPS_IDX=$(NEXT_IDX); \
+	fi
+
+# Execution (Index > N)
 else
 
 #----------------------------------------------------------------
-# Targets (Setup, Secrets, Infra, Apps)
+# Targets
 #----------------------------------------------------------------
 
-## setup: validate tools and initialize SOPS encryption
+## setup: validate tools and initialize SOPS
 setup: check-tools sops-setup sops-init-prod
 
 check-tools:
 	@for tool in $(ATMOS) terraform $(SOPS) $(AGE_KEYGEN); do \
-		command -v $$tool >/dev/null 2>&1 || { $(PRINTF) -- "$$tool not found (required)\n"; exit 1; }; \
+	   command -v $$tool >/dev/null 2>&1 || { $(PRINTF) -- "$$tool not found\n"; exit 1; }; \
 	done
-	@$(PRINTF) -- "✓ All required tools are installed\n"
 
-## deploy-[env]: deploy all infrastructure components
+## deploy-[env]: deploy all infrastructure
 deploy-%:
 	@$(ATMOS) workflow bootstrap -s $(get_stack)
 
-## plan-[env]-[comp/all]: generate terraform plan for a component or full stack
+## plan-[env]-[comp/all]: terraform plan
 plan-%:
-	@if [ "$(get_comp)" = "all" ]; then $(ATMOS) workflow plan -s $(get_stack); \
-	else $(ATMOS) terraform plan $(get_comp) -s $(get_stack); fi
+	@if [ "$(get_app)" = "all" ]; then $(ATMOS) workflow plan -s $(get_stack); \
+	else $(ATMOS) terraform plan $(get_app) -s $(get_stack); fi
 
-## apply-[env]-[comp]: deploy a specific terraform component to an environment
+## apply-[env]-[comp]: terraform apply
 apply-%:
-	@if [ "$(get_comp)" = "all" ]; then $(ATMOS) workflow apply -s $(get_stack); \
-	else $(ATMOS) terraform apply $(get_comp) -s $(get_stack); fi
+	@if [ "$(get_app)" = "all" ]; then $(ATMOS) workflow apply -s $(get_stack); \
+	else $(ATMOS) terraform apply $(get_app) -s $(get_stack); fi
 
-## validate-[env]-[comp/all]: run static analysis and linting on the stack
+## validate-[env]-[comp/all]: static analysis
 validate-%:
-	@if [ "$(get_comp)" = "all" ]; then $(ATMOS) workflow validate -s $(get_stack); \
-	else $(ATMOS) terraform validate $(get_comp) -s $(get_stack); fi
+	@if [ "$(get_app)" = "all" ]; then $(ATMOS) workflow validate -s $(get_stack); \
+	else $(ATMOS) terraform validate $(get_app) -s $(get_stack); fi
 
-## destroy-[env]-[comp]: destruction of infrastructure
+## destroy-[env]-[comp]: infrastructure destruction
 destroy-%:
-	@$(PRINTF) -- "Destroy $(get_comp) in $(get_env)? (yes/no): " && read prompt && [ "$$prompt" = "yes" ] || exit 1
+	@$(PRINTF) -- "Destroy $(get_app) in $(get_env)? (yes/no): " && read prompt && [ "$$prompt" = "yes" ] || exit 1
 	@$(MAKE) _destroy-$*
 
-# Internal target for non-interactive destruction
 _destroy-%:
-	@if [ "$(get_comp)" = "all" ]; then $(ATMOS) workflow destroy -s $(get_stack); \
-	else $(ATMOS) terraform destroy $(get_comp) -s $(get_stack) -auto-approve; fi
+	@if [ "$(get_app)" = "all" ]; then $(ATMOS) workflow destroy -s $(get_stack); \
+	else $(ATMOS) terraform destroy $(get_app) -s $(get_stack) -auto-approve; fi
 
-## dev-[comp]: start local development environment for an app using bun
+## dev-[comp]: start local development
 dev-%:
-	cd apps/$(get_comp) && $(BUN) install && $(BUN) run dev
+	cd apps/$(get_app) && $(BUN) install && $(BUN) run dev
 
-## build-[comp]: build the production bundle for a specific app
+## build-[comp]: build production bundle
 build-%:
-	cd apps/$(get_comp) && $(BUN) install && $(BUN) run build
+	cd apps/$(get_app) && $(BUN) install && $(BUN) run build
 
-## docker-build-[env]-[comp]: build docker image
+## docker-build-[env]-[comp]: build image with secrets
 docker-build-%:
-	$(DOCKER) build --secret id=secrets,src=$(SECRETS_DIR)/$(get_env)/$(get_comp).yaml \
-		-t $(REGISTRY)/$(get_comp):$(DEPLOY_VER) apps/$(get_comp)
+	$(DOCKER) build --secret id=secrets,src=$(SECRETS_DIR)/$(get_env)/$(get_app).yaml \
+	   -t $(REGISTRY)/$(get_app):$(DEPLOY_VER) apps/$(get_app)
 
-## docker-tag-[comp]: alias the current deploy version to latest
+## docker-tag-[comp]: tag as latest
 docker-tag-%:
-	$(DOCKER) tag $(REGISTRY)/$(get_comp):$(DEPLOY_VER) $(REGISTRY)/$(get_comp):latest
+	$(DOCKER) tag $(REGISTRY)/$(get_app):$(DEPLOY_VER) $(REGISTRY)/$(get_app):latest
 
-## vault-import-secrets-[app]: fetch secrets from OCI vault and generate .env
+## vault-import-secrets-[app]: oci vault sync
 vault-import-secrets-%:
 	@oci vault secret list --compartment-id $(TF_VAR_compartment_ocid) --name-contains "$*" \
-		--query 'data[*].{name:name, id:id}' --output json > .tmp_ids.json
+	   --query 'data[*].{name:name, id:id}' --output json > .tmp_ids.json
 	@jq -c '.[]' .tmp_ids.json | while read i; do \
-		NAME=$$(echo $$i | jq -r '.name'); \
-		ID=$$(echo $$i | jq -r '.id'); \
-		VALUE=$$(oci secrets secret-bundle get --secret-id $$ID --query 'data."secret-bundle-content".content' --raw | base64 -d); \
-		echo "$${NAME#$*_}=$$VALUE" >> apps/$*/.env; \
+	   NAME=$$(echo $$i | jq -r '.name'); \
+	   ID=$$(echo $$i | jq -r '.id'); \
+	   VALUE=$$(oci secrets secret-bundle get --secret-id $$ID --query 'data."secret-bundle-content".content' --raw | base64 -d); \
+	   echo "$${NAME#$*_}=$$VALUE" >> apps/$*/.env; \
 	done
 	@rm .tmp_ids.json
 
-## sops-setup: generate master age private key if it does not exist
+## sops-setup: generate age key
 sops-setup:
 	@mkdir -p $(SECRETS_DIR)
-	@if [ ! -f "$(AGE_KEY_FILE)" ]; then \
-		$(AGE_KEYGEN) -o "$(AGE_KEY_FILE)"; \
-		$(PRINTF) -- "Age key generated at $(AGE_KEY_FILE)\n"; \
-	else \
-		$(PRINTF) -- "Age key already exists\n"; \
-	fi
+	@test -f "$(AGE_KEY_FILE)" && echo "Age key exists" || $(AGE_KEYGEN) -o "$(AGE_KEY_FILE)"
 
-## sops-init-prod: create .sops.yaml config with age public key
+## sops-init-prod: create sops config
 sops-init-prod:
 	$(eval PK := $(shell grep 'public key' $(AGE_KEY_FILE) | cut -d' ' -f4))
-	@mkdir -p $(SECRETS_DIR)
-	@$(PRINTF) "creation_rules:\n  - path_regex: .*\\.yaml$$\n    age: $(PK)\n" > "$(SECRETS_DIR)/$(SOPS_CONFIG)"
-	@$(PRINTF) -- "SOPS configuration created\n"
+	@mkdir -p $(SECRETS_DIR)/prod
+	@$(PRINTF) "creation_rules:\n  - path_regex: .*\\.yaml$$\n    age: $(PK)\n" > "$(SECRETS_DIR)/prod/$(SOPS_CONFIG)"
 
-## sops-encrypt-prod: encrypt all *.decrypted.yaml files in secrets dir
+## sops-encrypt-prod: encrypt files
 sops-encrypt-prod:
 	@PK=$$(grep 'public key' $(AGE_KEY_FILE) | cut -d' ' -f4); \
-	for f in $(SECRETS_DIR)/*.decrypted.yaml; do \
-		[ -f "$$f" ] || continue; \
-		$(SOPS) --encrypt --age "$$PK" --output "$${f%.decrypted.yaml}.yaml" "$$f"; \
+	for f in $(SECRETS_DIR)/prod/*.decrypted.yaml; do \
+	   [ -f "$$f" ] || continue; \
+	   $(SOPS) --encrypt --age "$$PK" --output "$${f%.decrypted.yaml}.yaml" "$$f"; \
 	done
-	fi
-	@$(SOPS) --encrypt --age $(PK) --output "$(SECRETS_DIR)/secrets.yaml" "$(SECRETS_DIR)/secrets.decrypted.yaml"
-	@$(PRINTF) -- "Secrets encrypted to $(SECRETS_DIR)/secrets.yaml\n"
 
-## sops-decrypt-prod: decrypt all *.yaml files (excluding *.decrypted.yaml and config)
+## sops-decrypt-prod: decrypt files
 sops-decrypt-prod:
-	@for f in $(SECRETS_DIR)/*.yaml; do \
-		[ -f "$$f" ] || continue; \
-		[[ "$$f" == *".decrypted.yaml" || "$$f" == *"$(SOPS_CONFIG)" ]] && continue; \
-		$(SOPS) --decrypt "$$f" > "$${f%.yaml}.decrypted.yaml"; \
+	@for f in $(SECRETS_DIR)/prod/*.yaml; do \
+	   [ -f "$$f" ] || continue; \
+	   [[ "$$f" == *".decrypted.yaml" || "$$f" == *"$(SOPS_CONFIG)" ]] && continue; \
+	   $(SOPS) --decrypt "$$f" > "$${f%.yaml}.decrypted.yaml"; \
 	done
 
-%: _SOPS_READY :=
-endif # _SOPS_READY
+endif
 
-#----------------------------------------------------------------
-# Docs
-#----------------------------------------------------------------
-
-## help: show this menu with target descriptions
+## help: show this menu
 help:
 	@$(PRINTF) -- "========================================================================\n"
 	@$(PRINTF) -- " fabianpiper.com | Version: $(DEPLOY_VER)\n"

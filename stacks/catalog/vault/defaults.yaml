@@ -6,6 +6,3 @@ components:
       vars:
         enabled: true
         name: vault
-        git_username: "{{ env.TF_VAR_git_username }}"
-        git_pat: "{{ env.TF_VAR_git_pat }}"
-        mixpanel_token: "{{ env.TF_VAR_mixpanel_token }}"

@@ -55,3 +55,8 @@ variable "name" {
   default     = "oidc"
 }
 
+variable "git_email" {
+  type        = string
+  description = "Email address for the GitHub Actions service account"
+}
+

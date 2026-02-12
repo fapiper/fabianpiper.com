@@ -1,18 +1,19 @@
 locals {
   enabled = data.context_config.main.enabled
+  resource_name = data.context_label.main.rendered != "" ? data.context_label.main.rendered : "github-actions"
 }
 
 data "context_config" "main" {}
 
 data "context_label" "main" {
   values = {
-    name = "github-actions"
+    name = var.name
   }
 }
 
 data "context_tags" "main" {
   values = {
-    name = "github-actions"
+    name = var.name
   }
 }
 
@@ -24,8 +25,9 @@ data "context_tags" "main" {
 resource "oci_identity_user" "github_actions" {
   count          = local.enabled ? 1 : 0
   compartment_id = var.tenancy_ocid
-  name           = data.context_label.main.rendered
+  name           = local.resource_name
   description    = "Service account for GitHub Actions CI/CD"
+  email          = var.git_email
   freeform_tags  = data.context_tags.main.tags
 }
 
@@ -33,7 +35,7 @@ resource "oci_identity_user" "github_actions" {
 resource "oci_identity_group" "github_actions" {
   count          = local.enabled ? 1 : 0
   compartment_id = var.tenancy_ocid
-  name           = "${data.context_label.main.rendered}-group"
+  name           = "${local.resource_name}-group"
   description    = "Group for GitHub Actions service accounts"
   freeform_tags  = data.context_tags.main.tags
 }
@@ -45,11 +47,11 @@ resource "oci_identity_user_group_membership" "github_actions" {
   group_id = oci_identity_group.github_actions[0].id
 }
 
-# Policy for GitHub Actions to push to GHCR and read from Vault (minimal permissions)
+# Policy for GitHub Actions to push to GHCR and read from Vault with minimal permissions
 resource "oci_identity_policy" "github_actions" {
   count          = local.enabled ? 1 : 0
   compartment_id = var.tenancy_ocid
-  name           = data.context_label.main.rendered
+  name           = "${local.resource_name}-policy"
   description    = "Allow GitHub Actions to read Vault secrets for GHCR authentication"
 
   statements = [

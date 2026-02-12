@@ -6,15 +6,7 @@ vars:
   tenant: "glg"
 
 components:
-  terraform:
-    vault:
-      vars: {}
-
     k3s-cluster:
       vars:
         common_tags:
           Environment: "prod"
-
-    oidc:
-      vars: {}
-
