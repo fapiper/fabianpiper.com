@@ -93,11 +93,33 @@ jobs:
         run: |
           set -euo pipefail
           
+          echo "DEBUG: OCI_COMPARTMENT_ID=$OCI_COMPARTMENT_ID"
+          echo "DEBUG: Testing OCI CLI authentication..."
+          oci iam compartment get --compartment-id "$OCI_COMPARTMENT_ID" || echo "WARNING: Could not verify compartment access"
+          
+          echo "DEBUG: Fetching secrets from vault..."
           SECRETS_JSON=$(oci vault secret list \
             --compartment-id "$OCI_COMPARTMENT_ID" \
             --all \
-            --lifecycle-state ACTIVE \
-            2>/dev/null | jq -c '[.data[] | {name: .["secret-name"], id: .id}]')
+            --lifecycle-state ACTIVE 2>&1)
+          
+          if [ $? -ne 0 ]; then
+            echo "ERROR: Failed to list secrets"
+            echo "$SECRETS_JSON"
+            exit 1
+          fi
+          
+          echo "DEBUG: Raw OCI response received"
+          
+          SECRETS_JSON=$(echo "$SECRETS_JSON" | jq -c '[.data[] | {name: .["secret-name"], id: .id}]' 2>&1)
+          
+          if [ $? -ne 0 ]; then
+            echo "ERROR: Failed to parse secrets JSON"
+            echo "$SECRETS_JSON"
+            exit 1
+          fi
+          
+          echo "DEBUG: Found secrets count: $(echo "$SECRETS_JSON" | jq '. | length')"
           
           if [ "$SECRETS_JSON" = "[]" ] || [ -z "$SECRETS_JSON" ]; then
             echo "::warning::No active secrets found in vault"
@@ -108,30 +130,44 @@ jobs:
           {
             echo "build_args<<EOF_BUILD_ARGS"
           
-            while read -r secret; do
+            while IFS= read -r secret; do
               VAULT_NAME=$(echo "$secret" | jq -r '.name')
               VAULT_ID=$(echo "$secret" | jq -r '.id')
           
-              [ "$VAULT_NAME" = "null" ] || [ "$VAULT_ID" = "null" ] && continue
+              if [ "$VAULT_NAME" = "null" ] || [ "$VAULT_ID" = "null" ]; then
+                echo "DEBUG: Skipping null secret"
+                continue
+              fi
           
               ARG_NAME=$(echo "$VAULT_NAME" | tr '-' '_' | tr '[:lower:]' '[:upper:]')
+          
+              echo "DEBUG: Processing $VAULT_NAME -> $ARG_NAME"
           
               BUNDLE=$(oci secrets secret-bundle get \
                 --secret-id "$VAULT_ID" \
                 --stage CURRENT 2>&1)
           
-              [ $? -ne 0 ] && continue
+              if [ $? -ne 0 ]; then
+                echo "WARNING: Failed to fetch secret $VAULT_NAME"
+                echo "$BUNDLE"
+                continue
+              fi
           
               VALUE=$(echo "$BUNDLE" | jq -r '.data."secret-bundle-content".content' 2>/dev/null | base64 -d 2>/dev/null)
           
               if [ -n "$VALUE" ]; then
                 echo "::add-mask::${VALUE}"
                 echo "${ARG_NAME}=${VALUE}"
+                echo "DEBUG: Successfully processed $ARG_NAME"
+              else
+                echo "WARNING: Empty value for $VAULT_NAME"
               fi
             done < <(echo "$SECRETS_JSON" | jq -c '.[]')
           
             echo "EOF_BUILD_ARGS"
           } >> $GITHUB_OUTPUT
+          
+          echo "DEBUG: Secrets resolution completed"
 
       - uses: docker/setup-buildx-action@v3
 

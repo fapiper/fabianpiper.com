@@ -27,3 +27,8 @@ output "mixpanel_token_secret_id" {
   value       = join("", oci_vault_secret.mixpanel_token[*].id)
   description = "The OCID of the Mixpanel token secret"
 }
+
+output "site_url_secret_id" {
+  value       = join("", oci_vault_secret.site_url[*].id)
+  description = "The OCID of the site URL secret"
+}

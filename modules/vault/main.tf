@@ -52,7 +52,6 @@ resource "oci_kms_key" "default" {
   depends_on = [time_sleep.wait_for_vault_dns]
 }
 
-# Secrets for Git credentials
 resource "oci_vault_secret" "git_username" {
   count = local.enabled ? 1 : 0
 
@@ -89,7 +88,6 @@ resource "oci_vault_secret" "git_pat" {
   depends_on = [oci_kms_key.default]
 }
 
-# Secret for Mixpanel token
 resource "oci_vault_secret" "mixpanel_token" {
   count = local.enabled ? 1 : 0
 
@@ -101,6 +99,24 @@ resource "oci_vault_secret" "mixpanel_token" {
   secret_content {
     content_type = "BASE64"
     content      = base64encode(var.mixpanel_token)
+  }
+
+  freeform_tags = data.context_tags.main.tags
+
+  depends_on = [oci_kms_key.default]
+}
+
+resource "oci_vault_secret" "site_url" {
+  count = local.enabled ? 1 : 0
+
+  compartment_id = local.compartment_ocid
+  vault_id       = oci_kms_vault.default[0].id
+  key_id         = oci_kms_key.default[0].id
+  secret_name    = "site-url"
+
+  secret_content {
+    content_type = "BASE64"
+    content      = base64encode(var.site_url)
   }
 
   freeform_tags = data.context_tags.main.tags

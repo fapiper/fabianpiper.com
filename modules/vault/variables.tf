@@ -27,3 +27,9 @@ variable "mixpanel_token" {
   description = "Mixpanel token"
   sensitive   = true
 }
+
+variable "site_url" {
+  type        = string
+  description = "Site URL"
+  sensitive   = true
+}
