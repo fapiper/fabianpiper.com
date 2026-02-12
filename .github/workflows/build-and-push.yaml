@@ -25,8 +25,12 @@ jobs:
         run: |
           set -euo pipefail
           BASE_SHA=${{ github.event.before }}
-          [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ] && BASE_SHA="HEAD^"
+          if [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ] || [ -z "$BASE_SHA" ]; then 
+            BASE_SHA="HEAD^"
+          fi
+          
           DIFF=$(git diff --name-only $BASE_SHA ${{ github.sha }} | grep '^apps/' | cut -d/ -f2 | sort -u || true)
+          
           if [ -z "$DIFF" ]; then
             echo "apps=[]" >> $GITHUB_OUTPUT
           else
@@ -36,7 +40,7 @@ jobs:
 
   build-and-push:
     needs: detect-changes
-    if: needs.detect-changes.outputs.apps != '[]'
+    if: needs.detect-changes.outputs.apps != '[]' && needs.detect-changes.outputs.apps != ''
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -61,8 +65,6 @@ jobs:
           
           sops -d --output-type dotenv secrets/prod/secrets.yaml > secrets.env
           
-          if [ ! -s secrets.env ]; then echo "ERROR: secrets.env is empty or not found"; exit 1; fi
-          
           while IFS='=' read -r key value; do
             [ -n "$value" ] && echo "::add-mask::${value}"
           done < secrets.env
@@ -73,84 +75,62 @@ jobs:
           set -a && source secrets.env && set +a
           
           mkdir -p ~/.oci
-          
           printf "%s" "$TF_VAR_private_key_content" | tr -d '\r' > ~/.oci/key.pem
           chmod 600 ~/.oci/key.pem
           
-          if ! head -n 1 ~/.oci/key.pem | grep -q "BEGIN"; then
-            echo "ERROR: Key file does not start with BEGIN header. Check your SOPS secret format."
-            exit 1
-          fi
+          echo "[DEFAULT]" > ~/.oci/config
+          echo "user=$TF_VAR_user_ocid" >> ~/.oci/config
+          echo "fingerprint=$TF_VAR_fingerprint" >> ~/.oci/config
+          echo "tenancy=$TF_VAR_tenancy_ocid" >> ~/.oci/config
+          echo "region=$TF_VAR_region" >> ~/.oci/config
+          echo "key_file=$HOME/.oci/key.pem" >> ~/.oci/config
           
-          cat <<EOF > ~/.oci/config
-  [DEFAULT]
-  user=$TF_VAR_user_ocid
-  fingerprint=$TF_VAR_fingerprint
-  tenancy=$TF_VAR_tenancy_ocid
-  region=$TF_VAR_region
-  key_file=$HOME/.oci/key.pem
-  EOF
-  chmod 600 ~/.oci/config
-  
-  echo "OCI_COMPARTMENT_ID=$TF_VAR_compartment_ocid" >> $GITHUB_ENV
+          chmod 600 ~/.oci/config
+          echo "OCI_COMPARTMENT_ID=$TF_VAR_compartment_ocid" >> $GITHUB_ENV
 
-- uses: oracle-actions/run-oci-cli-command@v1.3.2
-  with:
-    command: "--version"
-    silent: true
+      - uses: oracle-actions/run-oci-cli-command@v1.3.2
+        with:
+          command: "--version"
+          silent: true
 
-- name: Resolve Vault Secrets
-  id: vault_secrets
-  run: |
-    set -euo pipefail
-    
-    oci iam compartment get --compartment-id "$OCI_COMPARTMENT_ID" > /dev/null || (echo "ERROR: OCI Login failed or Compartment ID invalid" && exit 1)
-    
-    echo "Fetching secrets..."
-    SECRETS_JSON=$(oci vault secret list --compartment-id "$OCI_COMPARTMENT_ID" --all --lifecycle-state ACTIVE --query "data[*].{name: \"secret-name\", id: id}")
-    
-    if [ "$SECRETS_JSON" = "[]" ] || [ -z "$SECRETS_JSON" ]; then
-      echo "::warning::No secrets found"
-      echo "build_args=" >> $GITHUB_OUTPUT
-      exit 0
-    fi
-    
-    {
-      echo "build_args<<EOF_BUILD_ARGS"
-      while read -r secret; do
-        V_NAME=$(echo "$secret" | jq -r '.name')
-        V_ID=$(echo "$secret" | jq -r '.id')
-        [ "$V_NAME" = "null" ] && continue
-    
-        ARG_NAME=$(echo "$V_NAME" | tr '-' '_' | tr '[:lower:]' '[:upper:]')
-    
-        BUNDLE=$(oci secrets secret-bundle get --secret-id "$V_ID" --stage CURRENT 2>/dev/null)
-        VALUE=$(echo "$BUNDLE" | jq -r '.data."secret-bundle-content".content' | base64 -d 2>/dev/null)
-    
-        if [ -n "$VALUE" ]; then
-          echo "::add-mask::${VALUE}"
-          echo "${ARG_NAME}=${VALUE}"
-        fi
-      done < <(echo "$SECRETS_JSON" | jq -c '.[]')
-    
-      echo "EOF_BUILD_ARGS"
-    } >> $GITHUB_OUTPUT
+      - name: Resolve Vault Secrets
+        id: vault_secrets
+        run: |
+          set -euo pipefail
+          
+          echo "Fetching secrets from OCI Vault..."
+          QUERY="data[?\"lifecycle-state\" == 'ACTIVE'].{name: \"secret-name\", id: id}"
+          SECRETS_JSON=$(oci vault secret list --compartment-id "$OCI_COMPARTMENT_ID" --all --query "$QUERY")
+          
+          if [ -z "$SECRETS_JSON" ] || [ "$SECRETS_JSON" == "[]" ]; then
+            echo "::warning::No active secrets found"
+            echo "build_args=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
 
-- uses: docker/setup-buildx-action@v3
+          echo "build_args<<EOF_DOCKER" >> $GITHUB_OUTPUT
+          
+          while read -r secret; do
+            V_NAME=$(echo "$secret" | jq -r '.name')
+            V_ID=$(echo "$secret" | jq -r '.id')
+          
+            ARG_NAME=$(echo "$V_NAME" | tr '-' '_' | tr '[:lower:]' '[:upper:]')
+          
+            BUNDLE=$(oci secrets secret-bundle get --secret-id "$V_ID" --stage CURRENT 2>/dev/null || true)
+            if [ -n "$BUNDLE" ]; then
+              VAL=$(echo "$BUNDLE" | jq -r '.data."secret-bundle-content".content' | base64 -d 2>/dev/null || true)
+              if [ -n "$VAL" ]; then
+                echo "::add-mask::$VAL"
+                echo "${ARG_NAME}=${VAL}" >> $GITHUB_OUTPUT
+              fi
+            fi
+          done < <(echo "$SECRETS_JSON" | jq -c '.[]')
+          echo "EOF_DOCKER" >> $GITHUB_OUTPUT
 
-- uses: docker/login-action@v3
-  with:
-    registry: ${{ env.REGISTRY }}
-    username: ${{ github.actor }}
-    password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@v3
 
-- uses: docker/build-push-action@v6
-  with:
-    context: apps/${{ matrix.app }}
-    push: true
-    tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.app }}:latest
-    build-args: ${{ steps.vault_secrets.outputs.build_args }}
-
-- name: Cleanup
-  if: always()
-  run: rm -rf secrets.env secrets/ ~/.oci/
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
