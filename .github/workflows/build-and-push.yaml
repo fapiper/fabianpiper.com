@@ -2,9 +2,9 @@ name: Build and Push Docker Images
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
     paths:
-      - 'apps/**'
+      - "apps/**"
   workflow_dispatch:
 
 env:
@@ -24,18 +24,44 @@ jobs:
       - id: set-matrix
         run: |
           set -euo pipefail
-          BASE_SHA=${{ github.event.before }}
-          if [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ] || [ -z "$BASE_SHA" ]; then 
+
+          BASE_SHA="${{ github.event.before }}"
+
+          # Fallback for first push or manual trigger (no before SHA)
+          if [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ] || [ -z "$BASE_SHA" ]; then
             BASE_SHA="HEAD^"
           fi
-          
-          DIFF=$(git diff --name-only $BASE_SHA ${{ github.sha }} | grep '^apps/' | cut -d/ -f2 | sort -u || true)
-          
+
+          if ! echo "$BASE_SHA" | grep -qE '^[0-9a-f]{40}$|^HEAD\^$'; then
+            echo "::error::Unexpected BASE_SHA format: $BASE_SHA"
+            exit 1
+          fi
+
+          DIFF=$(git diff --name-only -- "$BASE_SHA" "${{ github.sha }}" \
+            | grep '^apps/' \
+            | cut -d/ -f2 \
+            | sort -u \
+            || true)
+
           if [ -z "$DIFF" ]; then
-            echo "apps=[]" >> $GITHUB_OUTPUT
+            echo "apps=[]" >> "$GITHUB_OUTPUT"
           else
-            APPS_JSON=$(echo "$DIFF" | jq -R -s -c 'split("\n") | map(select(length > 0))')
-            echo "apps=$APPS_JSON" >> $GITHUB_OUTPUT
+            # Allowlist: only alphanumeric, hyphens, underscores
+            SAFE_APPS=""
+            while IFS= read -r app; do
+              if echo "$app" | grep -qE '^[a-zA-Z0-9_-]+$'; then
+                SAFE_APPS="${SAFE_APPS}${app}"$'\n'
+              else
+                echo "::warning::Skipping app with unsafe name: $app"
+              fi
+            done <<< "$DIFF"
+
+            if [ -z "$SAFE_APPS" ]; then
+              echo "apps=[]" >> "$GITHUB_OUTPUT"
+            else
+              APPS_JSON=$(echo "$SAFE_APPS" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+              echo "apps=$APPS_JSON" >> "$GITHUB_OUTPUT"
+            fi
           fi
 
   build-and-push:
@@ -54,77 +80,98 @@ jobs:
 
       - uses: nhedger/setup-sops@v2
 
-      - name: Decrypt and Configure OCI
+      - name: Decrypt SOPS Secrets
         env:
           SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
         run: |
           set -euo pipefail
-          
-          mkdir -p secrets
-          echo "$SOPS_AGE_KEY" > secrets/.sops.key
-          export SOPS_AGE_KEY_FILE=$(pwd)/secrets/.sops.key
-          
-          sops -d --output-type json secrets/prod/secrets.yaml > secrets.json
-          
-          mkdir -p ~/.oci
-          jq -r '.TF_VAR_private_key_content' secrets.json | tr -d '\r' > ~/.oci/key.pem
-          chmod 600 ~/.oci/key.pem
-          
-          OCI_USER=$(jq -r '.TF_VAR_user_ocid' secrets.json)
-          OCI_TENANCY=$(jq -r '.TF_VAR_tenancy_ocid' secrets.json)
-          OCI_FINGERPRINT=$(jq -r '.TF_VAR_fingerprint' secrets.json)
-          OCI_REGION=$(jq -r '.TF_VAR_region' secrets.json)
-          OCI_COMPARTMENT=$(jq -r '.TF_VAR_compartment_ocid' secrets.json)
-          
+
+          TMPKEY=$(mktemp)
+          trap 'rm -f "$TMPKEY"' EXIT
+          echo "$SOPS_AGE_KEY" > "$TMPKEY"
+          export SOPS_AGE_KEY_FILE="$TMPKEY"
+
+          SECRETS_JSON=$(sops -d --output-type json secrets/prod/secrets.yaml)
+
+          OCI_USER=$(echo "$SECRETS_JSON" | jq -r '.TF_VAR_user_ocid')
+          OCI_TENANCY=$(echo "$SECRETS_JSON" | jq -r '.TF_VAR_tenancy_ocid')
+          OCI_FINGERPRINT=$(echo "$SECRETS_JSON" | jq -r '.TF_VAR_fingerprint')
+          OCI_REGION=$(echo "$SECRETS_JSON" | jq -r '.TF_VAR_region')
+          OCI_COMPARTMENT=$(echo "$SECRETS_JSON" | jq -r '.TF_VAR_compartment_ocid')
+          OCI_PRIVATE_KEY=$(echo "$SECRETS_JSON" | jq -r '.TF_VAR_private_key_content' | tr -d '\r')
+
           echo "::add-mask::$OCI_USER"
           echo "::add-mask::$OCI_TENANCY"
           echo "::add-mask::$OCI_FINGERPRINT"
+          echo "::add-mask::$OCI_PRIVATE_KEY"
 
-          echo "[DEFAULT]" > ~/.oci/config
-          echo "user=$OCI_USER" >> ~/.oci/config
-          echo "fingerprint=$OCI_FINGERPRINT" >> ~/.oci/config
-          echo "tenancy=$OCI_TENANCY" >> ~/.oci/config
-          echo "region=$OCI_REGION" >> ~/.oci/config
-          echo "key_file=$HOME/.oci/key.pem" >> ~/.oci/config
+          mkdir -p ~/.oci
+          echo "$OCI_PRIVATE_KEY" > ~/.oci/key.pem
+          chmod 600 ~/.oci/key.pem
+
+          cat > ~/.oci/config <<EOF
+          [DEFAULT]
+          user=$OCI_USER
+          fingerprint=$OCI_FINGERPRINT
+          tenancy=$OCI_TENANCY
+          region=$OCI_REGION
+          key_file=$HOME/.oci/key.pem
+          EOF
           chmod 600 ~/.oci/config
-          
-          echo "OCI_COMPARTMENT_ID=$OCI_COMPARTMENT" >> $GITHUB_ENV
 
-      - uses: oracle-actions/run-oci-cli-command@v1.3.2
-        with:
-          command: "--version"
-          silent: true
+          echo "OCI_COMPARTMENT_ID=$OCI_COMPARTMENT" >> "$GITHUB_ENV"
+
+          unset SECRETS_JSON OCI_PRIVATE_KEY
 
       - name: Resolve Vault Secrets
         id: vault_secrets
         run: |
           set -euo pipefail
-          
-          VAULT_SECRETS=$(oci vault secret list --compartment-id "$OCI_COMPARTMENT_ID" --all --query "data[?\"lifecycle-state\" == 'ACTIVE'].{name: \"secret-name\", id: id}")
-          
-          echo "build_args<<EOF_DOCKER" >> $GITHUB_OUTPUT
-          
-          if [ "$VAULT_SECRETS" != "[]" ] && [ -n "$VAULT_SECRETS" ]; then
-            while read -r secret; do
-              NAME=$(echo "$secret" | jq -r '.name')
-              ID=$(echo "$secret" | jq -r '.id')
-              ARG_NAME=$(echo "$NAME" | tr '-' '_' | tr '[:lower:]' '[:upper:]')
-          
-              BUNDLE=$(oci secrets secret-bundle get --secret-id "$ID" --stage CURRENT 2>/dev/null || true)
-              if [ -n "$BUNDLE" ]; then
-                VAL=$(echo "$BUNDLE" | jq -r '.data."secret-bundle-content".content' | base64 -d 2>/dev/null || true)
-                if [ -n "$VAL" ]; then
-                  while read -r line; do
-                    echo "::add-mask::$line"
-                  done <<< "$VAL"
-                  echo "${ARG_NAME}=${VAL}" >> $GITHUB_OUTPUT
+
+          VAULT_SECRETS=$(oci vault secret list \
+            --compartment-id "$OCI_COMPARTMENT_ID" \
+            --all \
+            --lifecycle-state ACTIVE \
+            --query "data[].{name: \"secret-name\", id: id}" \
+            2>/dev/null)
+
+          {
+            echo "secret_envs<<EOF_SECRETS"
+
+            if [ -n "$VAULT_SECRETS" ] && [ "$VAULT_SECRETS" != "[]" ]; then
+              while IFS= read -r secret; do
+                NAME=$(echo "$secret" | jq -r '.name')
+                ID=$(echo "$secret" | jq -r '.id')
+
+                if ! echo "$NAME" | grep -qE '^[a-zA-Z0-9_-]+$'; then
+                  echo "::warning::Skipping secret with unsafe name: $NAME"
+                  continue
                 fi
-              fi
-            done < <(echo "$VAULT_SECRETS" | jq -c '.[]')
-          fi
-          
-          echo "SITE_URL=https://glg.fabianpiper.com" >> $GITHUB_OUTPUT
-          echo "EOF_DOCKER" >> $GITHUB_OUTPUT
+
+                BUNDLE=$(oci secrets secret-bundle get --secret-id "$ID" --stage CURRENT 2>/dev/null) || {
+                  echo "::warning::Could not fetch secret: $NAME" >&2
+                  continue
+                }
+
+                VAL=$(echo "$BUNDLE" | jq -r '.data."secret-bundle-content".content' | base64 -d 2>/dev/null) || {
+                  echo "::warning::Could not decode secret: $NAME" >&2
+                  continue
+                }
+
+                if [ -n "$VAL" ]; then
+                  # Mask every line of multi-line values
+                  while IFS= read -r line; do
+                    [ -n "$line" ] && echo "::add-mask::$line"
+                  done <<< "$VAL"
+
+                  ARG_NAME=$(echo "$NAME" | tr '-' '_' | tr '[:lower:]' '[:upper:]')
+                  echo "${ARG_NAME}=${VAL}"
+                fi
+              done < <(echo "$VAULT_SECRETS" | jq -c '.[]')
+            fi
+
+            echo "EOF_SECRETS"
+          } >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@v3
 
@@ -139,11 +186,15 @@ jobs:
         with:
           context: apps/${{ matrix.app }}
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.app }}:latest
-          build-args: ${{ steps.vault_secrets.outputs.build_args }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.app }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.app }}:${{ github.sha }}
+          secrets: ${{ steps.vault_secrets.outputs.secret_envs }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Cleanup
         if: always()
         run: |
-          rm -f secrets.json secrets/.sops.key ~/.oci/key.pem
-          rm -rf secrets/ ~/.oci/
+          rm -f ~/.oci/key.pem ~/.oci/config
+          rmdir ~/.oci 2>/dev/null || true
