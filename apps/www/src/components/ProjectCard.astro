@@ -19,23 +19,6 @@ if (entry.data.image) {
     src: entry.data.image,
     alt: entry.data.name,
   }
-} else if (entry.data.links) {
-  const githubLink = entry.data.links.find((link) =>
-    link.href.includes('github.com'),
-  )
-
-  if (githubLink) {
-    // Matches: github.com/user/repo
-    const match = githubLink.href.match(/github\.com\/([^\/]+)\/([^\/]+)/)
-    if (match) {
-      imageProps = {
-        src: `https://opengraph.githubassets.com/1/${match[1]}/${match[2]}`,
-        alt: `${entry.data.name} Image`,
-        width: 1200,
-        height: 630,
-      }
-    }
-  }
 }
 ---
 

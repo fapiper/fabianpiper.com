@@ -53,9 +53,6 @@ export default defineConfig({
   devToolbar: {
     enabled: false,
   },
-  image: {
-    domains: ['opengraph.githubassets.com'],
-  },
   markdown: {
     syntaxHighlight: false,
     rehypePlugins: [
