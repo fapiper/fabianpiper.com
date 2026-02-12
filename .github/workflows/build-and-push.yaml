@@ -121,20 +121,12 @@ jobs:
             echo "EOF_OCI_KEY"
           } >> "$GITHUB_ENV"
 
-      # FIX: Test OCI connection with silent=false to see errors
-      - name: Test OCI CLI Connection
-        uses: oracle-actions/run-oci-cli-command@v1.3.2
-        with:
-          silent: false  # Show errors!
-          command: 'iam region list'
-
       - name: List Vault Secrets
         uses: oracle-actions/run-oci-cli-command@v1.3.2
         id: list_secrets
         with:
-          silent: false  # FIX: Show output for debugging
           command: vault secret list --compartment-id ${{ env.OCI_COMPARTMENT_ID }} --all --lifecycle-state ACTIVE
-          query: "data[].{name: \"secret-name\", id: id}"
+          query: 'data[].{name: "secret-name", id: id}'
 
       - name: Resolve Vault Secrets
         id: vault_secrets
@@ -157,18 +149,17 @@ jobs:
                 continue
               fi
           
-              echo "Fetching secret: $NAME (ID: ${ID:0:20}...)"
+              echo "Fetching secret: $NAME"
           
-              # Use oracle-action to fetch secret bundle
-              BUNDLE_JSON=$(oci secrets secret-bundle get \
+              BUNDLE=$(oci secrets secret-bundle get \
                 --secret-id "$ID" \
                 --stage CURRENT 2>&1) || {
                 echo "::warning::Could not fetch secret: $NAME" >&2
-                echo "Error: $BUNDLE_JSON" >&2
+                echo "Error: $BUNDLE" >&2
                 continue
               }
           
-              VAL=$(echo "$BUNDLE_JSON" | jq -r '.data."secret-bundle-content".content' | base64 -d 2>/dev/null) || {
+              VAL=$(echo "$BUNDLE" | jq -r '.data."secret-bundle-content".content' | base64 -d 2>/dev/null) || {
                 echo "::warning::Could not decode secret: $NAME" >&2
                 continue
               }
@@ -181,6 +172,7 @@ jobs:
           
                 ARG_NAME=$(echo "$NAME" | tr '-' '_' | tr '[:lower:]' '[:upper:]')
           
+                # Write to file
                 echo "${ARG_NAME}=${VAL}" >> "$SECRET_FILE"
                 echo "✓ Added secret: $ARG_NAME"
               fi
