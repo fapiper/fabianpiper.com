@@ -8,14 +8,20 @@ RUN bun install
 
 COPY . .
 
-RUN --mount=type=secret,id=MIXPANEL_TOKEN \
-    --mount=type=secret,id=SITE_URL \
-    PUBLIC_MIXPANEL_TOKEN=$(cat /run/secrets/MIXPANEL_TOKEN) \
-    PUBLIC_SITE_URL=$(cat /run/secrets/SITE_URL) \
+RUN --mount=type=secret,id=secrets \
+    set -euo pipefail && \
+    set -a && \
+    . /run/secrets/secrets && \
+    set +a && \
+    PUBLIC_MIXPANEL_TOKEN="$MIXPANEL_TOKEN" \
+    PUBLIC_SITE_URL="$SITE_URL" \
     bun run build
 
 FROM nginx:alpine
-RUN rm -rf /usr/share/nginx/html/*
-COPY --from=builder /app/dist /usr/share/nginx/html
+
+RUN chown -R nginx:nginx /usr/share/nginx/html
+COPY --from=builder --chown=nginx:nginx /app/dist /usr/share/nginx/html
+USER nginx
+
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]

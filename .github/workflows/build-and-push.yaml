@@ -33,8 +33,8 @@ jobs:
             BASE_SHA="HEAD^"
           fi
 
-          if ! echo "$BASE_SHA" | grep -qE '^[0-9a-f]{40}$|^HEAD\^$'; then
-            echo "::error::Unexpected BASE_SHA format: $BASE_SHA"
+          if ! git rev-parse --verify "$BASE_SHA" >/dev/null 2>&1; then
+            echo "::error::Invalid BASE_SHA: $BASE_SHA"
             exit 1
           fi
 
@@ -79,7 +79,8 @@ jobs:
 
       - uses: nhedger/setup-sops@v2
 
-      - name: Decrypt SOPS Secrets
+      - name: Decrypt SOPS Secrets and Setup OCI
+        id: setup_oci
         env:
           SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
         run: |
@@ -97,78 +98,81 @@ jobs:
           OCI_FINGERPRINT=$(echo "$SECRETS_JSON" | jq -r '.TF_VAR_fingerprint')
           OCI_REGION=$(echo "$SECRETS_JSON" | jq -r '.TF_VAR_region')
           OCI_COMPARTMENT=$(echo "$SECRETS_JSON" | jq -r '.TF_VAR_compartment_ocid')
-          OCI_PRIVATE_KEY=$(echo "$SECRETS_JSON" | jq -r '.TF_VAR_private_key_content' | tr -d '\r')
+          OCI_PRIVATE_KEY=$(echo "$SECRETS_JSON" | jq -r '.TF_VAR_private_key_content')
 
           echo "::add-mask::$OCI_USER"
           echo "::add-mask::$OCI_TENANCY"
           echo "::add-mask::$OCI_FINGERPRINT"
+          echo "::add-mask::$OCI_COMPARTMENT"
 
           while IFS= read -r line; do
             [ -n "$line" ] && echo "::add-mask::$line"
           done <<< "$OCI_PRIVATE_KEY"
 
-          mkdir -p ~/.oci
-          echo "$OCI_PRIVATE_KEY" > ~/.oci/key.pem
-          chmod 600 ~/.oci/key.pem
-
-          printf '[DEFAULT]\nuser=%s\nfingerprint=%s\ntenancy=%s\nregion=%s\nkey_file=%s/.oci/key.pem\n' \
-            "$OCI_USER" "$OCI_FINGERPRINT" "$OCI_TENANCY" "$OCI_REGION" "$HOME" \
-            > ~/.oci/config
-          chmod 600 ~/.oci/config
-
+          echo "OCI_CLI_USER=$OCI_USER" >> "$GITHUB_ENV"
+          echo "OCI_CLI_TENANCY=$OCI_TENANCY" >> "$GITHUB_ENV"
+          echo "OCI_CLI_FINGERPRINT=$OCI_FINGERPRINT" >> "$GITHUB_ENV"
+          echo "OCI_CLI_REGION=$OCI_REGION" >> "$GITHUB_ENV"
           echo "OCI_COMPARTMENT_ID=$OCI_COMPARTMENT" >> "$GITHUB_ENV"
 
-          unset SECRETS_JSON OCI_PRIVATE_KEY
+          {
+            echo "OCI_CLI_KEY_CONTENT<<EOF_OCI_KEY"
+            echo "$OCI_PRIVATE_KEY"
+            echo "EOF_OCI_KEY"
+          } >> "$GITHUB_ENV"
+
+      - name: List Vault Secrets
+        uses: oracle-actions/run-oci-cli-command@v1.3.2
+        id: list_secrets
+        with:
+          command: vault secret list --compartment-id ${{ env.OCI_COMPARTMENT_ID }} --all --lifecycle-state ACTIVE
+          query: "data[].{name: \"secret-name\", id: id}"
 
       - name: Resolve Vault Secrets
         id: vault_secrets
         run: |
           set -euo pipefail
-
-          VAULT_SECRETS=$(oci vault secret list \
-            --compartment-id "$OCI_COMPARTMENT_ID" \
-            --all \
-            --lifecycle-state ACTIVE \
-            --query "data[].{name: \"secret-name\", id: id}" \
-            2>/dev/null)
-
-          {
-            echo "secret_envs<<EOF_SECRETS"
-
-            if [ -n "$VAULT_SECRETS" ] && [ "$VAULT_SECRETS" != "[]" ]; then
-              while IFS= read -r secret; do
-                NAME=$(echo "$secret" | jq -r '.name')
-                ID=$(echo "$secret" | jq -r '.id')
-
-                if ! echo "$NAME" | grep -qE '^[a-zA-Z0-9_-]+$'; then
-                  echo "::warning::Skipping secret with unsafe name: $NAME"
-                  continue
-                fi
-
-                BUNDLE=$(oci secrets secret-bundle get --secret-id "$ID" --stage CURRENT 2>/dev/null) || {
-                  echo "::warning::Could not fetch secret: $NAME" >&2
-                  continue
-                }
-
-                VAL=$(echo "$BUNDLE" | jq -r '.data."secret-bundle-content".content' | base64 -d 2>/dev/null) || {
-                  echo "::warning::Could not decode secret: $NAME" >&2
-                  continue
-                }
-
-                if [ -n "$VAL" ]; then
-
-                  while IFS= read -r line; do
-                    [ -n "$line" ] && echo "::add-mask::$line"
-                  done <<< "$VAL"
-
-                  ARG_NAME=$(echo "$NAME" | tr '-' '_' | tr '[:lower:]' '[:upper:]')
-                  echo "${ARG_NAME}=${VAL}"
-                fi
-              done < <(echo "$VAULT_SECRETS" | jq -c '.[]')
-            fi
-
-            echo "EOF_SECRETS"
-          } >> "$GITHUB_OUTPUT"
+          
+          VAULT_SECRETS='${{ steps.list_secrets.outputs.output }}'
+          
+          SECRET_FILE="$RUNNER_TEMP/vault-secrets-${{ github.run_id }}.env"
+          > "$SECRET_FILE"
+          chmod 600 "$SECRET_FILE"
+          
+          if [ -n "$VAULT_SECRETS" ] && [ "$VAULT_SECRETS" != "[]" ]; then
+            while IFS= read -r secret; do
+              NAME=$(echo "$secret" | jq -r '.name')
+              ID=$(echo "$secret" | jq -r '.id')
+          
+              if ! echo "$NAME" | grep -qE '^[a-zA-Z0-9_-]+$'; then
+                echo "::warning::Skipping secret with unsafe name: $NAME"
+                continue
+              fi
+          
+              BUNDLE=$(oci secrets secret-bundle get --secret-id "$ID" --stage CURRENT 2>/dev/null) || {
+                echo "::warning::Could not fetch secret: $NAME" >&2
+                continue
+              }
+          
+              VAL=$(echo "$BUNDLE" | jq -r '.data."secret-bundle-content".content' | base64 -d 2>/dev/null) || {
+                echo "::warning::Could not decode secret: $NAME" >&2
+                continue
+              }
+          
+              if [ -n "$VAL" ]; then
+                while IFS= read -r line; do
+                  [ -n "$line" ] && echo "::add-mask::$line"
+                done <<< "$VAL"
+          
+                ARG_NAME=$(echo "$NAME" | tr '-' '_' | tr '[:lower:]' '[:upper:]')
+          
+                echo "${ARG_NAME}=${VAL}" >> "$SECRET_FILE"
+              fi
+            done < <(echo "$VAULT_SECRETS" | jq -c '.[]')
+          fi
+          
+          echo "secret_file=$SECRET_FILE" >> "$GITHUB_OUTPUT"
+          echo "::notice::Secrets written to secure file ($(wc -l < "$SECRET_FILE") lines)"
 
       - uses: docker/setup-buildx-action@v3
 
@@ -188,13 +192,16 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.app }}:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.app }}:${{ github.sha }}
 
-          secrets: ${{ steps.vault_secrets.outputs.secret_envs }}
+          secret-files: |
+            secrets=${{ steps.vault_secrets.outputs.secret_file }}
 
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Cleanup
+      - name: Cleanup Secrets File
         if: always()
         run: |
-          rm -f ~/.oci/key.pem ~/.oci/config
-          rmdir ~/.oci 2>/dev/null || true
+          SECRET_FILE="${{ steps.vault_secrets.outputs.secret_file }}"
+          if [ -f "$SECRET_FILE" ]; then
+            shred -vfz -n 3 "$SECRET_FILE" 2>/dev/null || rm -f "$SECRET_FILE"
+          fi
