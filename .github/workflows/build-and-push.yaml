@@ -38,8 +38,7 @@ jobs:
             exit 1
           fi
 
-          DIFF=$(git diff --name-only -- "$BASE_SHA" "$HEAD_SHA" \
-            | { grep '^apps/' || true; } \
+          DIFF=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- apps/ \
             | cut -d/ -f2 \
             | sort -u)
 
@@ -66,7 +65,7 @@ jobs:
 
   build-and-push:
     needs: detect-changes
-    if: needs.detect-changes.outputs.apps != '[]' && needs.detect-changes.outputs.apps != ''
+    if: ${{ needs.detect-changes.outputs.apps != '[]' && needs.detect-changes.outputs.apps != '' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
