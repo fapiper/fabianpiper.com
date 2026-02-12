@@ -39,10 +39,9 @@ jobs:
           fi
 
           DIFF=$(git diff --name-only -- "$BASE_SHA" "$HEAD_SHA" \
-            | grep '^apps/' \
+            | { grep '^apps/' || true; } \
             | cut -d/ -f2 \
-            | sort -u \
-            || true)
+            | sort -u)
 
           if [ -z "$DIFF" ]; then
             echo "apps=[]" >> "$GITHUB_OUTPUT"
@@ -169,7 +168,6 @@ jobs:
               done < <(echo "$VAULT_SECRETS" | jq -c '.[]')
             fi
 
-            echo "SITE_URL=https://glg.fabianpiper.com"
             echo "EOF_SECRETS"
           } >> "$GITHUB_OUTPUT"
 
