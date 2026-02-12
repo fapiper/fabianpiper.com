@@ -166,7 +166,12 @@ jobs:
             --query 'data[].{"name": "secret-name", "id": id}' \
             --output json)
           
-          echo "secrets=$SECRETS_JSON" >> "$GITHUB_OUTPUT"
+          {
+            echo "secrets<<EOF_SECRETS_JSON"
+            echo "$SECRETS_JSON"
+            echo "EOF_SECRETS_JSON"
+          } >> "$GITHUB_OUTPUT"
+          
           echo "✓ Found $(echo "$SECRETS_JSON" | jq '. | length') secrets"
 
       - name: Resolve Vault Secrets
