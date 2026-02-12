@@ -54,39 +54,47 @@ jobs:
 
       - uses: nhedger/setup-sops@v2
 
-      - name: Decrypt Bootstrap Secrets
+      - name: Decrypt and Configure OCI
         env:
           SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
         run: |
           set -euo pipefail
+          
+          # Setup SOPS
           mkdir -p secrets
           echo "$SOPS_AGE_KEY" > secrets/.sops.key
           export SOPS_AGE_KEY_FILE=$(pwd)/secrets/.sops.key
           
-          sops -d --output-type dotenv secrets/prod/secrets.yaml > secrets.env
+          sops -d --output-type json secrets/prod/secrets.yaml > secrets.json
           
-          while IFS='=' read -r key value; do
-            [ -n "$value" ] && echo "::add-mask::${value}"
-          done < secrets.env
+          # Extract variables 
+          OCI_USER=$(jq -r '.TF_VAR_user_ocid' secrets.json)
+          OCI_TENANCY=$(jq -r '.TF_VAR_tenancy_ocid' secrets.json)
+          OCI_FINGERPRINT=$(jq -r '.TF_VAR_fingerprint' secrets.json)
+          OCI_REGION=$(jq -r '.TF_VAR_region' secrets.json)
+          OCI_COMPARTMENT=$(jq -r '.TF_VAR_compartment_ocid' secrets.json)
+          OCI_KEY_CONTENT=$(jq -r '.TF_VAR_private_key_content' secrets.json)
+          
+          # Mask sensitive data
+          echo "::add-mask::$OCI_USER"
+          echo "::add-mask::$OCI_TENANCY"
+          echo "::add-mask::$OCI_FINGERPRINT"
+          echo "::add-mask::$OCI_KEY_CONTENT"
 
-      - name: Configure OCI CLI
-        run: |
-          set -euo pipefail
-          set -a && source secrets.env && set +a
-          
+          # Write OCI credentials
           mkdir -p ~/.oci
-          printf "%s" "$TF_VAR_private_key_content" | tr -d '\r' > ~/.oci/key.pem
+          printf "%s" "$OCI_KEY_CONTENT" | tr -d '\r' > ~/.oci/key.pem
           chmod 600 ~/.oci/key.pem
           
           echo "[DEFAULT]" > ~/.oci/config
-          echo "user=$TF_VAR_user_ocid" >> ~/.oci/config
-          echo "fingerprint=$TF_VAR_fingerprint" >> ~/.oci/config
-          echo "tenancy=$TF_VAR_tenancy_ocid" >> ~/.oci/config
-          echo "region=$TF_VAR_region" >> ~/.oci/config
+          echo "user=$OCI_USER" >> ~/.oci/config
+          echo "fingerprint=$OCI_FINGERPRINT" >> ~/.oci/config
+          echo "tenancy=$OCI_TENANCY" >> ~/.oci/config
+          echo "region=$OCI_REGION" >> ~/.oci/config
           echo "key_file=$HOME/.oci/key.pem" >> ~/.oci/config
-          
           chmod 600 ~/.oci/config
-          echo "OCI_COMPARTMENT_ID=$TF_VAR_compartment_ocid" >> $GITHUB_ENV
+          
+          echo "OCI_COMPARTMENT_ID=$OCI_COMPARTMENT" >> $GITHUB_ENV
 
       - uses: oracle-actions/run-oci-cli-command@v1.3.2
         with:
@@ -98,33 +106,30 @@ jobs:
         run: |
           set -euo pipefail
           
-          echo "Fetching secrets from OCI Vault..."
-          QUERY="data[?\"lifecycle-state\" == 'ACTIVE'].{name: \"secret-name\", id: id}"
-          SECRETS_JSON=$(oci vault secret list --compartment-id "$OCI_COMPARTMENT_ID" --all --query "$QUERY")
+          # Fetch all active secrets from compartment
+          VAULT_SECRETS=$(oci vault secret list --compartment-id "$OCI_COMPARTMENT_ID" --all --query "data[?\"lifecycle-state\" == 'ACTIVE'].{name: \"secret-name\", id: id}")
           
-          if [ -z "$SECRETS_JSON" ] || [ "$SECRETS_JSON" == "[]" ]; then
-            echo "::warning::No active secrets found"
-            echo "build_args=" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
           echo "build_args<<EOF_DOCKER" >> $GITHUB_OUTPUT
           
-          while read -r secret; do
-            V_NAME=$(echo "$secret" | jq -r '.name')
-            V_ID=$(echo "$secret" | jq -r '.id')
+          if [ "$VAULT_SECRETS" != "[]" ] && [ -n "$VAULT_SECRETS" ]; then
+            while read -r secret; do
+              NAME=$(echo "$secret" | jq -r '.name')
+              ID=$(echo "$secret" | jq -r '.id')
           
-            ARG_NAME=$(echo "$V_NAME" | tr '-' '_' | tr '[:lower:]' '[:upper:]')
+              # Convert hyphen-case to UPPER_SNAKE_CASE
+              ARG_NAME=$(echo "$NAME" | tr '-' '_' | tr '[:lower:]' '[:upper:]')
           
-            BUNDLE=$(oci secrets secret-bundle get --secret-id "$V_ID" --stage CURRENT 2>/dev/null || true)
-            if [ -n "$BUNDLE" ]; then
-              VAL=$(echo "$BUNDLE" | jq -r '.data."secret-bundle-content".content' | base64 -d 2>/dev/null || true)
-              if [ -n "$VAL" ]; then
-                echo "::add-mask::$VAL"
-                echo "${ARG_NAME}=${VAL}" >> $GITHUB_OUTPUT
+              BUNDLE=$(oci secrets secret-bundle get --secret-id "$ID" --stage CURRENT 2>/dev/null || true)
+              if [ -n "$BUNDLE" ]; then
+                VAL=$(echo "$BUNDLE" | jq -r '.data."secret-bundle-content".content' | base64 -d 2>/dev/null || true)
+                if [ -n "$VAL" ]; then
+                  echo "::add-mask::$VAL"
+                  echo "${ARG_NAME}=${VAL}" >> $GITHUB_OUTPUT
+                fi
               fi
-            fi
-          done < <(echo "$SECRETS_JSON" | jq -c '.[]')
+            done < <(echo "$VAULT_SECRETS" | jq -c '.[]')
+          fi
+          
           echo "EOF_DOCKER" >> $GITHUB_OUTPUT
 
       - uses: docker/setup-buildx-action@v3
@@ -134,3 +139,17 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/${{ matrix.app }}
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.app }}:latest
+          build-args: ${{ steps.vault_secrets.outputs.build_args }}
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f secrets.json secrets/.sops.key ~/.oci/key.pem
+          rm -rf secrets/ ~/.oci/
