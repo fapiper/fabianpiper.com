@@ -103,7 +103,10 @@ jobs:
           echo "::add-mask::$OCI_USER"
           echo "::add-mask::$OCI_TENANCY"
           echo "::add-mask::$OCI_FINGERPRINT"
-          echo "::add-mask::$OCI_PRIVATE_KEY"
+          
+          while IFS= read -r line; do
+            [ -n "$line" ] && echo "::add-mask::$line"
+          done <<< "$OCI_PRIVATE_KEY"
 
           mkdir -p ~/.oci
           echo "$OCI_PRIVATE_KEY" > ~/.oci/key.pem
