@@ -1,10 +1,78 @@
-<div align="center">
+<p align="center">
+  <a href="https://www.fabianpiper.com">
+    <h1 align="center">fabianpiper.com</h1>
+  </a>
+</p>
 
-# fabianpiper.com
+<p align="center">
+  Portfolio deployment using K3s, Terraform, Atmos, and ArgoCD on Oracle Cloud Free Tier
+</p>
 
-*Portfolio deployment using K3s, Terraform, Atmos, and ArgoCD on Oracle Cloud Free Tier*
+<p align="center">
+  <a href="https://registry.terraform.io/">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/terraform-1.14+-1A202C?logo=terraform&logoColor=7B42BC&labelColor=1A202C">
+      <img src="https://img.shields.io/badge/terraform-1.14+-2D3748?logo=terraform&logoColor=7B42BC&labelColor=2D3748" alt="Terraform">
+    </picture>
+  </a>
+  <a href="https://k3s.io/">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/k3s-latest-1A202C?logo=kubernetes&logoColor=326CE5&labelColor=1A202C">
+      <img src="https://img.shields.io/badge/k3s-latest-2D3748?logo=kubernetes&logoColor=326CE5&labelColor=2D3748" alt="K3s">
+    </picture>
+  </a>
+  <a href="https://atmos.tools/">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/atmos-0.23+-1A202C?labelColor=1A202C">
+      <img src="https://img.shields.io/badge/atmos-0.23+-2D3748?labelColor=2D3748" alt="Atmos">
+    </picture>
+  </a>
+  <a href="https://argo-cd.readthedocs.io/">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/argocd-latest-1A202C?logo=argo&logoColor=EF7B4D&labelColor=1A202C">
+      <img src="https://img.shields.io/badge/argocd-latest-2D3748?logo=argo&logoColor=EF7B4D&labelColor=2D3748" alt="ArgoCD">
+    </picture>
+  </a>
+  <br />
+  <a href="https://www.oracle.com/cloud/free/">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/oci-free_tier-1A202C?logo=oracle&logoColor=F80000&labelColor=1A202C">
+      <img src="https://img.shields.io/badge/oci-free_tier-2D3748?logo=oracle&logoColor=F80000&labelColor=2D3748" alt="OCI Free Tier">
+    </picture>
+  </a>
+  <a href="https://github.com/fapiper/fabianpiper.com/blob/main/LICENSE">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/github/license/fapiper/fabianpiper.com?color=1A202C&labelColor=1A202C">
+      <img src="https://img.shields.io/github/license/fapiper/fabianpiper.com?color=2D3748&labelColor=2D3748" alt="MIT License">
+    </picture>
+  </a>
+  <a href="https://github.com/mozilla/sops">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/sops-encrypted-1A202C?logo=mozilla&logoColor=FF7139&labelColor=1A202C">
+      <img src="https://img.shields.io/badge/sops-encrypted-2D3748?logo=mozilla&logoColor=FF7139&labelColor=2D3748" alt="SOPS Encrypted">
+    </picture>
+  </a>
+  <a href="https://github.com/fapiper/fabianpiper.com/actions">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/github/actions/workflow/status/fapiper/fabianpiper.com/build-and-push.yaml?branch=main&color=1A202C&labelColor=1A202C&label=ci/cd">
+      <img src="https://img.shields.io/github/actions/workflow/status/fapiper/fabianpiper.com/build-and-push.yaml?branch=main&color=2D3748&labelColor=2D3748&label=ci/cd" alt="CI/CD Status">
+    </picture>
+  </a>
+</p>
 
-</div>
+<p align="center">
+  <strong>·</strong>
+  <a href="#installation">Installation</a>
+  <strong>·</strong>
+  <a href="#architecture">Architecture</a>
+  <strong>·</strong>
+  <a href="#development">Development</a>
+  <strong>·</strong>
+  <a href="#common-operations">Common operations</a>
+  <strong>·</strong>
+</p>
+
+---
 
 ## Overview
 
