@@ -1,4 +1,4 @@
-# K3s Cluster Component - Outputs
+# Cluster Component - Outputs
 
 output "ingress_instance_id" {
   description = "OCID of the ingress instance"

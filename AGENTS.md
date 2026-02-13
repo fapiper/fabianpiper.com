@@ -48,13 +48,13 @@ fabianpiper.com/
 │   ├── iam/
 │   ├── vault/
 │   ├── oidc/
-│   └── k3s-cluster/
+│   └── cluster/
 ├── modules/                  # Terraform modules (actual logic)
 │   ├── networking/           # VCN, subnets, security lists
 │   ├── iam/                  # Dynamic group, policies
 │   ├── vault/                # OCI Vault + secrets
 │   ├── oidc/                 # GitHub OIDC provider
-│   └── k3s-cluster/          # 3 instances (ingress, server, worker)
+│   └── cluster/          # 3 instances (ingress, server, worker)
 │       ├── main.tf
 │       ├── user-data/        # Cloud-init templates
 │       │   ├── ingress.yaml
@@ -165,7 +165,7 @@ cat secrets/.sops.key
 # 6. Deploy infrastructure (15-20 minutes total)
 make deploy-prod
 # This runs: atmos workflow apply -s glg-prod-fra
-# Order: networking → iam → vault → oidc → k3s-cluster
+# Order: networking → iam → vault → oidc → cluster
 # Output: Terraform will create VCN, instances, vault, and K3s cluster
 # ArgoCD is installed automatically via cloud-init on server instance
 ```
@@ -173,7 +173,7 @@ make deploy-prod
 ### Verify Deployment
 ```bash
 # 1. Get ingress public IP (from Terraform outputs or OCI console)
-# Run: make plan-prod-k3s-cluster | grep ingress_public_ip
+# Run: make plan-prod-cluster | grep ingress_public_ip
 
 # 2. SSH to ingress instance (test connectivity)
 ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_PUBLIC_IP>
@@ -237,7 +237,7 @@ kubectl get pods -A
 - **Naming**: 
   - Resources: `<provider>_<resource_type>.<descriptive_name>` (e.g., `oci_core_vcn.default`)
   - Variables: snake_case (e.g., `compartment_ocid`, `vcn_cidr_blocks`)
-  - Modules: kebab-case directory names (e.g., `k3s-cluster`, `networking`)
+  - Modules: kebab-case directory names (e.g., `cluster`, `networking`)
 - **Module Structure**: Each module must have:
   - `main.tf` (resources)
   - `variables.tf` (inputs with descriptions and types)
@@ -324,7 +324,7 @@ cd ../vault
 terraform validate
 cd ../oidc
 terraform validate
-cd ../k3s-cluster
+cd ../cluster
 terraform validate
 cd ../..
 
@@ -424,26 +424,26 @@ curl -I https://www.fabianpiper.com
 git checkout -b feat/add-monitoring
 
 # 2. Edit Terraform files
-vim modules/k3s-cluster/main.tf
+vim modules/cluster/main.tf
 
 # 3. Format code
 terraform fmt -recursive
 
 # 4. Validate changes
-cd modules/k3s-cluster
+cd modules/cluster
 terraform validate
 cd ../..
 
 # 5. Plan changes (review carefully!)
-make plan-prod-k3s-cluster
+make plan-prod-cluster
 # Read output, ensure changes are expected
 
 # 6. Commit with descriptive message
-git add modules/k3s-cluster/
+git add modules/cluster/
 git commit -m "feat(k3s): increase worker memory to 8GB"
 
 # 7. Apply in production (after review)
-make apply-prod-k3s-cluster
+make apply-prod-cluster
 
 # 8. Verify changes
 ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_IP> \
@@ -741,7 +741,7 @@ grep TF_VAR_ssh_public_key_path secrets/prod/secrets.decrypted.yaml
 # Ensure path matches your actual SSH public key
 
 # Verify public IP assigned to ingress
-make plan-prod-k3s-cluster | grep ingress_public_ip
+make plan-prod-cluster | grep ingress_public_ip
 
 # Try verbose SSH
 ssh -v -i ~/.ssh/id_rsa ubuntu@<INGRESS_IP>
@@ -872,7 +872,7 @@ cd ../vault
 terraform init -upgrade
 cd ../oidc
 terraform init -upgrade
-cd ../k3s-cluster
+cd ../cluster
 terraform init -upgrade
 cd ../..
 
@@ -889,12 +889,12 @@ make apply-prod-all
 # To pin specific version:
 
 # 1. Edit cloud-init scripts
-vim modules/k3s-cluster/user-data/server.yaml
+vim modules/cluster/user-data/server.yaml
 # Change: curl -sfL https://get.k3s.io | K3S_VERSION=v1.28.5+k3s1 sh -
 
 # 2. Recreate instances (downtime!)
-make destroy-prod-k3s-cluster
-make apply-prod-k3s-cluster
+make destroy-prod-cluster
+make apply-prod-cluster
 
 # Or upgrade in-place (on each node):
 ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_IP> \

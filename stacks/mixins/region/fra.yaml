@@ -3,7 +3,7 @@ import:
   - catalog/vault/defaults
   - catalog/oidc/defaults
   - catalog/networking/defaults
-  - catalog/k3s-cluster/defaults
+  - catalog/cluster/defaults
 
 vars:
   region: "eu-frankfurt-1"

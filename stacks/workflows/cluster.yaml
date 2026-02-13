@@ -6,7 +6,7 @@ workflows:
       - command: terraform apply iam
       - command: terraform apply vault
       - command: terraform apply oidc
-      - command: terraform apply k3s-cluster
+      - command: terraform apply cluster
   plan:
     description: "Dry-run of all infrastructure components"
     steps:
@@ -14,11 +14,11 @@ workflows:
       - command: terraform plan iam
       - command: terraform plan vault
       - command: terraform plan oidc
-      - command: terraform plan k3s-cluster
+      - command: terraform plan cluster
   destroy:
     description: "Teardown of all resources"
     steps:
-      - command: terraform destroy k3s-cluster
+      - command: terraform destroy cluster
       - command: terraform destroy oidc
       - command: terraform destroy vault
       - command: terraform destroy iam
@@ -30,4 +30,4 @@ workflows:
       - command: terraform validate iam
       - command: terraform validate vault
       - command: terraform validate oidc
-      - command: terraform validate k3s-cluster
+      - command: terraform validate cluster

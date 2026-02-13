@@ -6,7 +6,7 @@ vars:
   tenant: "glg"
 
 components:
-    k3s-cluster:
+    cluster:
       vars:
         common_tags:
           Environment: "prod"

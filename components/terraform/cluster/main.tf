@@ -1,12 +1,12 @@
-module "k3s_cluster" {
-  source = "../../../modules/k3s-cluster"
+module "cluster" {
+  source = "../../../modules/cluster"
 
   compartment_ocid    = var.compartment_ocid
 
   # Network Configuration
-  vcn_id              = data.terraform_remote_state.networking.outputs.vcn_id
+  vcn_id              = try(data.terraform_remote_state.networking.outputs.vcn_id, "")
   vcn_cidr_block      = var.vcn_cidr_block
-  public_subnet_id    = data.terraform_remote_state.networking.outputs.subnet_id
+  public_subnet_id    = try(data.terraform_remote_state.networking.outputs.subnet_id, "")
   private_subnet_cidr = var.private_subnet_cidr
 
   # SSH Configuration
@@ -42,7 +42,7 @@ module "k3s_cluster" {
   git_pat      = var.git_pat
   git_username = var.git_username
   git_repo_url = var.git_repo_url
-  vault_id     = data.terraform_remote_state.vault.outputs.id
+  vault_id     = try(data.terraform_remote_state.vault.outputs.id, "")
 
   common_tags = var.common_tags
   enabled     = var.enabled

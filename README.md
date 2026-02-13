@@ -186,7 +186,7 @@ fabianpiper.com/
 │   ├── iam/                   # Dynamic groups and policies
 │   ├── vault/                 # OCI Vault and stored secrets
 │   ├── oidc/                  # GitHub OIDC provider
-│   └── k3s-cluster/           # K3s instances and cloud-init
+│   └── cluster/           # K3s instances and cloud-init
 ├── modules/                    # Terraform module implementations
 ├── stacks/                     # Atmos stack configurations
 │   ├── orgs/glg/prod/fra.yaml # Production deployment config
@@ -247,7 +247,7 @@ make apply-prod-networking     # Deploy VCN and subnets
 make apply-prod-iam            # Deploy IAM policies
 make apply-prod-vault          # Deploy OCI Vault
 make apply-prod-oidc           # Deploy OIDC provider
-make apply-prod-k3s-cluster    # Deploy K3s cluster
+make apply-prod-cluster    # Deploy K3s cluster
 ```
 
 ### Secret Management

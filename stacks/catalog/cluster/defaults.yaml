@@ -1,8 +1,8 @@
 components:
   terraform:
-    k3s-cluster:
+    cluster:
       metadata:
-        component: k3s-cluster
+        component: cluster
       vars:
         enabled: true
-        name: "k3s-cluster"
+        name: "cluster"
