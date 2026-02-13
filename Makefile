@@ -110,8 +110,11 @@ destroy-%:
 	@$(MAKE) _destroy-$*
 
 _destroy-%:
-	@if [ "$(get_app)" = "all" ]; then $(ATMOS) workflow destroy -s $(get_stack); \
-	else $(ATMOS) terraform destroy $(get_app) -s $(get_stack) -auto-approve; fi
+	@if [ "$(get_app)" = "all" ]; then \
+		TF_CLI_ARGS_destroy="-auto-approve" $(ATMOS) workflow destroy -s $(get_stack); \
+	else \
+		$(ATMOS) terraform destroy $(get_app) -s $(get_stack) -auto-approve; \
+	fi
 
 ## dev-[comp]: start local development
 dev-%:
