@@ -40,7 +40,8 @@ runcmd:
   - k3s kubectl create namespace argocd
 
   # Install ArgoCD core manifests
-  - k3s kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+  - k3s kubectl apply --server-side -k https://github.com/argoproj/argo-cd/manifests/crds?ref=v3.3.0
+  - k3s kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.3.0/manifests/install.yaml
 
   # Wait for ArgoCD CRDs to be established
   - sleep 10
@@ -73,6 +74,9 @@ runcmd:
       password: ${git_pat}
     EOF
 
-  # Deploy root application (bootstraps everything via ApplicationSets)
+  # Ensure the application-controller is also ready
+  - k3s kubectl wait --for=condition=available --timeout=600s deployment/argocd-application-controller -n argocd
+
+  # Deploy root application
   - sleep 5
   - curl -sfL https://raw.githubusercontent.com/fapiper/fabianpiper.com/main/kubernetes/bootstrap/root.yaml | k3s kubectl apply -f -
