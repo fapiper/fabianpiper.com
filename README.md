@@ -265,7 +265,7 @@ make destroy-prod-all          # Destroy all infrastructure components
 
 ## Documentation
 
-For detailed operational procedures and agent-friendly instructions, refer to [AGENT.md](AGENT.md).
+For detailed operational procedures and agent-friendly instructions, refer to [AGENTS.md](AGENTS.md).
 
 ## License
 

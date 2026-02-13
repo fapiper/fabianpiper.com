@@ -449,10 +449,10 @@ make apply-prod-k3s-cluster
 ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_IP> \
   'ssh ubuntu@10.0.2.10 sudo kubectl get nodes -o wide'
 
-# 9. Update AGENT.md if commands/structure changed
-vim AGENT.md
-git add AGENT.md
-git commit -m "docs: update AGENT.md for memory increase"
+# 9. Update AGENTS.md if commands/structure changed
+vim AGENTS.md
+git add AGENTS.md
+git commit -m "docs: update AGENTS.md for memory increase"
 ```
 
 ### Adding New K8s Resources
@@ -956,7 +956,7 @@ Before marking any task as complete, the agent MUST:
 - [ ] Run `terraform validate` in affected module directories if Terraform files changed
 - [ ] Run `kubectl apply --dry-run=client -f <file>` if K8s manifests changed
 - [ ] Verify no secrets in code: `git grep -i 'password\|secret\|token\|key' -- '*.tf' '*.yaml' '*.yml' '*.sh' | grep -v 'TF_VAR' | grep -v 'example'`
-- [ ] Update this AGENT.md if project structure, commands, or workflows changed
+- [ ] Update this AGENTS.md if project structure, commands, or workflows changed
 - [ ] Check OCI free tier impact for new compute/storage resources (calculate before apply)
 - [ ] Test changes in isolation before applying to production (use dry-run, plan, or local testing)
 - [ ] Commit with conventional commit message: `<type>(<scope>): <description>` (e.g., `feat(k8s): add prometheus`)
