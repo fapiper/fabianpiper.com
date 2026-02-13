@@ -3,7 +3,7 @@ kind: Kustomization
 
 resources:
   - operator.yaml
-  - secret-store.yaml
+  - cluster-store.yaml
   - vault-config.yaml
 
 replacements:

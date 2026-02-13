@@ -37,14 +37,17 @@ runcmd:
   - sleep 30
   - k3s kubectl wait --for=condition=Ready nodes --all --timeout=300s
 
-  # Install ArgoCD
+  # Install ArgoCD (includes all CRDs)
   - k3s kubectl create namespace argocd || true
   - k3s kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 
   # Wait for ArgoCD to be ready
-  - k3s kubectl wait --for=condition=available --timeout=600s deployment/argocd-server -n argocd
+  - sleep 10
+  - k3s kubectl wait --for=condition=available --timeout=600s deployment/argocd-server -n argocd || true
+  - k3s kubectl wait --for=condition=available --timeout=600s deployment/argocd-repo-server -n argocd || true
+  - k3s kubectl wait --for=condition=available --timeout=600s deployment/argocd-applicationset-controller -n argocd || true
 
-  # Configure ArgoCD to use Git repository
+  # Configure ArgoCD Git credentials
   - |
     k3s kubectl apply -f - <<EOF
     apiVersion: v1
@@ -62,20 +65,25 @@ runcmd:
       password: ${git_pat}
     EOF
 
-  # Deploy root ArgoCD application (App of Apps pattern)
+  # Deploy root infrastructure app (bootstraps all infrastructure)
   - |
     k3s kubectl apply -f - <<EOF
     apiVersion: argoproj.io/v1alpha1
     kind: Application
     metadata:
-      name: root
+      name: root-infrastructure
       namespace: argocd
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
     spec:
       project: default
       source:
         repoURL: ${git_repo_url}
         targetRevision: HEAD
-        path: argocd/apps
+        path: argocd/infrastructure
+        directory:
+          recurse: true
+          include: '*/application.yaml'
       destination:
         server: https://kubernetes.default.svc
         namespace: argocd
@@ -83,5 +91,37 @@ runcmd:
         automated:
           prune: true
           selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+    EOF
+
+  # Deploy root apps (bootstraps all applications like www)
+  - |
+    k3s kubectl apply -f - <<EOF
+    apiVersion: argoproj.io/v1alpha1
+    kind: Application
+    metadata:
+      name: root-apps
+      namespace: argocd
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: default
+      source:
+        repoURL: ${git_repo_url}
+        targetRevision: HEAD
+        path: argocd/apps
+        directory:
+          recurse: true
+          include: '*/application.yaml'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
     EOF
 

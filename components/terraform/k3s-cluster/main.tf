@@ -42,6 +42,7 @@ module "k3s_cluster" {
   git_pat      = var.git_pat
   git_username = var.git_username
   git_repo_url = var.git_repo_url
+  vault_id     = data.terraform_remote_state.vault.outputs.id
 
   common_tags = var.common_tags
   enabled     = var.enabled

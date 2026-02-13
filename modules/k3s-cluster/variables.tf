@@ -182,6 +182,12 @@ variable "git_repo_url" {
   type        = string
 }
 
+variable "vault_id" {
+  description = "OCI Vault OCID for external secrets"
+  type        = string
+  default     = ""
+}
+
 variable "common_tags" {
   description = "Common tags to apply to all resources"
   type        = map(string)
