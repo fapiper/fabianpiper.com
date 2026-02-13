@@ -2,140 +2,204 @@
 
 # fabianpiper.com
 
-*A portfolio using K3s, Terraform, Atmos, and Argo CD on OCI Free Tier*
+*Portfolio deployment using K3s, Terraform, Atmos, and ArgoCD on Oracle Cloud Free Tier*
 
 </div>
 
----
+## Overview
 
-## Getting Started
+This repository demonstrates infrastructure automation and GitOps principles by deploying a portfolio website on Oracle Cloud Infrastructure Free Tier. The stack uses Terraform with Atmos for infrastructure orchestration, K3s for container orchestration, and ArgoCD for continuous deployment.
 
-### Prerequisites
-- [Make (v4.3+)](https://www.gnu.org/software/make/)
-- [Terraform (v1.14+)](https://www.terraform.io/)
-- [Atmos (v0.23+)](https://atmos.tools) 
-- [SOPS (v3.11+)](https://github.com/mozilla/sops)
-- [age (v1.3+)](https://github.com/FiloSottile/age)
-- [Docker (v29.1+)](https://www.docker.com)
-- [Bun (v1.3+)](https://bun.sh)
+Key capabilities:
+- Declarative infrastructure provisioning with Terraform
+- GitOps workflow via ArgoCD ApplicationSets
+- Automated image updates and zero-downtime deployments
+- Secure secret management using SOPS and OCI Vault
+- CI/CD pipeline with minimal credentials via GitHub OIDC
 
-### Installation
+## Prerequisites
+
+Install the following tools before beginning:
+
+- [Make](https://www.gnu.org/software/make/) v4.3+
+- [Terraform](https://www.terraform.io/) v1.14+
+- [Atmos](https://atmos.tools) v0.23+
+- [SOPS](https://github.com/mozilla/sops) v3.11+
+- [age](https://github.com/FiloSottile/age) v1.3+
+- [Docker](https://www.docker.com) v29.1+
+- [Bun](https://bun.sh) v1.3+
+
+## Installation
+
+### Account Setup
+
 1. Create Oracle Cloud Infrastructure account
-2. Upgrade Free Tier account to a paid account. Paid accounts precede Free Tier accounts when it comes to resources (especially instances) provisioning by OCI. The resources used in this repository fit within the Free Tier limits
-3. [Optional] Create budgets to control costs
-4. Create a Cloudflare account and API token with appropriate permissions for DNS management
-5. Create a GitHub Personal Access Token with `repo` and `workflow` scopes
-6. Clone the repo
+2. Upgrade Free Tier to paid account for priority resource allocation (remains within Free Tier limits)
+3. Create Cloudflare account and generate API token with DNS management permissions
+4. Generate GitHub Personal Access Token with `repo` and `packages` scopes
+
+### Repository Configuration
+
 ```bash
 git clone https://github.com/fapiper/fabianpiper.com.git
+cd fabianpiper.com
 ```
-7. Install the [Prerequisites](#prerequisites)
-8. Copy the example secret file and fill in your values
-```bash
-cp secrets/prod/secrets.example.yaml secrets/prod/secrets.decrypted.yaml
-# Edit secrets/prod/secrets.decrypted.yaml with your actual values
-```
-9. Encrypt your secrets before committing
-```bash
-make sops-encrypt-prod
-```
-10. Follow the [Quick Start](#quick-start) steps
 
-### Quick Start
+Initialize encryption and configure secrets:
 
-Follow these steps to get started with the repository.
-
-#### Setup
-Validate the local environment, generate the age encryption key, and initialize SOPS config for all secret files.
 ```bash
 make setup
 ```
 
 > [!NOTE]
-> This generates `secrets/.sops.key` and `.sops.yaml` config. To encrypt or decrypt secrets, use `make sops-encrypt-prod` / `make sops-decrypt-prod`.
+> This generates `secrets/.sops.key` and configures SOPS for all secret files.
 
-#### Provisioning
-Create an entire OCI stack (Networking, IAM, Vault, K3s with ArgoCD) in one command
+Copy the example secrets file and add your credentials:
 
 ```bash
-make bootstrap-prod
-# ArgoCD is automatically installed on K3s server via cloud-init
-# Verify the health of all components
+cp secrets/prod/secrets.example.yaml secrets/prod/secrets.decrypted.yaml
+```
+
+Edit `secrets/prod/secrets.decrypted.yaml` with your actual values, then encrypt:
+
+```bash
+make sops-encrypt-prod
+```
+
+### Infrastructure Deployment
+
+Deploy the complete stack with a single command:
+
+```bash
+make deploy-prod
+```
+
+This provisions networking, IAM policies, OCI Vault, OIDC configuration, and a K3s cluster with ArgoCD automatically installed.
+
+Verify deployment health:
+
+```bash
 make validate-prod
 ```
 
-#### Application Development
-Build and tag your applications for deployment
+### Accessing ArgoCD
+
+Retrieve the admin password:
 
 ```bash
-# Run the website in ./apps/www locally
-make dev-local-www
-
-# Build the website's Docker image
-make docker-build-prod-www
+ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_IP> \
+  'ssh ubuntu@10.0.2.10 sudo kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d'
 ```
 
-## Stack
+Create a port forward to access the UI:
 
-* Infrastructure as Code: [Terraform](https://www.terraform.io/) + [Atmos](https://atmos.tools).
-* Container Orchestration: K3s on Oracle Cloud Infrastructure (OCI).
-* Ingress & Networking: Cloudflare Tunnels + Kubernetes Gateway API (Envoy).
-* GitOps: Argo CD using the "App of Apps" pattern.
-* Automation: Argo CD Image Updater for CD via GHCR.
+```bash
+ssh -i ~/.ssh/id_rsa -L 8080:10.0.2.10:80 ubuntu@<INGRESS_IP>
+```
+
+Open your browser to `http://localhost:8080` and log in with username `admin` and the retrieved password.
+
+## Architecture
+
+The infrastructure consists of:
+
+- VCN with public (10.0.1.0/24) and private (10.0.2.0/24) subnets
+- Three ARM Ampere A1 instances running K3s
+- OCI Vault for runtime secret storage
+- GitHub OIDC provider for CI/CD authentication
+- ArgoCD managing GitOps deployments
+
+### Directory Structure
+
+```
+fabianpiper.com/
+├── components/terraform/       # Atmos component wrappers
+│   ├── networking/            # VCN, subnets, security lists
+│   ├── iam/                   # Dynamic groups and policies
+│   ├── vault/                 # OCI Vault and stored secrets
+│   ├── oidc/                  # GitHub OIDC provider
+│   └── k3s-cluster/           # K3s instances and cloud-init
+├── modules/                    # Terraform module implementations
+├── stacks/                     # Atmos stack configurations
+│   ├── orgs/glg/prod/fra.yaml # Production deployment config
+│   ├── mixins/                # Reusable configuration snippets
+│   └── workflows/             # Multi-component workflows
+├── kubernetes/                 # GitOps manifests
+│   ├── bootstrap/             # ArgoCD installation and root app
+│   │   ├── root.yaml         # Single entry point
+│   │   ├── templates/        # ApplicationSets
+│   │   └── argocd/           # ArgoCD manifests
+│   ├── infrastructure/        # Platform services
+│   └── apps/                  # Application deployments
+├── apps/www/                   # Website source code
+├── secrets/prod/               # SOPS-encrypted secrets
+└── .github/workflows/          # CI/CD automation
+```
 
 ## CI/CD Pipeline
 
-This repository features a fully automated CI/CD pipeline with minimal secrets:
+The automated deployment flow:
 
-1. **Push code** to `main` branch → triggers GitHub Actions
-2. **GitHub Actions** builds Docker image using native `GITHUB_TOKEN`
-3. **Build & Push** Docker image to GHCR (GitHub Container Registry)
-4. **ArgoCD Image Updater** detects new image → updates deployment
-5. **ArgoCD** syncs changes → deploys to K3s cluster
+1. Code changes pushed to `main` branch
+2. GitHub Actions workflow triggered
+3. Docker image built and pushed to GHCR
+4. ArgoCD Image Updater detects new image digest
+5. ArgoCD automatically syncs and deploys updated application
 
-**GitHub Secrets Required**: Only `SOPS_AGE_KEY` (for decrypting config during infrastructure changes)
+> [!IMPORTANT]
+> Only one GitHub secret is required: `SOPS_AGE_KEY` for infrastructure modifications.
 
-## Structure
+## Development
 
-```
-secrets/prod/               # SOPS-encrypted secrets
-stacks/
-  ├── deploy/              # Stack definitions
-  ├── catalog/             # Component defaults
-  ├── mixins/              # Reusable configuration
-  └── workflows/           # Atmos workflows
-components/terraform/       # Infrastructure components
-  ├── networking/          # VCN + subnets
-  ├── iam/                 # IAM policies  
-  ├── vault/               # OCI Vault (stores runtime secrets)
-  ├── oidc/                # Service account for CI/CD
-  └── k3s-cluster/         # 3 ARM instances (ArgoCD auto-installed)
-argocd/                     # GitOps applications
-  ├── infrastructure/      # Cluster infrastructure apps
-  └── apps/                # Business applications
-apps/www/                   # Website source code
-```
-
-## Commands
+Start the local development server:
 
 ```bash
-# Infrastructure
-make plan-prod-all                     # Plan all components
-make apply-prod-networking             # Deploy network
-make apply-prod-iam                    # Deploy IAM policies
-make apply-prod-vault                  # Deploy OCI Vault
-make apply-prod-oidc                   # Deploy OIDC provider for GitHub Actions
-make apply-prod-k3s-cluster            # Deploy K3s cluster (includes ArgoCD)
-
-# Secrets
-make sops-encrypt-prod                 # Encrypt secrets
-make sops-decrypt-prod                 # Decrypt secrets for editing
-
-# Development
-make dev-www                           # Start local dev server
-make build-www                         # Build production bundle
+make dev-www
 ```
+
+Build production bundle:
+
+```bash
+make build-www
+```
+
+Build Docker image:
+
+```bash
+make docker-build-prod-www
+```
+
+## Common Operations
+
+### Infrastructure Management
+
+```bash
+make plan-prod-all             # Review planned changes for all components
+make apply-prod-networking     # Deploy VCN and subnets
+make apply-prod-iam            # Deploy IAM policies
+make apply-prod-vault          # Deploy OCI Vault
+make apply-prod-oidc           # Deploy OIDC provider
+make apply-prod-k3s-cluster    # Deploy K3s cluster
+```
+
+### Secret Management
+
+```bash
+make sops-encrypt-prod         # Encrypt secrets before committing
+make sops-decrypt-prod         # Decrypt secrets for editing
+```
+
+### Teardown
+
+```bash
+make destroy-prod-all          # Destroy all infrastructure components
+```
+
+## Documentation
+
+For detailed operational procedures and agent-friendly instructions, refer to [AGENT.md](AGENT.md).
 
 ## License
 
-This project is open-source and available under the MIT License.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
