@@ -37,12 +37,19 @@ runcmd:
   - sleep 30
   - k3s kubectl wait --for=condition=Ready nodes --all --timeout=300s
 
-  # Install ArgoCD (includes all CRDs)
-  - k3s kubectl create namespace argocd || true
-  - k3s kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+  # Install ArgoCD using kustomize (includes namespace and all CRDs)
+  - |
+    cat > /tmp/argocd-bootstrap.yaml <<'EOFKUSTOMIZE'
+    apiVersion: kustomize.config.k8s.io/v1beta1
+    kind: Kustomization
+    namespace: argocd
+    resources:
+      - https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/namespace-install.yaml
+    EOFKUSTOMIZE
+  - k3s kubectl apply -k /tmp/argocd-bootstrap.yaml
 
   # Wait for ArgoCD to be ready
-  - sleep 10
+  - sleep 15
   - k3s kubectl wait --for=condition=available --timeout=600s deployment/argocd-server -n argocd || true
   - k3s kubectl wait --for=condition=available --timeout=600s deployment/argocd-repo-server -n argocd || true
   - k3s kubectl wait --for=condition=available --timeout=600s deployment/argocd-applicationset-controller -n argocd || true
@@ -65,63 +72,6 @@ runcmd:
       password: ${git_pat}
     EOF
 
-  # Deploy root infrastructure app (bootstraps all infrastructure)
-  - |
-    k3s kubectl apply -f - <<EOF
-    apiVersion: argoproj.io/v1alpha1
-    kind: Application
-    metadata:
-      name: root-infrastructure
-      namespace: argocd
-      finalizers:
-        - resources-finalizer.argocd.argoproj.io
-    spec:
-      project: default
-      source:
-        repoURL: ${git_repo_url}
-        targetRevision: HEAD
-        path: argocd/infrastructure
-        directory:
-          recurse: true
-          include: '*/application.yaml'
-      destination:
-        server: https://kubernetes.default.svc
-        namespace: argocd
-      syncPolicy:
-        automated:
-          prune: true
-          selfHeal: true
-        syncOptions:
-          - CreateNamespace=true
-    EOF
-
-  # Deploy root apps (bootstraps all applications like www)
-  - |
-    k3s kubectl apply -f - <<EOF
-    apiVersion: argoproj.io/v1alpha1
-    kind: Application
-    metadata:
-      name: root-apps
-      namespace: argocd
-      finalizers:
-        - resources-finalizer.argocd.argoproj.io
-    spec:
-      project: default
-      source:
-        repoURL: ${git_repo_url}
-        targetRevision: HEAD
-        path: argocd/apps
-        directory:
-          recurse: true
-          include: '*/application.yaml'
-      destination:
-        server: https://kubernetes.default.svc
-        namespace: argocd
-      syncPolicy:
-        automated:
-          prune: true
-          selfHeal: true
-        syncOptions:
-          - CreateNamespace=true
-    EOF
+  # Deploy root application (bootstraps everything via ApplicationSets)
+  - curl -sfL https://raw.githubusercontent.com/fapiper/fabianpiper.com/main/kubernetes/bootstrap/root.yaml | k3s kubectl apply -f -
 

@@ -1,14 +1,19 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: argocd-image-updater
+  name: root
   namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   source:
     repoURL: https://github.com/fapiper/fabianpiper.com.git
     targetRevision: HEAD
-    path: argocd/infrastructure/argocd-image-updater
+    path: kubernetes/bootstrap
+    directory:
+      recurse: true
+      include: "templates/*.yaml"
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
@@ -16,3 +21,4 @@ spec:
     automated:
       prune: true
       selfHeal: true
+
