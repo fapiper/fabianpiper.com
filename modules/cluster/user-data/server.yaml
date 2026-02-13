@@ -5,7 +5,6 @@ packages:
   - iptables-persistent
 
 write_files:
-
   - path: /etc/rancher/k3s/registries.yaml
     owner: root:root
     permissions: '0644'
@@ -37,22 +36,24 @@ runcmd:
   - sleep 30
   - k3s kubectl wait --for=condition=Ready nodes --all --timeout=300s
 
-  # Install ArgoCD using kustomize (includes namespace and all CRDs)
-  - |
-    cat > /tmp/argocd-bootstrap.yaml <<'EOFKUSTOMIZE'
-    apiVersion: kustomize.config.k8s.io/v1beta1
-    kind: Kustomization
-    namespace: argocd
-    resources:
-      - https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/namespace-install.yaml
-    EOFKUSTOMIZE
-  - k3s kubectl apply -k /tmp/argocd-bootstrap.yaml
+  # Create ArgoCD namespace
+  - k3s kubectl create namespace argocd
 
-  # Wait for ArgoCD to be ready
-  - sleep 15
-  - k3s kubectl wait --for=condition=available --timeout=600s deployment/argocd-server -n argocd || true
-  - k3s kubectl wait --for=condition=available --timeout=600s deployment/argocd-repo-server -n argocd || true
-  - k3s kubectl wait --for=condition=available --timeout=600s deployment/argocd-applicationset-controller -n argocd || true
+  # Install ArgoCD core manifests
+  - k3s kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+  # Wait for ArgoCD CRDs to be established
+  - sleep 10
+  - k3s kubectl wait --for=condition=established --timeout=300s crd/applications.argoproj.io
+  - k3s kubectl wait --for=condition=established --timeout=300s crd/applicationsets.argoproj.io
+
+  # Force restart the applicationset-controller to clear a startup crash loop
+  - k3s kubectl rollout restart deployment/argocd-applicationset-controller -n argocd
+
+  # Wait for ArgoCD pods to be ready
+  - k3s kubectl wait --for=condition=available --timeout=600s deployment/argocd-server -n argocd
+  - k3s kubectl wait --for=condition=available --timeout=600s deployment/argocd-repo-server -n argocd
+  - k3s kubectl wait --for=condition=available --timeout=600s deployment/argocd-applicationset-controller -n argocd
 
   # Configure ArgoCD Git credentials
   - |
@@ -73,5 +74,5 @@ runcmd:
     EOF
 
   # Deploy root application (bootstraps everything via ApplicationSets)
+  - sleep 5
   - curl -sfL https://raw.githubusercontent.com/fapiper/fabianpiper.com/main/kubernetes/bootstrap/root.yaml | k3s kubectl apply -f -
-
