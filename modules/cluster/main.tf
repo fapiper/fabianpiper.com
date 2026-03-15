@@ -156,11 +156,13 @@ resource "oci_core_instance" "server" {
   metadata = {
     ssh_authorized_keys = local.ssh_public_key
     user_data = local.use_cloud_init ? base64encode(templatefile("${path.module}/user-data/server.yaml", {
-      public_ip     = oci_core_instance.ingress[0].public_ip
-      k3s_token     = var.k3s_token
-      git_pat       = var.git_pat
-      git_username  = var.git_username
-      git_repo_url  = var.git_repo_url
+      public_ip    = oci_core_instance.ingress[0].public_ip
+      k3s_token    = var.k3s_token
+      git_pat      = var.git_pat
+      git_username = var.git_username
+      git_repo_url = var.git_repo_url
+      vault_id     = var.vault_id
+      git_email    = var.git_email
     })) : null
   }
 

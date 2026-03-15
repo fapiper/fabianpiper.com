@@ -18,6 +18,21 @@ output "worker_private_ip" {
   value       = module.cluster.worker_private_ip
 }
 
+output "ssh_private_key_path" {
+  description = "Derived SSH private key path"
+  value       = module.cluster.ssh_private_key_path
+}
+
+output "ssh_ingress_command" {
+  description = "SSH command to connect to the ingress instance"
+  value       = module.cluster.ssh_ingress_command
+}
+
+output "ssh_server_command" {
+  description = "SSH command to connect to the server instance (via ingress jump host)"
+  value       = module.cluster.ssh_server_command
+}
+
 output "kubeconfig_command" {
   description = "Command to retrieve kubeconfig"
   value       = module.cluster.kubeconfig_command
