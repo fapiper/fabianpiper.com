@@ -64,12 +64,19 @@ resource "oci_core_default_route_table" "default" {
   freeform_tags              = data.context_tags.vcn.tags
 }
 
+# The VCN default security list is managed here so Terraform owns it completely.
+# It is intentionally left with NO rules – none of our subnets use it
+# (all subnets declare security_list_ids explicitly). This prevents the default
+# list from silently inheriting permissive OCI defaults.
 resource "oci_core_default_security_list" "internal" {
   count = local.enabled ? 1 : 0
 
   manage_default_resource_id = oci_core_vcn.default[0].default_security_list_id
   compartment_id             = local.compartment_ocid
   freeform_tags              = data.context_tags.vcn.tags
+
+  # Intentionally empty – no ingress, no egress.
+  # Subnets in this VCN use oci_core_security_list.k3s exclusively.
 }
 
 
@@ -82,11 +89,12 @@ resource "oci_core_security_list" "k3s" {
   display_name   = "${data.context_label.subnet.rendered}-k3s"
   freeform_tags  = data.context_tags.subnet.tags
 
-  # Allow all egress
+  # Allow all egress (stateful – return traffic for ingress rules is automatic)
   egress_security_rules {
     destination = "0.0.0.0/0"
     protocol    = "all"
     description = "Allow all egress"
+    stateless   = false
   }
 
   # SSH ingress
@@ -94,6 +102,7 @@ resource "oci_core_security_list" "k3s" {
     source      = "0.0.0.0/0"
     protocol    = "6"  # TCP
     description = "Allow SSH ingress"
+    stateless   = false
 
     tcp_options {
       min = 22
@@ -106,6 +115,7 @@ resource "oci_core_security_list" "k3s" {
     source      = "0.0.0.0/0"
     protocol    = "6"  # TCP
     description = "Allow HTTP ingress"
+    stateless   = false
 
     tcp_options {
       min = 80
@@ -118,6 +128,7 @@ resource "oci_core_security_list" "k3s" {
     source      = "0.0.0.0/0"
     protocol    = "6"  # TCP
     description = "Allow HTTPS ingress"
+    stateless   = false
 
     tcp_options {
       min = 443
@@ -130,6 +141,7 @@ resource "oci_core_security_list" "k3s" {
     source      = "0.0.0.0/0"
     protocol    = "6"  # TCP
     description = "Allow K3s API ingress"
+    stateless   = false
 
     tcp_options {
       min = 6443
@@ -142,6 +154,7 @@ resource "oci_core_security_list" "k3s" {
     source      = local.vcn_cidr_blocks[0]
     protocol    = "all"
     description = "Allow all internal VCN traffic"
+    stateless   = false
   }
 }
 
@@ -155,6 +168,14 @@ resource "oci_core_subnet" "default" {
   dns_label      = local.subnet_dns_label
   freeform_tags  = data.context_tags.subnet.tags
 
+  # Route table is specified inline to avoid the race condition that would occur
+  # with a separate oci_core_route_table_attachment resource: without this, the
+  # subnet would temporarily use the empty default route table during apply,
+  # which has no internet gateway route and would break cloud-init.
+  route_table_id = oci_core_route_table.default[0].id
+
+  # This list is exhaustive – the VCN default security list is NOT included,
+  # ensuring only explicitly defined rules govern this subnet's traffic.
   security_list_ids = [
     oci_core_security_list.k3s[0].id
   ]
@@ -174,9 +195,8 @@ resource "oci_core_route_table" "default" {
   }
 }
 
-resource "oci_core_route_table_attachment" "default" {
-  count = local.enabled ? 1 : 0
-
-  subnet_id      = oci_core_subnet.default[0].id
-  route_table_id = oci_core_route_table.default[0].id
-}
+# REMOVED: oci_core_route_table_attachment
+# The route_table_id is now set directly on oci_core_subnet.default above.
+# If this resource still exists in your Terraform state, run:
+#   terraform state rm 'module.networking.oci_core_route_table_attachment.default[0]'
+# before applying, to avoid a conflict.

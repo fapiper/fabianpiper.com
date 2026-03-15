@@ -1,6 +1,8 @@
 # syntax=docker/dockerfile:1.4
 
-FROM oven/bun:1 AS builder
+# Build on native CI platform (x86_64) to avoid QEMU emulation for bun install/build.
+# The dist/ output is static files (HTML/CSS/JS) and therefore platform-agnostic.
+FROM --platform=$BUILDPLATFORM oven/bun:1 AS builder
 WORKDIR /app
 
 COPY package.json bun.lock ./

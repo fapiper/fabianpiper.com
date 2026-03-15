@@ -134,3 +134,23 @@ runcmd:
   - sleep 10
   - k3s kubectl apply -f /tmp/patch-cluster-issuer.yaml || true
 
+  # Wait for ArgoCD to deploy Envoy Gateway and patch the Gateway with the public IP.
+  # This is the declarative equivalent of the manual status patch:
+  # Setting spec.addresses causes Envoy Gateway to propagate the IP into
+  # status.addresses, which external-dns reads to create Cloudflare DNS records.
+  # ArgoCD is configured to ignore spec.addresses (see infrastructure ApplicationSet).
+  - |
+    MAX_RETRIES=40; RETRY=0
+    echo "Waiting for ArgoCD to create public-gateway..."
+    until k3s kubectl get gateway public-gateway -n envoy-gateway-system >/dev/null 2>&1; do
+      RETRY=$((RETRY + 1))
+      [ "$RETRY" -ge "$MAX_RETRIES" ] && { echo "WARNING: Timeout waiting for public-gateway, skipping patch"; break; }
+      sleep 30
+    done
+    if k3s kubectl get gateway public-gateway -n envoy-gateway-system >/dev/null 2>&1; then
+      echo "Patching public-gateway spec.addresses = ${public_ip}"
+      k3s kubectl patch gateway public-gateway -n envoy-gateway-system \
+        --type=merge \
+        -p "{\"spec\":{\"addresses\":[{\"type\":\"IPAddress\",\"value\":\"${public_ip}\"}]}}" || true
+    fi
+
