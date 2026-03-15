@@ -80,7 +80,7 @@ runcmd:
   # Configure OCI Vault ClusterSecretStore (patch after external-secrets is deployed)
   - |
     cat > /tmp/patch-vault-store.yaml <<EOF
-    apiVersion: external-secrets.io/v1beta1
+    apiVersion: external-secrets.io/v1
     kind: ClusterSecretStore
     metadata:
       name: oci-vault

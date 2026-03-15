@@ -9,7 +9,7 @@ data:
   vault_ocid: "" # This will be populated by cloud-init during cluster setup
   region: "eu-frankfurt-1"
 ---
-apiVersion: external-secrets.io/v1beta1
+apiVersion: external-secrets.io/v1
 kind: ClusterSecretStore
 metadata:
   name: oci-vault
