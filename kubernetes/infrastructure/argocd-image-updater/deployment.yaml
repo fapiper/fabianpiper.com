@@ -22,6 +22,8 @@ kind: Deployment
 metadata:
   name: argocd-image-updater
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
 spec:
   replicas: 1
   selector:
@@ -35,7 +37,7 @@ spec:
       serviceAccountName: argocd-image-updater
       containers:
         - name: argocd-image-updater
-          image: argoprojlabs/argocd-image-updater:v0.12.2
+          image: quay.io/argoprojlabs/argocd-image-updater:v0.12.2
           imagePullPolicy: Always
           args:
             - run
