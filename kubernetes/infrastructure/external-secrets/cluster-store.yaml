@@ -3,6 +3,8 @@ kind: ConfigMap
 metadata:
   name: oci-vault-config
   namespace: external-secrets
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
 data:
   vault_ocid: "" # This will be populated by cloud-init during cluster setup
   region: "eu-frankfurt-1"
@@ -11,6 +13,8 @@ apiVersion: external-secrets.io/v1beta1
 kind: ClusterSecretStore
 metadata:
   name: oci-vault
+  annotations:
+    argocd.argoproj.io/sync-wave: "15"
 spec:
   provider:
     oracle:

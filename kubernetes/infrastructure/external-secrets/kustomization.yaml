@@ -4,18 +4,3 @@ kind: Kustomization
 resources:
   - operator.yaml
   - cluster-store.yaml
-  - vault-config.yaml
-
-replacements:
-  - source:
-      kind: ConfigMap
-      name: vault-config
-      fieldPath: data.VAULT_OCID
-    targets:
-      - select:
-          kind: ClusterSecretStore
-          name: oci-vault-store
-        fieldPaths:
-          - spec.provider.oracle.vault
-        options:
-          delimiter: ""

@@ -77,6 +77,60 @@ runcmd:
   # Ensure the application-controller is also ready
   - k3s kubectl wait --for=condition=available --timeout=600s deployment/argocd-application-controller -n argocd
 
+  # Configure OCI Vault ClusterSecretStore (patch after external-secrets is deployed)
+  - |
+    cat > /tmp/patch-vault-store.yaml <<EOF
+    apiVersion: external-secrets.io/v1beta1
+    kind: ClusterSecretStore
+    metadata:
+      name: oci-vault
+    spec:
+      provider:
+        oracle:
+          vault: ${vault_id}
+          region: eu-frankfurt-1
+          principalType: InstancePrincipal
+    EOF
+
+  # Configure cert-manager ClusterIssuer with email
+  - |
+    cat > /tmp/patch-cluster-issuer.yaml <<EOF
+    apiVersion: cert-manager.io/v1
+    kind: ClusterIssuer
+    metadata:
+      name: cloudflare-issuer
+    spec:
+      acme:
+        email: ${git_email}
+        server: https://acme-v02.api.letsencrypt.org/directory
+        privateKeySecretRef:
+          name: cloudflare-issuer-account-key
+        solvers:
+          - http01:
+              gatewayHTTPRoute:
+                parentRefs:
+                  - name: public-gateway
+                    namespace: envoy-gateway-system
+                    kind: Gateway
+                    group: gateway.networking.k8s.io
+    EOF
+
   # Deploy root application
   - sleep 5
   - curl -sfL https://raw.githubusercontent.com/fapiper/fabianpiper.com/main/kubernetes/bootstrap/root.yaml | k3s kubectl apply -f -
+
+  # Wait for external-secrets CRD to be available (deployed by ArgoCD)
+  - sleep 30
+  - k3s kubectl wait --for=condition=established --timeout=300s crd/clustersecretstores.external-secrets.io || true
+
+  # Apply the vault store configuration
+  - sleep 10
+  - k3s kubectl apply -f /tmp/patch-vault-store.yaml || true
+
+  # Wait for cert-manager CRD to be available
+  - k3s kubectl wait --for=condition=established --timeout=300s crd/clusterissuers.cert-manager.io || true
+
+  # Apply the ClusterIssuer configuration
+  - sleep 10
+  - k3s kubectl apply -f /tmp/patch-cluster-issuer.yaml || true
+

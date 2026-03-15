@@ -5,6 +5,7 @@ namespace: www
 
 resources:
   - deployment.yaml
+  - service.yaml
   - external-secret.yaml
   - httproute.yaml
   - certificate.yaml

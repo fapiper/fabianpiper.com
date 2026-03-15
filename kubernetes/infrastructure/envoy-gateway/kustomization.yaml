@@ -6,6 +6,14 @@ resources:
 
 patches:
   - target:
+      kind: Namespace
+      name: envoy-gateway-system
+    patch: |-
+      - op: add
+        path: /metadata/annotations
+        value:
+          argocd.argoproj.io/sync-wave: "0"
+  - target:
       kind: EnvoyProxy
       name: custom-proxy-config
     patch: |-

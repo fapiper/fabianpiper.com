@@ -3,6 +3,8 @@ kind: Certificate
 metadata:
   name: www-tls
   namespace: www
+  annotations:
+    argocd.argoproj.io/sync-wave: "18"
 spec:
   secretName: www-tls # This name must match the one in your Gateway listener
   issuerRef:

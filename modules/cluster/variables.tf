@@ -177,6 +177,12 @@ variable "git_username" {
   default     = ""
 }
 
+variable "git_email" {
+  description = "Email address for Let's Encrypt certificates"
+  type        = string
+  default     = ""
+}
+
 variable "git_repo_url" {
   description = "Git repository URL for ArgoCD bootstrap"
   type        = string

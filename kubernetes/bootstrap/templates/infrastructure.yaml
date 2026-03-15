@@ -3,6 +3,8 @@ kind: ApplicationSet
 metadata:
   name: infrastructure
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   goTemplate: true
   goTemplateOptions: ["missingkey=error"]
@@ -16,6 +18,8 @@ spec:
     metadata:
       name: "{{.path.basename}}"
       namespace: argocd
+      annotations:
+        argocd.argoproj.io/sync-wave: "2"
       finalizers:
         - resources-finalizer.argocd.argoproj.io
     spec:
@@ -27,6 +31,15 @@ spec:
       destination:
         server: https://kubernetes.default.svc
         namespace: "{{.path.basename}}"
+      ignoreDifferences:
+        - group: external-secrets.io
+          kind: ClusterSecretStore
+          jqPathExpressions:
+            - .spec.provider.oracle.vault
+        - group: cert-manager.io
+          kind: ClusterIssuer
+          jqPathExpressions:
+            - .spec.acme.email
       syncPolicy:
         automated:
           prune: true
@@ -34,10 +47,12 @@ spec:
         syncOptions:
           - CreateNamespace=true
           - ServerSideApply=true
+          - RespectIgnoreDifferences=true
+          - SkipDryRunOnMissingResource=true
         retry:
-          limit: 3
+          limit: 10
           backoff:
-            duration: 5s
+            duration: 30s
             factor: 2
-            maxDuration: 3m
+            maxDuration: 10m
 

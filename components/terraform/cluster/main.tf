@@ -41,6 +41,7 @@ module "cluster" {
   initialization_method  = var.initialization_method
   git_pat      = var.git_pat
   git_username = var.git_username
+  git_email    = var.git_email
   git_repo_url = var.git_repo_url
   vault_id     = try(data.terraform_remote_state.vault.outputs.id, "")
 
