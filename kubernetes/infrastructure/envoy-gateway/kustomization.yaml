@@ -13,10 +13,3 @@ patches:
         path: /metadata/annotations
         value:
           argocd.argoproj.io/sync-wave: "0"
-  - target:
-      kind: EnvoyProxy
-      name: custom-proxy-config
-    patch: |-
-      - op: replace
-        path: /spec/provider/kubernetes/envoyService/type
-        value: ClusterIP

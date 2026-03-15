@@ -124,3 +124,21 @@ resource "oci_vault_secret" "site_url" {
   depends_on = [oci_kms_key.default]
 }
 
+resource "oci_vault_secret" "cloudflare_api_token" {
+  count = local.enabled ? 1 : 0
+
+  compartment_id = local.compartment_ocid
+  vault_id       = oci_kms_vault.default[0].id
+  key_id         = oci_kms_key.default[0].id
+  secret_name    = "cloudflare-api-token"
+
+  secret_content {
+    content_type = "BASE64"
+    content      = base64encode(var.cloudflare_api_token)
+  }
+
+  freeform_tags = data.context_tags.main.tags
+
+  depends_on = [oci_kms_key.default]
+}
+

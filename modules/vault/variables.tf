@@ -33,3 +33,9 @@ variable "site_url" {
   description = "Site URL"
   sensitive   = true
 }
+
+variable "cloudflare_api_token" {
+  type        = string
+  description = "Cloudflare API token for DNS management"
+  sensitive   = true
+}

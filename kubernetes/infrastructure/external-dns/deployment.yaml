@@ -3,16 +3,23 @@ kind: Deployment
 metadata:
   name: external-dns
   namespace: external-dns
+  labels:
+    app.kubernetes.io/name: external-dns
+    app.kubernetes.io/instance: external-dns
+    app.kubernetes.io/part-of: infrastructure
 spec:
   strategy:
     type: Recreate
   selector:
     matchLabels:
-      app: external-dns
+      app.kubernetes.io/name: external-dns
   template:
     metadata:
       labels:
         app: external-dns
+        app.kubernetes.io/name: external-dns
+        app.kubernetes.io/instance: external-dns
+        app.kubernetes.io/part-of: infrastructure
     spec:
       serviceAccountName: external-dns
       containers:
@@ -29,3 +36,10 @@ spec:
                 secretKeyRef:
                   name: cloudflare-api-token
                   key: api-token
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
