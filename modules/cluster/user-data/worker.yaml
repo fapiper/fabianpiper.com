@@ -14,14 +14,14 @@ runcmd:
   - |
     echo "Waiting for K3s Server at ${server_ip}:6443..."
     until curl -sf --connect-timeout 5 -k https://${server_ip}:6443 > /dev/null 2>&1; do
-      echo "  Not ready yet, retrying in 10s..."
+      echo "  API not ready yet, retrying in 10 seconds..."
       sleep 10
     done
     echo "K3s Server ready."
 
   # Install required packages (internet is confirmed available at this point)
-  - apt-get update -qq || true
-  - apt-get install -y curl iptables-persistent
+  - apt-get update -qq
+  - apt-get install -y curl
 
   # Install K3s agent with worker role
   - curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="agent --node-label role=worker" K3S_URL=https://${server_ip}:6443 K3S_TOKEN=${k3s_token} sh -

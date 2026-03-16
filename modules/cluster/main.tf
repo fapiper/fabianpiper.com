@@ -92,6 +92,11 @@ resource "oci_core_route_table" "private_rt" {
     destination_type  = "CIDR_BLOCK"
     network_entity_id = data.oci_core_private_ips.ingress_ips[0].private_ips[0].id
   }
+
+  lifecycle {
+    replace_triggered_by = [oci_core_instance.ingress]
+    create_before_destroy = true
+  }
 }
 
 # Security list for private subnet - allows all internal communication

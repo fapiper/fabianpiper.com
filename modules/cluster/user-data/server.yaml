@@ -10,23 +10,23 @@ runcmd:
   - iptables -P FORWARD ACCEPT
   - iptables -F INPUT
   - iptables -F FORWARD
-  - netfilter-persistent save
 
   # Wait for internet connectivity via the ingress NAT gateway.
   # The ingress cloud-init must finish setting up iptables MASQUERADE before
   # this node can reach the internet. Without this wait, the K3s install curl
   # fails silently and all subsequent k3s commands are "not found".
   - |
-    echo "Waiting for internet connectivity (ingress NAT may not be ready)..."
-    until curl -sf --connect-timeout 5 --max-time 10 https://get.k3s.io > /dev/null 2>&1; do
-      echo "  No internet yet, retrying in 15s..."
+    echo "Waiting for internet connectivity..."
+    until ping -c 1 -W 5 8.8.8.8 > /dev/null 2>&1; do
+      echo "  No route to internet yet, retrying in 15s..."
       sleep 15
     done
     echo "Internet connectivity confirmed."
 
   # Install required packages now that we have internet
-  - apt-get update -qq || true
+  - apt-get update -qq
   - apt-get install -y curl iptables-persistent
+  - netfilter-persistent save
 
   # Install K3s server (creates /etc/rancher/k3s/ automatically)
   - |
@@ -37,7 +37,7 @@ runcmd:
       --disable servicelb \
       --node-label role=server
 
-  # Write GHCR registry credentials AFTER K3s has created /etc/rancher/k3s/
+  # Write GHCR registry credentials after K3s has created /etc/rancher/k3s/
   - mkdir -p /etc/rancher/k3s
   - |
     cat > /etc/rancher/k3s/registries.yaml <<'REGISTRIES'
@@ -51,28 +51,25 @@ runcmd:
   - systemctl restart k3s
 
   # Wait for K3s to be ready
-  - sleep 30
+  - sleep 20
   - k3s kubectl wait --for=condition=Ready nodes --all --timeout=300s
 
   # Create ArgoCD namespace
-  - k3s kubectl create namespace argocd
-
+  - k3s kubectl create namespace argocd || true
   # Install ArgoCD core manifests
   - k3s kubectl apply --server-side -k https://github.com/argoproj/argo-cd/manifests/crds?ref=v3.3.0
-  - k3s kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.3.0/manifests/install.yaml
+  - k3s kubectl apply --server-side -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.3.0/manifests/install.yaml
 
   # Wait for ArgoCD CRDs to be established
   - sleep 10
   - k3s kubectl wait --for=condition=established --timeout=300s crd/applications.argoproj.io
-  - k3s kubectl wait --for=condition=established --timeout=300s crd/applicationsets.argoproj.io
-
   # Force restart the applicationset-controller to clear a startup crash loop
   - k3s kubectl rollout restart deployment/argocd-applicationset-controller -n argocd
 
   # Wait for ArgoCD pods to be ready
   - k3s kubectl wait --for=condition=available --timeout=600s deployment/argocd-server -n argocd
   - k3s kubectl wait --for=condition=available --timeout=600s deployment/argocd-repo-server -n argocd
-  - k3s kubectl wait --for=condition=available --timeout=600s deployment/argocd-applicationset-controller -n argocd
+  - k3s kubectl wait --for=jsonpath='{.status.readyReplicas}'=1 --timeout=600s statefulset/argocd-application-controller -n argocd
 
   # Configure ArgoCD Git credentials
   - |
@@ -91,9 +88,6 @@ runcmd:
       username: ${git_username}
       password: ${git_pat}
     EOF
-
-  # Ensure the application-controller is also ready
-  - k3s kubectl wait --for=condition=available --timeout=600s deployment/argocd-application-controller -n argocd
 
   # Configure OCI Vault ClusterSecretStore (patch after external-secrets is deployed)
   - |
@@ -138,18 +132,20 @@ runcmd:
   - curl -sfL https://raw.githubusercontent.com/fapiper/fabianpiper.com/main/kubernetes/bootstrap/root.yaml | k3s kubectl apply -f -
 
   # Wait for external-secrets CRD to be available (deployed by ArgoCD)
-  - sleep 30
+  - |
+    echo "Waiting for external-secrets webhook to be ready..."
+    until k3s kubectl get deployment external-secrets-webhook -n external-secrets >/dev/null 2>&1; do sleep 10; done
+    k3s kubectl wait --for=condition=available --timeout=600s deployment/external-secrets-webhook -n external-secrets
+
   - k3s kubectl wait --for=condition=established --timeout=300s crd/clustersecretstores.external-secrets.io || true
 
   # Apply the vault store configuration
-  - sleep 10
   - k3s kubectl apply -f /tmp/patch-vault-store.yaml || true
 
   # Wait for cert-manager CRD to be available
   - k3s kubectl wait --for=condition=established --timeout=300s crd/clusterissuers.cert-manager.io || true
 
   # Apply the ClusterIssuer configuration
-  - sleep 10
   - k3s kubectl apply -f /tmp/patch-cluster-issuer.yaml || true
 
   # Wait for ArgoCD to deploy Envoy Gateway and patch the Gateway with the public IP.
@@ -159,16 +155,13 @@ runcmd:
   # ArgoCD is configured to ignore spec.addresses (see infrastructure ApplicationSet).
   - |
     MAX_RETRIES=40; RETRY=0
-    echo "Waiting for ArgoCD to create public-gateway..."
     until k3s kubectl get gateway public-gateway -n envoy-gateway-system >/dev/null 2>&1; do
       RETRY=$((RETRY + 1))
-      [ "$RETRY" -ge "$MAX_RETRIES" ] && { echo "WARNING: Timeout waiting for public-gateway, skipping patch"; break; }
+      [ "$RETRY" -ge "$MAX_RETRIES" ] && break
       sleep 30
     done
     if k3s kubectl get gateway public-gateway -n envoy-gateway-system >/dev/null 2>&1; then
-      echo "Patching public-gateway spec.addresses = ${public_ip}"
       k3s kubectl patch gateway public-gateway -n envoy-gateway-system \
         --type=merge \
         -p "{\"spec\":{\"addresses\":[{\"type\":\"IPAddress\",\"value\":\"${public_ip}\"}]}}" || true
     fi
-
