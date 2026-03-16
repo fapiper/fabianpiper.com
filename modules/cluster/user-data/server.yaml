@@ -11,14 +11,19 @@ runcmd:
   - iptables -F INPUT
   - iptables -F FORWARD
 
+  # Force IPv4 and disable IPv6 to prevent "Network unreachable" errors during boot
+  - sysctl -w net.ipv6.conf.all.disable_ipv6=1
+  - sysctl -w net.ipv6.conf.default.disable_ipv6=1
+  - echo 'Acquire::ForceIPv4 "true";' > /etc/apt/apt.conf.d/99force-ipv4
+
   # Wait for internet connectivity via the ingress NAT gateway.
   # The ingress cloud-init must finish setting up iptables MASQUERADE before
   # this node can reach the internet. Without this wait, the K3s install curl
   # fails silently and all subsequent k3s commands are "not found".
   - |
     echo "Waiting for internet connectivity..."
-    until ping -c 1 -W 5 8.8.8.8 > /dev/null 2>&1; do
-      echo "  No route to internet yet, retrying in 15s..."
+    until curl -sf --connect-timeout 5 https://get.k3s.io > /dev/null 2>&1; do
+      echo "  No route to internet yet (or DNS/IPv6 fail), retrying in 15s..."
       sleep 15
     done
     echo "Internet connectivity confirmed."
