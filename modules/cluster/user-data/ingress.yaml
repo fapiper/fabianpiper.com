@@ -1,8 +1,8 @@
 #cloud-config
-package_update: true
-packages:
-  - curl
-  - iptables-persistent
+# package_update intentionally disabled so runcmd starts immediately after boot.
+# The iptables NAT must be active BEFORE the server node tries to reach the internet.
+# Packages are installed in runcmd AFTER NAT is established.
+package_update: false
 
 write_files:
   - path: /etc/sysctl.d/99-k3s.conf
@@ -12,11 +12,13 @@ write_files:
     permissions: '0644'
 
 runcmd:
-  # Enable IP forwarding immediately
+  # Enable IP forwarding IMMEDIATELY - this is the critical first step.
+  # The server node cannot reach the internet until forwarding + MASQUERADE is active.
   - sysctl -w net.ipv4.ip_forward=1
+  - sysctl -w net.bridge.bridge-nf-call-iptables=1
 
-  # Configure iptables for NAT and forwarding (interface-agnostic)
-  # Using multi-line block to keep DEFAULT_IFACE in scope
+  # Configure iptables for NAT and forwarding.
+  # Done BEFORE apt-get so the private subnet gets internet as fast as possible.
   - |
     DEFAULT_IFACE=$(ip route get 8.8.8.8 | awk '{print $5; exit}')
     iptables -P INPUT ACCEPT
@@ -38,12 +40,18 @@ runcmd:
     # With hostNetwork: true, the host must redirect 80/443 to these internal ports.
     iptables -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 10080
     iptables -t nat -A PREROUTING -p tcp --dport 443 -j REDIRECT --to-port 10443
-    netfilter-persistent save
+
+  # Now install packages (ingress has public internet directly, no NAT needed for itself)
+  - apt-get update -qq || true
+  - apt-get install -y curl iptables-persistent
+
+  # Persist iptables rules so they survive a reboot
+  - netfilter-persistent save
 
   # Wait for K3s server to be ready
   - |
-    until curl -k https://${server_ip}:6443; do
-      echo "Waiting for K3s Server..."
+    until curl -k --connect-timeout 5 https://${server_ip}:6443 > /dev/null 2>&1; do
+      echo "Waiting for K3s Server at ${server_ip}:6443..."
       sleep 10
     done
 

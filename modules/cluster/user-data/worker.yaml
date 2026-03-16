@@ -1,8 +1,5 @@
 #cloud-config
-package_update: true
-packages:
-  - curl
-  - iptables-persistent
+package_update: false
 
 runcmd:
   # Configure iptables
@@ -12,12 +9,19 @@ runcmd:
   - iptables -F FORWARD
   - netfilter-persistent save
 
-  # Wait for K3s server to be ready
+  # Wait for internet connectivity AND K3s server to be ready.
+  # Both the ingress NAT and the K3s API server must be up before installing.
   - |
-    until curl -k https://${server_ip}:6443; do
-      echo "Waiting for K3s Server..."
+    echo "Waiting for K3s Server at ${server_ip}:6443..."
+    until curl -sf --connect-timeout 5 -k https://${server_ip}:6443 > /dev/null 2>&1; do
+      echo "  Not ready yet, retrying in 10s..."
       sleep 10
     done
+    echo "K3s Server ready."
+
+  # Install required packages (internet is confirmed available at this point)
+  - apt-get update -qq || true
+  - apt-get install -y curl iptables-persistent
 
   # Install K3s agent with worker role
   - curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="agent --node-label role=worker" K3S_URL=https://${server_ip}:6443 K3S_TOKEN=${k3s_token} sh -

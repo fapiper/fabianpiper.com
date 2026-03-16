@@ -1,29 +1,34 @@
 #cloud-config
-package_update: true
-packages:
-  - curl
-  - iptables-persistent
-
-write_files:
-  - path: /etc/rancher/k3s/registries.yaml
-    owner: root:root
-    permissions: '0644'
-    content: |
-      configs:
-        ghcr.io:
-          auth:
-            username: ${git_username}
-            password: ${git_pat}
+# package_update intentionally disabled: the private subnet has no internet
+# connectivity until the ingress node finishes setting up its NAT iptables rules.
+# Packages are installed in runcmd AFTER we confirm internet is reachable.
+package_update: false
 
 runcmd:
-  # Configure iptables
+  # Configure iptables (allow all, no NAT needed on server)
   - iptables -P INPUT ACCEPT
   - iptables -P FORWARD ACCEPT
   - iptables -F INPUT
   - iptables -F FORWARD
   - netfilter-persistent save
 
-  # Install K3s server
+  # Wait for internet connectivity via the ingress NAT gateway.
+  # The ingress cloud-init must finish setting up iptables MASQUERADE before
+  # this node can reach the internet. Without this wait, the K3s install curl
+  # fails silently and all subsequent k3s commands are "not found".
+  - |
+    echo "Waiting for internet connectivity (ingress NAT may not be ready)..."
+    until curl -sf --connect-timeout 5 --max-time 10 https://get.k3s.io > /dev/null 2>&1; do
+      echo "  No internet yet, retrying in 15s..."
+      sleep 15
+    done
+    echo "Internet connectivity confirmed."
+
+  # Install required packages now that we have internet
+  - apt-get update -qq || true
+  - apt-get install -y curl iptables-persistent
+
+  # Install K3s server (creates /etc/rancher/k3s/ automatically)
   - |
     curl -sfL https://get.k3s.io | sh -s - server \
       --token ${k3s_token} \
@@ -31,6 +36,19 @@ runcmd:
       --disable traefik \
       --disable servicelb \
       --node-label role=server
+
+  # Write GHCR registry credentials AFTER K3s has created /etc/rancher/k3s/
+  - mkdir -p /etc/rancher/k3s
+  - |
+    cat > /etc/rancher/k3s/registries.yaml <<'REGISTRIES'
+    configs:
+      ghcr.io:
+        auth:
+          username: ${git_username}
+          password: ${git_pat}
+    REGISTRIES
+  - chmod 0644 /etc/rancher/k3s/registries.yaml
+  - systemctl restart k3s
 
   # Wait for K3s to be ready
   - sleep 30
