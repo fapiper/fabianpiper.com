@@ -29,7 +29,6 @@ spec:
           image: registry.k8s.io/external-dns/external-dns:v0.14.1
           args:
             - --source=gateway-httproute
-            - --source=gateway
             - --provider=cloudflare
             - --domain-filter=fabianpiper.com
           env:
