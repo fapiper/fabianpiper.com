@@ -5,7 +5,6 @@ metadata:
   namespace: www
   annotations:
     argocd.argoproj.io/sync-wave: "25"
-    external-dns.alpha.kubernetes.io/target: "${public_ip}"
 spec:
   parentRefs:
     - name: public-gateway
