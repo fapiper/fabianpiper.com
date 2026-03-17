@@ -3,5 +3,6 @@ kind: Kustomization
 
 resources:
   - operator.yaml
+  - external-secret.yaml
   - cluster-issuer.yaml
 

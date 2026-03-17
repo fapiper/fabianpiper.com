@@ -43,7 +43,7 @@ spec:
         - group: gateway.networking.k8s.io
           kind: Gateway
           jqPathExpressions:
-            - .spec.addresses  # Set by cloud-init with the OCI public IP; must not be overwritten by ArgoCD
+            - .metadata.annotations["external-dns.alpha.kubernetes.io/target"]  # Set by cloud-init; must not be overwritten by ArgoCD
       syncPolicy:
         automated:
           prune: true
