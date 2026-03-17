@@ -31,7 +31,6 @@ spec:
             - --source=gateway-httproute
             - --provider=cloudflare
             - --domain-filter=fabianpiper.com
-            - --cloudflare-proxied
           env:
             - name: CF_API_TOKEN
               valueFrom:

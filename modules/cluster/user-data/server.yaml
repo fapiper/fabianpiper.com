@@ -50,6 +50,14 @@ runcmd:
   - chmod 0644 /etc/rancher/k3s/registries.yaml
   - systemctl restart k3s
 
+  - |
+    iptables -I INPUT 1 -p tcp --dport 80 -j ACCEPT
+    iptables -I INPUT 1 -p tcp --dport 443 -j ACCEPT
+    
+    if command -v netfilter-persistent >/dev/null; then
+      netfilter-persistent save
+    fi
+
   # Initial K3s Wait
   - sleep 20
   - /usr/local/bin/k3s kubectl wait --for=condition=Ready nodes --all --timeout=300s
@@ -122,27 +130,35 @@ runcmd:
                     group: gateway.networking.k8s.io
     EOF
 
-  # Post-install configurations (Wait for CRDs then apply patches)
+  # Post-install configurations
   - |
-    echo "Waiting for external-secrets..."
-    until /usr/local/bin/k3s kubectl get deployment external-secrets-webhook -n external-secrets >/dev/null 2>&1; do sleep 10; done
-    /usr/local/bin/k3s kubectl wait --for=condition=established --timeout=300s crd/clustersecretstores.external-secrets.io
-    /usr/local/bin/k3s kubectl apply -f /tmp/patch-vault-store.yaml
+    echo "Waiting for external-secrets-webhook and applying ClusterSecretStore..."
+    # Wir loopen das apply selbst, da der Webhook oft erst 10-20s NACH dem Deployment-Start reagiert
+    until /usr/local/bin/k3s kubectl apply -f /tmp/patch-vault-store.yaml; do
+      echo "External-secrets webhook not ready yet. Retrying in 15s..."
+      sleep 15
+    done
 
-    echo "Waiting for cert-manager..."
-    /usr/local/bin/k3s kubectl wait --for=condition=established --timeout=300s crd/clusterissuers.cert-manager.io
-    /usr/local/bin/k3s kubectl apply -f /tmp/patch-cluster-issuer.yaml
+    echo "Waiting for cert-manager-webhook and applying ClusterIssuer..."
+    until /usr/local/bin/k3s kubectl apply -f /tmp/patch-cluster-issuer.yaml; do
+      echo "Cert-manager webhook not ready yet. Retrying in 15s..."
+      sleep 15
+    done
 
   # Final Step: Patch Envoy Gateway with Public IP
   - |
+    echo "Waiting for public-gateway to be programmed..."
     MAX_RETRIES=40; RETRY=0
-    until /usr/local/bin/k3s kubectl get gateway public-gateway -n envoy-gateway-system >/dev/null 2>&1; do
+    until /usr/local/bin/k3s kubectl get gateway public-gateway -n envoy-gateway-system -o jsonpath='{.status.conditions[?(@.type=="Programmed")].status}' | grep -q "True"; do
       RETRY=$((RETRY + 1))
-      [ "$RETRY" -ge "$MAX_RETRIES" ] && break
-      sleep 30
+      if [ "$RETRY" -ge "$MAX_RETRIES" ]; then
+        echo "Gateway timing out. Proceeding anyway..."
+        break
+      fi
+      echo "Waiting for gateway to be programmed... (Attempt $RETRY)"
+      sleep 20
     done
-    if /usr/local/bin/k3s kubectl get gateway public-gateway -n envoy-gateway-system >/dev/null 2>&1; then
-      /usr/local/bin/k3s kubectl patch gateway public-gateway -n envoy-gateway-system \
-        --type=merge \
-        -p "{\"spec\":{\"addresses\":[{\"type\":\"IPAddress\",\"value\":\"${public_ip}\"}]}}"
-    fi
+
+    /usr/local/bin/k3s kubectl patch gateway public-gateway -n envoy-gateway-system \
+      --type=merge \
+      -p "{\"spec\":{\"addresses\":[{\"type\":\"IPAddress\",\"value\":\"${public_ip}\"}]}}"
