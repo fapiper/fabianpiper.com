@@ -45,6 +45,18 @@ spec:
           kind: ClusterIssuer
           jqPathExpressions:
             - .spec.acme.email
+        - group: gateway.networking.k8s.io
+          kind: GatewayClass
+          jqPathExpressions:
+            - .metadata.annotations["meta.helm.sh/release-name"]
+            - .metadata.annotations["meta.helm.sh/release-namespace"]
+            - .metadata.labels["app.kubernetes.io/managed-by"]
+        - group: gateway.envoyproxy.io
+          kind: EnvoyProxy
+          jqPathExpressions:
+            - .metadata.annotations["meta.helm.sh/release-name"]
+            - .metadata.annotations["meta.helm.sh/release-namespace"]
+            - .metadata.labels["app.kubernetes.io/managed-by"]
       syncPolicy:
         automated:
           prune: true
