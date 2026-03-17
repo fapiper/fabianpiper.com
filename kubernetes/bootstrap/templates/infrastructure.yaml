@@ -32,6 +32,11 @@ spec:
         server: https://kubernetes.default.svc
         namespace: "{{.path.basename}}"
       ignoreDifferences:
+        - group: gateway.networking.k8s.io
+          kind: Gateway
+          jqPathExpressions:
+            - .spec.addresses
+            - .metadata.annotations["external-dns.alpha.kubernetes.io/target"]
         - group: external-secrets.io
           kind: ClusterSecretStore
           jqPathExpressions:
@@ -40,10 +45,6 @@ spec:
           kind: ClusterIssuer
           jqPathExpressions:
             - .spec.acme.email
-        - group: gateway.networking.k8s.io
-          kind: Gateway
-          jqPathExpressions:
-            - .metadata.annotations["external-dns.alpha.kubernetes.io/target"]  # Set by cloud-init; must not be overwritten by ArgoCD
       syncPolicy:
         automated:
           prune: true

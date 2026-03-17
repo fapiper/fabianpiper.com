@@ -30,6 +30,10 @@ spec:
         server: https://kubernetes.default.svc
         namespace: "{{.path.basename}}"
       ignoreDifferences:
+        - group: gateway.networking.k8s.io
+          kind: HTTPRoute
+          jqPathExpressions:
+            - .metadata.annotations["external-dns.alpha.kubernetes.io/target"]
         - group: external-secrets.io
           kind: ExternalSecret
           jqPathExpressions:

@@ -152,21 +152,23 @@ runcmd:
       sleep 15
     done
 
-  # Final Step: Annotate Gateway with Public IP for External-DNS
   - |
-    echo "Waiting for public-gateway to be created..."
+    echo "Waiting for www-route HTTPRoute to be created..."
     MAX_RETRIES=40; RETRY=0
-    until /usr/local/bin/k3s kubectl get gateway public-gateway -n envoy-gateway-system 2>/dev/null; do
+    until /usr/local/bin/k3s kubectl get httproute www-route -n www 2>/dev/null; do
       RETRY=$((RETRY + 1))
       if [ "$RETRY" -ge "$MAX_RETRIES" ]; then
-        echo "Gateway not found after timeout. Proceeding anyway..."
+        echo "HTTPRoute timeout - skipping annotation"
         break
       fi
-      echo "Waiting for gateway to be created... (Attempt $RETRY)"
+      echo "Waiting for HTTPRoute... (Attempt $RETRY)"
       sleep 20
     done
 
-    /usr/local/bin/k3s kubectl annotate gateway public-gateway \
-      -n envoy-gateway-system \
-      --overwrite \
-      "external-dns.alpha.kubernetes.io/target=${public_ip}" || true
+    if [ "$RETRY" -lt "$MAX_RETRIES" ]; then
+      /usr/local/bin/k3s kubectl annotate httproute www-route \
+        -n www \
+        --overwrite \
+        "external-dns.alpha.kubernetes.io/target=${public_ip}"
+      echo "HTTPRoute annotated with: ${public_ip}"
+    fi
