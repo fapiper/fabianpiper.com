@@ -34,6 +34,7 @@ get_stem  = $(subst -, ,$*)
 get_env   = $(word 1,$(get_stem))
 get_app   = $(if $(word 2,$(get_stem)),$(lastword $(get_stem)),all)
 get_stack = glg-$(get_env)-fra
+confirm = $(PRINTF) -- "\n>>> $(1) $(get_app) in $(get_env)? (yes/no): " && read -r prompt < /dev/tty && [ "$$prompt" = "yes" ] || { echo "$(1) cancelled."; exit 1; }
 
 #----------------------------------------------------------------
 # SOPS Injection
@@ -96,8 +97,13 @@ plan-%:
 
 ## apply-[env]-[comp]: terraform apply
 apply-%:
-	@if [ "$(get_app)" = "all" ]; then $(ATMOS) workflow apply -s $(get_stack); \
-	else $(ATMOS) terraform apply $(get_app) -s $(get_stack); fi
+	@if [ "$(get_app)" = "all" ]; then \
+		$(ATMOS) workflow plan -s $(get_stack); \
+		$(call confirm,Apply); \
+		TF_CLI_ARGS_apply="-auto-approve" $(ATMOS) workflow apply -s $(get_stack); \
+	else \
+		$(ATMOS) terraform apply $(get_app) -s $(get_stack); \
+	fi
 
 ## validate-[env]-[comp/all]: static analysis
 validate-%:
@@ -106,7 +112,7 @@ validate-%:
 
 ## destroy-[env]-[comp]: infrastructure destruction
 destroy-%:
-	@$(PRINTF) -- "Destroy $(get_app) in $(get_env)? (yes/no): " && read prompt && [ "$$prompt" = "yes" ] || exit 1
+	@$(call confirm,Destroy)
 	@$(MAKE) _destroy-$*
 
 _destroy-%:
