@@ -10,7 +10,7 @@ module "cluster" {
   private_subnet_cidr = var.private_subnet_cidr
 
   # SSH Configuration
-  ssh_public_key_path = var.ssh_public_key_path
+  ssh_public_key_path  = var.ssh_public_key_path
 
   # Instance configuration
   instance_shape      = var.instance_shape

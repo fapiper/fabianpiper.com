@@ -35,6 +35,7 @@ variable "ssh_public_key_path" {
   type        = string
 }
 
+
 variable "instance_shape" {
   description = "OCI instance shape"
   type        = string

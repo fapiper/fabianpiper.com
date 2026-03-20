@@ -25,31 +25,6 @@ runcmd:
   - apt-get install -y curl iptables-persistent
   - netfilter-persistent save
 
-  # Register shutdown hook to clean up Cloudflare DNS records on destroy
-  - |
-    cat > /etc/systemd/system/external-dns-cleanup.service <<'EOF'
-    [Unit]
-    Description=Clean up External-DNS Cloudflare records on shutdown
-    DefaultDependencies=no
-    Before=shutdown.target reboot.target halt.target
-    Requires=network-online.target
-
-    [Service]
-    Type=oneshot
-    RemainAfterExit=yes
-    ExecStop=/bin/bash -c '\
-      export KUBECONFIG=/etc/rancher/k3s/k3s.yaml; \
-      /usr/local/bin/k3s kubectl scale deployment/external-dns \
-        -n external-dns --replicas=0 || true; \
-      sleep 10; \
-      /usr/local/bin/k3s kubectl delete httproute www-route \
-        -n www --ignore-not-found || true'
-
-    [Install]
-    WantedBy=multi-user.target
-    EOF
-  - systemctl enable external-dns-cleanup.service
-  - systemctl start external-dns-cleanup.service
 
   # Install K3s server
   - |

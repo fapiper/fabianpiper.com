@@ -17,7 +17,7 @@ terraform.rc
 # OCI & Kubernetes
 .oci/
 oci_api_key.pem
-*config
+kubeconfig
 k3s.yaml
 .kube/
 
