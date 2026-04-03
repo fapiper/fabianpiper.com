@@ -1,0 +1,21 @@
+# IMPORTANT: sync-wave must match the Deployment (wave 10).
+# K3s local-path uses WaitForFirstConsumer binding: the PVC stays Pending
+# until a Pod requests it. Keeping both in the same wave avoids deadlock.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus-data
+  namespace: prometheus
+  labels:
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/instance: prometheus
+    app.kubernetes.io/part-of: infrastructure
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+

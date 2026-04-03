@@ -48,6 +48,8 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/grafana
+            - name: datasources
+              mountPath: /etc/grafana/provisioning/datasources
           resources:
             requests:
               cpu: "100m"
@@ -73,4 +75,7 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: grafana-data
+        - name: datasources
+          configMap:
+            name: grafana-datasources
 
