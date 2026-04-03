@@ -1,3 +1,8 @@
+# IMPORTANT: sync-wave must match the Deployment (wave 20).
+# K3s local-path uses WaitForFirstConsumer binding: the PVC stays Pending
+# until a Pod requests it. If PVC is in an earlier wave, ArgoCD waits for
+# it to become Bound before starting the Deployment wave - causing a deadlock.
+# Solution: PVC and Deployment must be in the same sync wave.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
