@@ -296,7 +296,7 @@ make help                    # List all targets
 
 # Infrastructure lifecycle
 make deploy-prod             # Full bootstrap: networking→iam→vault→cluster→dns
-make plan-prod-all           # Dry-run all components
+make plan-prod               # Dry-run all components
 make plan-prod-cluster       # Dry-run cluster only
 make apply-prod-networking   # Apply networking
 make apply-prod-iam          # Apply IAM
@@ -304,7 +304,7 @@ make apply-prod-vault        # Apply vault
 make apply-prod-cluster      # Apply cluster
 make apply-prod-dns          # Apply DNS
 make destroy-prod-cluster    # Destroy cluster (careful!)
-make validate-prod-all       # terraform validate all modules
+make validate-prod           # terraform validate all modules
 
 # Secrets management
 make sops-setup              # Generate age keypair (one-time)
@@ -1046,7 +1046,7 @@ make deploy-prod
 # ArgoCD reinstalls via cloud-init, root.yaml is re-applied automatically
 
 # 4. Verify
-make plan-prod-all   # Must show: No changes
+make plan-prod   # Must show: No changes
 curl -sI https://www.fabianpiper.com | head -1   # HTTP/2 200
 ```
 
@@ -1090,8 +1090,8 @@ for m in networking iam vault cluster dns; do
   cd modules/$m && terraform init -upgrade && cd ../..
 done
 
-make plan-prod-all    # Review
-make apply-prod-all   # Apply
+make plan-prod    # Review
+make apply-prod   # Apply
 ```
 
 ### Updating K3s (In-Place)

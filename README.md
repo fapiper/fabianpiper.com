@@ -45,7 +45,6 @@
       <img src="https://img.shields.io/badge/grafana-11.6.0-2D3748?logo=grafana&logoColor=F46800&labelColor=2D3748" alt="Grafana">
     </picture>
   </a>
-  <br />
   <a href="https://www.oracle.com/cloud/free/">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/oci-free_tier-1A202C?logo=oracle&logoColor=F80000&labelColor=1A202C">
@@ -119,10 +118,9 @@ Install the following tools before beginning:
 
 ### Account Setup
 
-1. Create Oracle Cloud Infrastructure account
-2. Upgrade Free Tier to paid account for priority resource allocation (remains within Free Tier limits)
-3. Create Cloudflare account and generate API token with DNS management permissions
-4. Generate GitHub Personal Access Token with `repo` and `packages` scopes
+1. Create Oracle Cloud Infrastructure account and upgrade Free Tier to paid account for priority resource allocation (remains within Free Tier limits) ([link](https://docs.oracle.com/en-us/iaas/Content/Billing/Tasks/changingpaymentmethod.htm#To_upgrade_to_PayasYouGo))
+3. Create Cloudflare account and generate API token with DNS management permissions ([link](https://developers.cloudflare.com/fundamentals/api/get-started/create-token))
+4. Generate GitHub Personal Access Token with `repo` and `packages` scopes ([link](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-personal-access-token-classic))
 
 ### Repository Configuration
 
@@ -143,7 +141,7 @@ make setup
 Copy the example secrets files and add your credentials:
 
 ```bash
-cp secrets/prod/*.example.yaml secrets/prod/secrets.decrypted.yaml
+cp secrets/prod/secrets.example.yaml secrets/prod/secrets.decrypted.yaml
 cp secrets/prod/www.example.yaml secrets/prod/www.decrypted.yaml
 ```
 
@@ -193,9 +191,9 @@ The infrastructure consists of:
 - VCN with public (10.0.1.0/24) and private (10.0.2.0/24) subnets
 - Three ARM Ampere A1 instances running K3s
 - OCI Vault for runtime secret storage via Instance Principal
-- Cloudflare DNS — static A records provisioned by Terraform, dynamic records synced by `external-dns` from HTTPRoutes
+- Cloudflare DNS with static A records provisioned by Terraform, dynamic records synced by `external-dns` from HTTPRoutes
 - ArgoCD managing GitOps deployments
-- Prometheus + Grafana for observability (`https://glg.fabianpiper.com/grafana`)
+- Prometheus + Grafana
 
 ### Directory Structure
 
@@ -242,47 +240,6 @@ The automated deployment flow:
 
 > [!IMPORTANT]
 > Only one GitHub secret is required: `SOPS_AGE_KEY` for infrastructure modifications.
-
-## Development
-
-Start the local development server:
-
-```bash
-make dev-www
-```
-
-Build production bundle:
-
-```bash
-make build-www
-```
-
-
-## Common Operations
-
-### Infrastructure Management
-
-```bash
-make plan-prod-all             # Review planned changes for all components
-make apply-prod-networking     # Deploy VCN and subnets
-make apply-prod-iam            # Deploy IAM policies
-make apply-prod-vault          # Deploy OCI Vault
-make apply-prod-cluster        # Deploy K3s cluster
-make apply-prod-dns            # Deploy DNS records
-```
-
-### Secret Management
-
-```bash
-make sops-encrypt-prod         # Encrypt secrets before committing
-make sops-decrypt-prod         # Decrypt secrets for editing
-```
-
-### Teardown
-
-```bash
-make destroy-prod-all          # Destroy all infrastructure components
-```
 
 ## Documentation
 

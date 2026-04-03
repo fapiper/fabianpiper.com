@@ -38,19 +38,19 @@ setup:
 deploy-%:
 	@$(run_atmos) bootstrap $(get_env) all
 
-## plan-[env]-[comp/all]: terraform plan
+## plan-[env]-[comp]: terraform plan (omit comp to plan all)
 plan-%:
 	@$(run_atmos) plan $(env_app)
 
-## apply-[env]-[comp]: terraform apply
+## apply-[env]-[comp]: terraform apply (omit comp to apply all)
 apply-%:
 	@$(run_atmos) apply $(env_app)
 
-## validate-[env]-[comp/all]: static analysis
+## validate-[env]-[comp]: static analysis (omit comp to validate all)
 validate-%:
 	@$(run_atmos) validate $(env_app)
 
-## destroy-[env]-[comp]: infrastructure destruction
+## destroy-[env]-[comp]: infrastructure destruction (omit comp to destroy all)
 destroy-%:
 	@$(run_atmos) destroy $(env_app)
 
