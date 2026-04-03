@@ -1,226 +1,421 @@
 # fabianpiper.com | Agent Operations Manual
 
-Last Updated: 2026-02-13
+Last Updated: 2026-04-03
 Generated for: AI Agents
 Repository: https://github.com/fapiper/fabianpiper.com
 Validation Status: Docs reviewed, Code cross-referenced, Ready for autonomous operation
 
 ---
 
-## Project Overview
+## Table of Contents
 
-### Tech Stack
-- **IaC**: Terraform >= 1.5 + Atmos >= 0.23 (stack orchestration)
-- **Cloud Provider**: Oracle Cloud Infrastructure (OCI) Free Tier
-- **Orchestration**: K3s (lightweight Kubernetes)
-- **Application**: Astro v5.7+ (portfolio website)
-- **GitOps**: ArgoCD with ApplicationSets (auto-discovery pattern)
-- **CI/CD**: GitHub Actions
-- **Secret Management**:
-  - Development: SOPS + age encryption
-  - Runtime: OCI Vault + Instance Principal
-  - CI/CD: OIDC (no long-lived credentials)
-- **State Backend**: Local Terraform state (per-component workspaces)
-- **Container Registry**: GitHub Container Registry (ghcr.io)
-
-### Architecture Mental Model
-Terraform provisions OCI compute (3 ARM instances) → K3s runs on bare metal → ArgoCD manages deployments → GitHub Actions builds images → ArgoCD Image Updater auto-deploys. All infrastructure is declarative. Application source lives in `apps/`, K8s manifests in `kubernetes/`. Terraform state is local with workspaces. Secrets encrypted at rest with SOPS (dev) and OCI Vault (runtime).
-
-### Directory Structure
-```
-fabianpiper.com/
-├── .github/workflows/        # CI/CD pipelines
-│   └── build-and-push.yaml   # Auto-build Docker images on push to apps/
-├── apps/                     # Application source code
-│   └── www/                  # Portfolio (Astro 5.7)
-│       ├── Dockerfile
-│       ├── package.json
-│       └── src/
-├── kubernetes/               # GitOps manifests
-│   ├── bootstrap/            # ArgoCD bootstrap
-│   │   ├── root.yaml         # Single entry point (applied via cloud-init)
-│   │   ├── templates/        # ApplicationSets (auto-discover apps/infra)
-│   │   └── argocd/           # ArgoCD installation manifests
-│   ├── apps/                 # App deployments (www)
-│   └── infrastructure/       # Platform components (cert-manager, external-secrets, etc.)
-├── components/terraform/     # Atmos component wrappers (thin)
-│   ├── networking/
-│   ├── iam/
-│   ├── vault/
-
-│   └── cluster/
-├── modules/                  # Terraform modules (actual logic)
-│   ├── networking/           # VCN, subnets, security lists
-│   ├── iam/                  # Dynamic group, policies
-│   ├── vault/                # OCI Vault + secrets
-│   └── cluster/          # 3 instances (ingress, server, worker)
-│       ├── main.tf
-│       ├── user-data/        # Cloud-init templates
-│       │   ├── ingress.yaml
-│       │   ├── server.yaml   # Installs ArgoCD, applies root.yaml
-│       │   └── worker.yaml
-│       └── versions.tf
-├── stacks/                   # Atmos stack configurations
-│   ├── orgs/glg/prod/fra.yaml  # prod-fra deployment config
-│   ├── mixins/               # Reusable config snippets
-│   └── workflows/            # Multi-step workflows (plan, apply, destroy)
-│       └── cluster.yaml
-├── secrets/                  # SOPS-encrypted secrets
-│   ├── .sops.key             # Age private key (NEVER commit)
-│   └── prod/
-│       ├── secrets.yaml      # Encrypted (committed)
-│       ├── secrets.decrypted.yaml  # Plaintext (gitignored)
-│       └── .sops.yaml        # SOPS config
-├── scripts/                  # Helper scripts
-├── atmos.yaml                # Atmos configuration
-├── Makefile                  # Primary interface
-└── README.md                 # Human documentation
-```
-
-### Extension Points for Future Additions
-
-**Observability (Prometheus, Grafana, Loki)**:
-- Add manifests to `kubernetes/infrastructure/observability/`
-- Create `kustomization.yaml` in directory
-- ApplicationSet will auto-discover and deploy
-- Use namespace: `observability` (add to each manifest)
-- Configure service monitors via annotations
-
-**Utility Services (ntfy, uptime-kuma, etc.)**:
-- Add manifests to `kubernetes/infrastructure/<service-name>/`
-- Follow existing pattern (deployment.yaml, service.yaml, kustomization.yaml)
-- Use dedicated namespace per service
-- ArgoCD will auto-create Application from directory
-
-**Infrastructure Modules**:
-- Create new module in `modules/<module-name>/`
-- Create Atmos component wrapper in `components/terraform/<module-name>/`
-- Add to workflow in `stacks/workflows/cluster.yaml`
-- Reference in stack config `stacks/orgs/glg/prod/fra.yaml`
+1. [Project Overview](#1-project-overview)
+2. [Architecture](#2-architecture)
+3. [Directory Structure](#3-directory-structure)
+4. [Infrastructure Components](#4-infrastructure-components)
+5. [Setup & Deployment](#5-setup--deployment)
+6. [Code Style & Conventions](#6-code-style--conventions)
+7. [Development Workflow](#7-development-workflow)
+8. [Observability](#8-observability)
+9. [Testing](#9-testing)
+10. [Constraints & Limits](#10-constraints--limits)
+11. [Troubleshooting](#11-troubleshooting)
+12. [Emergency Procedures](#12-emergency-procedures)
+13. [Maintenance](#13-maintenance)
+14. [Agent Completion Checklist](#14-agent-completion-checklist)
+15. [Reference Links](#15-reference-links)
 
 ---
 
-## Setup Commands
+## 1. Project Overview
+
+### Tech Stack
+
+| Layer | Technology | Version |
+|-------|-----------|---------|
+| IaC | Terraform + Atmos | >= 1.5 / >= 0.23 |
+| Cloud | Oracle Cloud Infrastructure (OCI) Free Tier | eu-frankfurt-1 |
+| Orchestration | K3s (lightweight Kubernetes) | latest stable |
+| Application | Astro (portfolio website) | v5.7+ |
+| GitOps | ArgoCD + ApplicationSets | stable |
+| CI/CD | GitHub Actions | — |
+| Secret Mgmt (dev) | SOPS + age | >= 3.11 / >= 1.3 |
+| Secret Mgmt (runtime) | OCI Vault + Instance Principal | — |
+| Secret Mgmt (CI/CD) | SOPS-decrypted OCI creds | — |
+| State Backend | Local Terraform state per-component workspace | — |
+| Container Registry | GitHub Container Registry (ghcr.io) | — |
+| Ingress | Envoy Gateway (Gateway API) | — |
+| DNS | Cloudflare via external-dns | — |
+| Observability | Prometheus + Grafana | v3.3.0 / v11.6.0 |
+
+### Architecture Mental Model
+
+```
+GitHub Push → GitHub Actions (build image, push to ghcr.io)
+                    ↓
+ArgoCD Image Updater (detects :latest, writes back to git)
+                    ↓
+ArgoCD (polls git every 30s, syncs K8s manifests)
+                    ↓
+K3s cluster (3 ARM nodes on OCI)
+  ├─ Ingress node  → Envoy Gateway (hostNetwork, NodePort 80/443)
+  ├─ Server node   → K3s control plane + all infra pods
+  └─ Worker node   → App pods (www)
+
+Terraform → OCI (VCN, compute, vault, IAM)
+SOPS+age  → secrets at rest in git
+OCI Vault → secrets at runtime (Instance Principal, no API keys on nodes)
+```
+
+---
+
+## 2. Architecture
+
+### Cluster Topology
+
+| Node | Role | Private IP | OCPUs | RAM | Public |
+|------|------|-----------|-------|-----|--------|
+| ingress | NAT gateway + Envoy Gateway | 10.0.1.10 | 1 | 6 GB | Yes (reserved IP) |
+| server | K3s server (control plane + infra pods) | 10.0.2.10 | 2 | 12 GB | No |
+| worker | K3s agent (app pods) | DHCP (10.0.2.x) | 1 | 6 GB | No |
+
+### Networking
+
+- **VCN CIDR**: `10.0.0.0/16` — **do not change** (subnet math depends on it)
+- **Public subnet**: `10.0.1.0/24` (ingress node only)
+- **Private subnet**: `10.0.2.0/24` (server + worker)
+- **Pod networking**: Flannel VXLAN over UDP `8472` (must be open in OCI security lists)
+- **Ingress flow**: Internet → OCI public IP → ingress:80/443 → iptables DNAT → Envoy Gateway pod (hostNetwork) → K8s Service → Pod
+
+### ArgoCD Bootstrap Chain
+
+```
+cloud-init (server node)
+  └─ kubectl apply kubernetes/bootstrap/root.yaml
+       └─ ArgoCD Application "root"
+            └─ watches kubernetes/bootstrap/templates/*.yaml
+                 ├─ ApplicationSet "infrastructure" (discovers kubernetes/infrastructure/*)
+                 └─ ApplicationSet "apps"           (discovers kubernetes/apps/*)
+```
+
+Git polling interval: **30 seconds** (`requeueAfterSeconds: 30` in both ApplicationSets).
+
+### Sync Wave Ordering Convention
+
+ArgoCD sync waves within each Application (lower = earlier):
+
+| Wave | Typical Resources |
+|------|------------------|
+| `0` | Helm operators (cert-manager, external-secrets via HelmChart CRD) |
+| `5` | RBAC (ServiceAccount, ClusterRole, ClusterRoleBinding), ConfigMaps |
+| `10` | PVCs + Deployments (must be **same wave** for WaitForFirstConsumer), Services |
+| `12–15` | Gateway, GatewayClass, provisioned ConfigMaps needed by later waves |
+| `20` | Deployments that depend on earlier waves (e.g., Grafana needs PVC + datasource CM) |
+| `25` | HTTPRoutes, Certificates |
+
+> **K3s WaitForFirstConsumer gotcha**: `local-path` StorageClass uses `WaitForFirstConsumer` binding.
+> If a PVC is in wave N and its Deployment is in wave N+1, ArgoCD waits for the PVC to become `Bound`
+> before starting wave N+1 — but the PVC never binds until a Pod requests it → **deadlock**.
+> **Fix: always assign PVC and its Deployment the same sync wave.**
+
+---
+
+## 3. Directory Structure
+
+```
+fabianpiper.com/
+├── .github/workflows/
+│   └── build-and-push.yaml       # Builds multi-arch (amd64+arm64) images on push to apps/
+├── apps/
+│   └── www/                      # Astro 5.7 portfolio site
+│       ├── Dockerfile
+│       ├── package.json
+│       └── src/
+├── kubernetes/
+│   ├── bootstrap/
+│   │   ├── root.yaml             # Single ArgoCD Application (applied via cloud-init)
+│   │   └── templates/
+│   │       ├── infrastructure.yaml  # ApplicationSet → kubernetes/infrastructure/*
+│   │       └── apps.yaml            # ApplicationSet → kubernetes/apps/*
+│   ├── apps/
+│   │   └── www/                  # Portfolio deployment (2 replicas, :latest tag)
+│   └── infrastructure/
+│       ├── argocd-image-updater/ # Auto-updates image tags, git write-back
+│       ├── cert-manager/         # TLS via Let's Encrypt (K3s HelmChart CRD)
+│       ├── envoy-gateway/        # Gateway API ingress (hostNetwork on ingress node)
+│       ├── external-dns/         # Cloudflare DNS sync
+│       ├── external-secrets/     # OCI Vault → K8s Secrets (K3s HelmChart CRD)
+│       ├── grafana/              # Grafana 11.6.0 at /grafana, Prometheus datasource
+│       └── prometheus/           # Prometheus v3.3.0, 15d retention, K8s SD
+├── components/terraform/         # Atmos thin wrappers (no logic, just delegation)
+│   ├── cluster/
+│   ├── dns/
+│   ├── iam/
+│   ├── networking/
+│   └── vault/
+├── modules/                      # Terraform modules (all logic lives here)
+│   ├── cluster/                  # 3 ARM instances + cloud-init templates
+│   │   ├── main.tf
+│   │   ├── outputs.tf
+│   │   ├── variables.tf
+│   │   ├── versions.tf
+│   │   └── user-data/
+│   │       ├── ingress.yaml      # NAT setup, iptables rules
+│   │       ├── server.yaml       # K3s server + ArgoCD bootstrap
+│   │       └── worker.yaml       # K3s agent join
+│   ├── dns/                      # Cloudflare static A records (ingress IP bootstrap)
+│   ├── iam/                      # OCI Dynamic Group + policies (Instance Principal)
+│   ├── networking/               # VCN, subnets, internet gateway, security lists
+│   └── vault/                    # OCI Vault + initial secrets
+├── stacks/
+│   ├── catalog/                  # Per-component default var definitions
+│   ├── mixins/                   # Reusable region/stage config snippets
+│   ├── orgs/glg/prod/fra.yaml    # Production stack: glg-prod-fra
+│   └── workflows/
+│       └── cluster.yaml          # Ordered multi-step workflows (apply/plan/destroy/validate)
+├── secrets/
+│   └── prod/
+│       ├── secrets.yaml          # SOPS-encrypted (committed — safe)
+│       ├── secrets.decrypted.yaml  # Plaintext (gitignored — NEVER commit)
+│       ├── secrets.example.yaml  # Template with placeholder values
+│       ├── www.yaml              # SOPS-encrypted app secrets
+│       ├── www.decrypted.yaml    # Plaintext (gitignored)
+│       └── www.example.yaml      # Template: mixpanel_token, site_url
+├── scripts/
+│   ├── _lib.sh                   # Shared shell functions
+│   ├── atmos.sh                  # Atmos wrapper (injects env, workspace)
+│   ├── setup.sh                  # Tool validation + SOPS key generation
+│   ├── sops.sh                   # SOPS encrypt/decrypt helper
+│   └── with-secrets.sh           # Decrypts SOPS → exports TF_VARs → runs command
+├── atmos.yaml                    # Atmos config (stack paths, component base path)
+├── Makefile                      # Primary operator interface
+└── README.md                     # Human-facing documentation
+```
+
+---
+
+## 4. Infrastructure Components
+
+### Deployed Kubernetes Applications
+
+#### `kubernetes/apps/www` — Portfolio Website
+- **Image**: `ghcr.io/fapiper/fabianpiper.com/www:latest`
+- **Replicas**: 2
+- **Image updates**: ArgoCD Image Updater detects new `:latest` push → writes tag back to git → ArgoCD syncs
+- **URLs**: `https://www.fabianpiper.com`, `https://glg.fabianpiper.com`
+- **Secrets**: `regcred` (GHCR pull secret), app env vars from OCI Vault via ExternalSecret
+
+#### `kubernetes/infrastructure/cert-manager` — TLS Certificates
+- Installed via K3s `HelmChart` CRD (not ArgoCD Helm source)
+- Issues Let's Encrypt certificates for all public-facing services
+- ClusterIssuer for ACME HTTP-01 challenge
+
+#### `kubernetes/infrastructure/envoy-gateway` — Ingress
+- GatewayClass `eg`, Gateway `public-gateway` in namespace `envoy-gateway-system`
+- Envoy pods: `hostNetwork: true`, NodeSelector `role: ingress`
+- Listens on ports 80 (HTTP) and 443 (HTTPS)
+- All HTTPRoutes attach to `public-gateway`
+
+#### `kubernetes/infrastructure/external-dns` — DNS Automation
+- Syncs Cloudflare DNS records **dynamically** from HTTPRoutes and annotated Services
+- Cloudflare API token sourced from OCI Vault
+- Runs continuously in-cluster; reconciles on every change to HTTPRoute or Service resources
+
+> **DNS layering**: Two independent mechanisms manage Cloudflare DNS.
+> `modules/dns` (Terraform) creates the **static bootstrap A records** (`www.fabianpiper.com`, `glg.fabianpiper.com` → ingress IP) as a one-time provisioning step.
+> `external-dns` (K8s) manages **dynamic records** derived from Gateway API HTTPRoutes at runtime.
+> Both write to the same Cloudflare zone; Terraform records are stable and rarely change, while `external-dns` keeps route-level records in sync.
+
+#### `kubernetes/infrastructure/external-secrets` — Secret Sync
+- Installed via K3s `HelmChart` CRD
+- `ClusterSecretStore` authenticates to OCI Vault via **Instance Principal** (no static credentials)
+- `ExternalSecret` → creates K8s `Secret` by referencing OCI Vault secret names
+
+#### `kubernetes/infrastructure/argocd-image-updater` — Image Automation
+- Polls GHCR for new `:latest` tags on the `www` image
+- Write-back: `git` method using `argocd/argocd-image-updater-github-creds` secret
+- Update strategy: `latest`, tag filter `regexp:^latest$`
+
+#### `kubernetes/infrastructure/grafana` — Metrics Dashboard
+- **Image**: `grafana/grafana:11.6.0`
+- **URL**: `https://glg.fabianpiper.com/grafana`
+- **Admin credentials**: OCI Vault → ExternalSecret → `grafana-admin` K8s Secret
+- **Datasource**: Prometheus, auto-provisioned via ConfigMap at `/etc/grafana/provisioning/datasources/`
+- **Storage**: 2 Gi PVC `grafana-data` (K3s local-path)
+- **Sync waves**: PVC + Deployment wave `20`, datasource ConfigMap wave `15`, HTTPRoute wave `25`
+
+#### `kubernetes/infrastructure/prometheus` — Metrics Collection
+- **Image**: `prom/prometheus:v3.3.0`
+- **Retention**: 15 days
+- **Storage**: 5 Gi PVC `prometheus-data` (K3s local-path)
+- **Access**: ClusterIP only — `prometheus.prometheus.svc.cluster.local:9090` (no public route)
+- **RBAC**: ClusterRole with read on nodes, pods, services, endpoints, namespaces
+- **Sync waves**: RBAC + ConfigMap wave `5`, PVC + Deployment + Service wave `10`
+- **Auto-instrumentation**: Pods annotated with `prometheus.io/scrape: "true"` are auto-discovered
+
+### OCI Vault Secrets (Runtime)
+
+| Secret Name | Consumer | Description |
+|-------------|----------|-------------|
+| `git-pat` | argocd-image-updater | GitHub PAT for GHCR read + git write-back |
+| `git-username` | argocd-image-updater | GitHub username |
+| `site-url` | www app | Public site URL |
+| `mixpanel-token` | www app | Analytics token (optional) |
+| `grafana-admin-password` | grafana | Grafana admin password |
+
+---
+
+## 5. Setup & Deployment
 
 ### Prerequisites
+
 ```bash
-# Verify CLI tools (exact versions required)
+# Verify required CLI tools
 terraform version    # Must be >= 1.5
 atmos version        # Must be >= 0.23
 sops --version       # Must be >= 3.11
 age --version        # Must be >= 1.3
-bun --version        # Must be >= 1.3
-oci --version        # OCI CLI installed and configured
+bun --version        # Must be >= 1.3 (apps/www only)
+oci --version        # OCI CLI
 
 # Install missing tools
-# Terraform: https://developer.hashicorp.com/terraform/install
-# Atmos: brew install atmos (macOS) or go install github.com/cloudposse/atmos/cmd/atmos@latest
-# SOPS: brew install sops or download from https://github.com/mozilla/sops/releases
-# age: brew install age or download from https://github.com/FiloSottile/age/releases
-# Bun: curl -fsSL https://bun.sh/install | bash
-# OCI CLI: bash -c "$(curl -L https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh)"
+# Terraform:  https://developer.hashicorp.com/terraform/install
+# Atmos:      brew install atmos  OR  go install github.com/cloudposse/atmos/cmd/atmos@latest
+# SOPS:       brew install sops   OR  https://github.com/mozilla/sops/releases
+# age:        brew install age    OR  https://github.com/FiloSottile/age/releases
+# Bun:        curl -fsSL https://bun.sh/install | bash
+# OCI CLI:    bash -c "$(curl -L https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh)"
+```
+
+### Makefile Interface
+
+All operations go through `make`. Pattern: `<action>-<env>[-<component>]`
+
+```bash
+make help                    # List all targets
+
+# Infrastructure lifecycle
+make deploy-prod             # Full bootstrap: networking→iam→vault→cluster→dns
+make plan-prod-all           # Dry-run all components
+make plan-prod-cluster       # Dry-run cluster only
+make apply-prod-networking   # Apply networking
+make apply-prod-iam          # Apply IAM
+make apply-prod-vault        # Apply vault
+make apply-prod-cluster      # Apply cluster
+make apply-prod-dns          # Apply DNS
+make destroy-prod-cluster    # Destroy cluster (careful!)
+make validate-prod-all       # terraform validate all modules
+
+# Secrets management
+make sops-setup              # Generate age keypair (one-time)
+make sops-init-prod          # Create secrets/prod/.sops.yaml
+make sops-encrypt-prod       # Encrypt *.decrypted.yaml → *.yaml
+make sops-decrypt-prod       # Decrypt *.yaml → *.decrypted.yaml
+
+# Application
+make dev-www                 # Local Astro dev server
+make build-www               # Production build locally
 ```
 
 ### Initial Deployment
+
 ```bash
-# 1. Clone repository
+# 1. Clone
 git clone https://github.com/fapiper/fabianpiper.com.git
 cd fabianpiper.com
 
-# 2. Initialize SOPS encryption
+# 2. Generate SOPS age key (one-time)
 make setup
-# Output: Creates secrets/.sops.key (age keypair)
-# Output: Creates secrets/prod/.sops.yaml (SOPS config)
+# Creates: secrets/.sops.key  ← NEVER COMMIT THIS FILE
+# Creates: secrets/prod/.sops.yaml
 
-# 3. Configure secrets
+# 3. Configure infrastructure secrets
 cp secrets/prod/secrets.example.yaml secrets/prod/secrets.decrypted.yaml
-# Edit secrets/prod/secrets.decrypted.yaml with your actual values:
-# - TF_VAR_user_ocid: Your OCI user OCID
-# - TF_VAR_tenancy_ocid: Your OCI tenancy OCID
-# - TF_VAR_compartment_ocid: Your OCI compartment OCID
-# - TF_VAR_fingerprint: Your OCI API key fingerprint
-# - TF_VAR_private_key_content: Your OCI API private key (multiline)
-# - TF_VAR_region: OCI region (e.g., eu-frankfurt-1)
-# - TF_VAR_ssh_public_key_path: Path to SSH public key for instance access
-# - TF_VAR_git_pat: GitHub Personal Access Token (repo + packages)
-# - TF_VAR_git_username: Your GitHub username
-# - TF_VAR_git_repo_url: https://github.com/fapiper/fabianpiper.com.git
-# - TF_VAR_cloudflare_api_token: Cloudflare API token
-# - TF_VAR_k3s_token: Generate with: uuidgen
-# - TF_VAR_site_url: https://www.fabianpiper.com
-# - TF_VAR_mixpanel_token: Mixpanel project token (optional)
+# Edit — required values:
+#   TF_VAR_user_ocid               OCI user OCID
+#   TF_VAR_tenancy_ocid            OCI tenancy OCID
+#   TF_VAR_compartment_ocid        OCI compartment OCID
+#   TF_VAR_fingerprint             OCI API key fingerprint
+#   TF_VAR_private_key_content     OCI API private key (PEM, multiline)
+#   TF_VAR_private_key_path        ~/.oci/oci_api_key.pem
+#   TF_VAR_region                  e.g. eu-frankfurt-1
+#   TF_VAR_ssh_public_key_path     ~/.ssh/id_rsa.pub
+#   TF_VAR_git_pat                 GitHub PAT (repo + packages scopes)
+#   TF_VAR_git_username            GitHub username
+#   TF_VAR_git_email               GitHub email
+#   TF_VAR_git_repo_url            https://github.com/fapiper/fabianpiper.com.git
+#   TF_VAR_cloudflare_api_token    Cloudflare API token (Zone:DNS:Edit)
+#   TF_VAR_k3s_token               Cluster join token — generate with: uuidgen
+#   TF_VAR_grafana_admin_password  Grafana admin password
 
-# 4. Encrypt secrets
+# 4. Configure application secrets
+cp secrets/prod/www.example.yaml secrets/prod/www.decrypted.yaml
+# Edit:
+#   TF_VAR_mixpanel_token  Mixpanel project token (or "disabled")
+#   TF_VAR_site_url        https://www.fabianpiper.com
+
+# 5. Encrypt
 make sops-encrypt-prod
-# Output: Creates secrets/prod/secrets.yaml (encrypted, safe to commit)
+# Creates: secrets/prod/secrets.yaml + secrets/prod/www.yaml (safe to commit)
 
-# 5. Add Age key to GitHub Secrets (required for CI/CD)
+# 6. Add age key to GitHub Actions secrets
 cat secrets/.sops.key
-# Copy the entire output including "AGE-SECRET-KEY-..."
-# Navigate to: https://github.com/fapiper/fabianpiper.com/settings/secrets/actions
-# Create new secret: SOPS_AGE_KEY
-# Paste the age key
+# Navigate: https://github.com/fapiper/fabianpiper.com/settings/secrets/actions
+# Create secret: SOPS_AGE_KEY  (paste full output including "AGE-SECRET-KEY-...")
 
-# 6. Deploy infrastructure (15-20 minutes total)
+# 7. Deploy (~15–20 min)
 make deploy-prod
-# This runs: atmos workflow apply -s glg-prod-fra
-# Order: networking → iam → vault → cluster
-# Output: Terraform will create VCN, instances, vault, and K3s cluster
-# ArgoCD is installed automatically via cloud-init on server instance
+# Order: networking → iam → vault → cluster → dns
+# cloud-init on server node installs K3s, ArgoCD, and applies root.yaml automatically
 ```
 
 ### Verify Deployment
+
 ```bash
-# 1. Get ingress public IP (from Terraform outputs or OCI console)
-# Run: make plan-prod-cluster | grep ingress_public_ip
+INGRESS_IP="<your-ingress-public-ip>"
 
-# 2. SSH to ingress instance (test connectivity)
-ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_PUBLIC_IP>
+# Get ingress IP from Terraform outputs
+make plan-prod-cluster 2>&1 | grep ingress_public_ip
 
-# 3. Access server instance through ingress (private subnet)
-ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_PUBLIC_IP> 'ssh ubuntu@10.0.2.10 hostname'
-# Output: server
+# SSH connectivity
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP 'echo ok'
 
-# 4. Check ArgoCD is running
-ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_PUBLIC_IP> \
+# Private subnet access via jump host
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP 'ssh ubuntu@10.0.2.10 hostname'
+# Expected: server
+
+# Cluster nodes
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 sudo kubectl get nodes -o wide'
+# Expected: 3 nodes, all Ready
+
+# ArgoCD pods
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
   'ssh ubuntu@10.0.2.10 sudo kubectl get pods -n argocd'
-# All pods should be Running
 
-# 5. Get ArgoCD admin password
-ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_PUBLIC_IP> \
-  'ssh ubuntu@10.0.2.10 sudo kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d'
+# ArgoCD admin password
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 sudo kubectl -n argocd get secret argocd-initial-admin-secret \
+   -o jsonpath="{.data.password}" | base64 -d && echo'
 
-# 6. Port-forward to ArgoCD UI
-ssh -i ~/.ssh/id_rsa -L 8080:10.0.2.10:80 ubuntu@<INGRESS_PUBLIC_IP>
-# Open browser: http://localhost:8080
-# Login: admin / <password from step 5>
+# ArgoCD UI (port-forward to http://localhost:8080)
+ssh -i ~/.ssh/id_rsa -L 8080:10.0.2.10:80 ubuntu@$INGRESS_IP -N &
+
+# Public endpoints
+curl -sI https://www.fabianpiper.com         | head -1  # HTTP/2 200
+curl -sI https://glg.fabianpiper.com/grafana | head -1  # HTTP/2 302
 ```
 
-### Daily Operations
+### Local kubectl Access
+
 ```bash
-# Check infrastructure status
-make plan-prod-all
-# Output: Shows drift for all components
+INGRESS_IP="<your-ingress-public-ip>"
 
-# View application logs (requires kubectl access via SSH)
-ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_PUBLIC_IP> \
-  'ssh ubuntu@10.0.2.10 sudo kubectl logs -n www deployment/www -f'
-
-# Update application (automatic via CI/CD)
-# 1. Make changes to apps/www/
-# 2. Commit and push to main branch
-# 3. GitHub Actions builds and pushes image to GHCR
-# 4. ArgoCD Image Updater detects new image (~2 min)
-# 5. ArgoCD syncs deployment (~30 sec)
-
-# Manual application update (if CI/CD not working)
-ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_PUBLIC_IP> \
-  'ssh ubuntu@10.0.2.10 sudo kubectl rollout restart deployment/www -n www'
-
-# Access cluster via kubectl (get kubeconfig)
-ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_PUBLIC_IP> \
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
   'ssh ubuntu@10.0.2.10 sudo cat /etc/rancher/k3s/k3s.yaml' > kubeconfig-prod.yaml
-# Edit kubeconfig-prod.yaml: Replace 127.0.0.1 with <INGRESS_PUBLIC_IP>
+
+sed -i "s/127.0.0.1/$INGRESS_IP/" kubeconfig-prod.yaml
+
 export KUBECONFIG=./kubeconfig-prod.yaml
 kubectl get nodes
 kubectl get pods -A
@@ -228,49 +423,39 @@ kubectl get pods -A
 
 ---
 
-## Code Style
+## 6. Code Style & Conventions
 
-### Terraform Conventions
-- **Formatting**: Run `terraform fmt -recursive` before every commit (enforced)
-- **Validation**: Run `terraform validate` in each module directory before commit
+### Terraform
+
+- **Format**: `terraform fmt -recursive` before every commit
+- **Validate**: `terraform validate` in each changed module directory
 - **Naming**:
   - Resources: `<provider>_<resource_type>.<descriptive_name>` (e.g., `oci_core_vcn.default`)
-  - Variables: snake_case (e.g., `compartment_ocid`, `vcn_cidr_blocks`)
-  - Modules: kebab-case directory names (e.g., `cluster`, `networking`)
-- **Module Structure**: Each module must have:
-  - `main.tf` (resources)
-  - `variables.tf` (inputs with descriptions and types)
-  - `outputs.tf` (outputs with descriptions)
-  - `versions.tf` (required_version and required_providers)
-  - Optional: `data.tf` (data sources), `locals.tf` (local values)
-- **Variables**:
-  - All variables must have `type` and `description`
-  - Use `default = null` for optional variables
-  - Use `validation` blocks for complex constraints
-- **Sensitive Data**:
-  - NEVER commit `.tfstate` files
-  - NEVER commit `.tfvars` files with real values
-  - Mark sensitive outputs with `sensitive = true`
-  - Use OCI Vault for runtime secrets
+  - Variables: `snake_case`
+  - Module directories: `kebab-case`
+- **Module structure** (all four files are mandatory):
+  ```
+  main.tf       # All resources
+  variables.tf  # All inputs — type + description required on every variable
+  outputs.tf    # All outputs — description required; sensitive = true where applicable
+  versions.tf   # required_version + required_providers with pinned version constraints
+  ```
+  Optional: `data.tf`, `locals.tf`
+- **Variables**: `default = null` for optional; `validation` blocks for constrained inputs
+- **Never commit**: `.tfstate`, `.tfvars` containing real values, `*.decrypted.*`
 
-### Kubernetes Manifest Conventions
-- **File Organization**: One manifest type per file
-  - `deployment.yaml`, `service.yaml`, `httproute.yaml`, `certificate.yaml`
-  - Group related resources in same directory
-  - Use `kustomization.yaml` to reference all resources
-- **Naming**: Resources named `<app-name>` (e.g., `www`, `cert-manager`)
-- **Labels**: Required labels on ALL resources:
+### Kubernetes Manifests
+
+- **One resource type per file**: `deployment.yaml`, `service.yaml`, `httproute.yaml`, etc.
+- **Every directory must have `kustomization.yaml`** listing all resources
+- **Required labels on ALL resources**:
   ```yaml
   labels:
     app.kubernetes.io/name: <app-name>
     app.kubernetes.io/instance: <app-name>
-    app.kubernetes.io/part-of: <system-name>  # e.g., "portfolio", "infrastructure"
+    app.kubernetes.io/part-of: infrastructure   # or "portfolio"
   ```
-- **Namespaces**:
-  - Apps: Use namespace matching directory name (e.g., `www`, `blog`)
-  - Infrastructure: Use component namespace (e.g., `cert-manager`, `external-secrets`)
-  - ArgoCD itself: `argocd` namespace
-- **Resource Limits**: ALWAYS define for all containers:
+- **Required resource limits on ALL containers**:
   ```yaml
   resources:
     requests:
@@ -280,700 +465,711 @@ kubectl get pods -A
       cpu: "500m"
       memory: "512Mi"
   ```
-- **Image Tags**: Use digest-based tags (auto-updated by ArgoCD Image Updater)
-  ```yaml
-  image: ghcr.io/fapiper/fabianpiper.com/www:main@sha256:abc123...
-  ```
+  Check OCI free tier headroom (§10) before setting limits for new services.
+- **Sync waves**: Annotate with `argocd.argoproj.io/sync-wave: "<N>"`. Follow the table in §2.
+  **PVC and Deployment must always share the same sync wave.**
+- **Namespaces**: Directory name == namespace (apps and infrastructure components both).
+- **Image tags**: App images use `:latest` (managed by ArgoCD Image Updater). Infrastructure images use explicit pinned version tags.
 
-### Shell Script Conventions
-- **Shebang**: Always use `#!/usr/bin/env bash` (portability)
-- **Error Handling**: Start every script with `set -euo pipefail`
-  - `-e`: Exit on error
-  - `-u`: Exit on undefined variable
-  - `-o pipefail`: Pipe failures propagate
-- **Linting**: Run `shellcheck <script>` before commit (if installed)
-- **Naming**: Use kebab-case for script files (e.g., `setup-cluster.sh`)
+### Shell Scripts
 
-### Makefile Conventions
-- **Targets**: Use `-` separator for multi-word targets (e.g., `plan-prod-all`)
-- **Pattern**: `<action>-<env>-<component>` (e.g., `apply-prod-networking`)
-- **PHONY**: Mark all non-file targets as `.PHONY`
-- **Documentation**: Add `## <target>: <description>` comments above targets
-- **Errors**: Use `>&2 echo "error message"` for error output
-- **Conditionals**: Prefer `[ condition ]` over `test condition`
+- **Shebang**: `#!/usr/bin/env bash`
+- **Error handling**: `set -euo pipefail` at top of every script
+- **Filenames**: `kebab-case.sh`
+- **Lint**: `shellcheck <script>` before commit
+
+### Git Commits
+
+Conventional Commits: `<type>(<scope>): <description>`
+
+| Type | When |
+|------|------|
+| `feat` | New feature or component |
+| `fix` | Bug fix |
+| `chore` | Maintenance (deps, formatting) |
+| `docs` | Documentation only |
+| `refactor` | Restructuring without behavior change |
+| `ci` | GitHub Actions changes |
+
+Examples: `feat(k8s): add prometheus`, `fix(grafana): correct datasource url`, `docs: update AGENTS.md`
 
 ---
 
-## Testing Instructions
+## 7. Development Workflow
 
-### Terraform Validation
+### Application Changes (apps/www)
+
 ```bash
-# Before committing Terraform changes:
-
-# 1. Format all files
-terraform fmt -recursive
-# Output: Lists modified files
-
-# 2. Validate syntax (run in each module directory)
-cd modules/networking
-terraform validate
-cd ../iam
-terraform validate
-cd ../vault
-terraform validate
-cd ../cluster
-terraform validate
-cd ../..
-
-# 3. Ensure plan succeeds
-make plan-prod-all
-# Review output for any unexpected changes
-
-# 4. Check for security issues (if tfsec installed)
-tfsec .
-# Address any HIGH or CRITICAL findings
-```
-
-### Kubernetes Manifest Validation
-```bash
-# Before applying manifests:
-
-# 1. Client-side dry-run (syntax check)
-kubectl apply --dry-run=client -f kubernetes/apps/www/
-# Output: Should show "created (dry run)" for each resource
-
-# 2. Server-side dry-run (admission control check)
-# Requires cluster access via SSH
-ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_IP> \
-  'ssh ubuntu@10.0.2.10 sudo kubectl apply --dry-run=server -f -' < kubernetes/apps/www/deployment.yaml
-
-# 3. Kustomize build (if using kustomize)
-kubectl kustomize kubernetes/apps/www/
-# Output: Complete manifest YAML
-
-# 4. YAML linting (if yamllint installed)
-yamllint kubernetes/
-# Address any errors
-```
-
-### Application Testing
-```bash
-# Local development testing (before pushing)
-
-# 1. Install dependencies
 cd apps/www
 bun install
+bun run dev            # http://localhost:4321
 
-# 2. Run type checking
-bun run astro check
-# Output: Should report 0 errors
+# Validate before push
+bun run astro check    # Must report 0 errors
+bun run build          # Production build — must exit 0
+bun run preview        # Smoke-test prod build at http://localhost:4321
 
-# 3. Build production bundle
-bun run build
-# Output: dist/ directory created
-
-# 4. Preview production build
-bun run preview
-# Open: http://localhost:4321
-# Verify site loads and functions correctly
-
-# 5. Check for bundle size issues
-ls -lh dist/
-# Ensure no single file > 5MB
-```
-
-### Integration Testing
-```bash
-# End-to-end CI/CD test
-
-# 1. Make trivial change to www app
-echo "# Test CI/CD" >> apps/www/README.md
-git add apps/www/README.md
-git commit -m "test: verify CI/CD pipeline"
+# Deploy — just push to main
+git add apps/www/
+git commit -m "feat(www): <description>"
 git push origin main
-
-# 2. Monitor GitHub Actions
-# Visit: https://github.com/fapiper/fabianpiper.com/actions
-# Ensure workflow runs and succeeds
-
-# 3. Wait for image update (~2 minutes)
-ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_IP> \
-  'ssh ubuntu@10.0.2.10 sudo kubectl get application www -n argocd -o yaml' | grep image:
-# Verify image digest updated
-
-# 4. Verify deployment
-ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_IP> \
-  'ssh ubuntu@10.0.2.10 sudo kubectl rollout status deployment/www -n www'
-# Output: successfully rolled out
-
-# 5. Test website accessibility
-curl -I https://www.fabianpiper.com
-# Output: HTTP/2 200 OK
+# → GitHub Actions builds linux/amd64 + linux/arm64
+# → Pushes ghcr.io/fapiper/fabianpiper.com/www:latest and www:<sha>
+# → ArgoCD Image Updater detects :latest (~2 min), writes tag back to git
+# → ArgoCD syncs deployment (~30 sec)
 ```
 
----
+### Infrastructure Changes
 
-## Development Workflow
-
-### Making Infrastructure Changes
 ```bash
-# 1. Create feature branch
-git checkout -b feat/add-monitoring
-
-# 2. Edit Terraform files
-vim modules/cluster/main.tf
-
-# 3. Format code
+# Edit modules/<module>/
 terraform fmt -recursive
+cd modules/<module> && terraform validate && cd ../..
 
-# 4. Validate changes
-cd modules/cluster
-terraform validate
-cd ../..
+make plan-prod-<component>    # Review diff carefully
+make apply-prod-<component>
 
-# 5. Plan changes (review carefully!)
-make plan-prod-cluster
-# Read output, ensure changes are expected
+# Verify
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 sudo kubectl get nodes'
 
-# 6. Commit with descriptive message
-git add modules/cluster/
-git commit -m "feat(k3s): increase worker memory to 8GB"
-
-# 7. Apply in production (after review)
-make apply-prod-cluster
-
-# 8. Verify changes
-ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_IP> \
-  'ssh ubuntu@10.0.2.10 sudo kubectl get nodes -o wide'
-
-# 9. Update AGENTS.md if commands/structure changed
-vim AGENTS.md
-git add AGENTS.md
-git commit -m "docs: update AGENTS.md for memory increase"
+git add modules/<module>/
+git commit -m "feat(<module>): <description>"
 ```
 
-### Adding New K8s Resources
+### Adding a New Kubernetes Service
+
 ```bash
-# Example: Adding Prometheus
+# 1. Create directory (name = ArgoCD app name = namespace)
+mkdir -p kubernetes/infrastructure/<service-name>
 
-# 1. Create directory
-mkdir -p kubernetes/infrastructure/prometheus
+# 2. Create required files:
+#    namespace.yaml, deployment.yaml, service.yaml, kustomization.yaml
+#    Optional: httproute.yaml, external-secret.yaml, pvc.yaml
 
-# 2. Create manifests
-cat > kubernetes/infrastructure/prometheus/namespace.yaml <<EOF
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: prometheus
-EOF
+# 3. Validate locally
+kubectl kustomize kubernetes/infrastructure/<service-name>/
 
-cat > kubernetes/infrastructure/prometheus/deployment.yaml <<EOF
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: prometheus
-  namespace: prometheus
-  labels:
-    app.kubernetes.io/name: prometheus
-    app.kubernetes.io/instance: prometheus
-    app.kubernetes.io/part-of: observability
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: prometheus
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/name: prometheus
-    spec:
-      containers:
-      - name: prometheus
-        image: prom/prometheus:v2.45.0
-        ports:
-        - containerPort: 9090
-        resources:
-          requests:
-            cpu: "200m"
-            memory: "512Mi"
-          limits:
-            cpu: "1000m"
-            memory: "2Gi"
-EOF
-
-cat > kubernetes/infrastructure/prometheus/kustomization.yaml <<EOF
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-resources:
-  - namespace.yaml
-  - deployment.yaml
-EOF
-
-# 3. Test locally
-kubectl kustomize kubernetes/infrastructure/prometheus/
-
-# 4. Commit
-git add kubernetes/infrastructure/prometheus/
-git commit -m "feat(prometheus): add Prometheus deployment"
+# 4. Commit and push
+git add kubernetes/infrastructure/<service-name>/
+git commit -m "feat(k8s): add <service-name>"
 git push origin main
 
-# 5. Verify ArgoCD auto-discovers
-# Wait ~60 seconds, then check
-ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_IP> \
-  'ssh ubuntu@10.0.2.10 sudo kubectl get application -n argocd'
-# Should show new "prometheus" application
+# 5. Trigger immediate ArgoCD discovery
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 sudo kubectl annotate applicationset infrastructure \
+   -n argocd argocd.argoproj.io/refresh=normal --overwrite'
 
-# 6. Verify deployment
-ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_IP> \
-  'ssh ubuntu@10.0.2.10 sudo kubectl get pods -n prometheus'
-# Should show prometheus pod Running
+# 6. Monitor
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 sudo kubectl get applications -n argocd -w'
 ```
 
-### Extending with New Tools
-**For observability tools (Prometheus, Grafana, Loki, etc.)**:
-- Add manifests to `kubernetes/infrastructure/<tool-name>/`
-- Use namespace: `<tool-name>` or `observability` (consistent choice)
-- Create `kustomization.yaml` referencing all resources
-- ApplicationSet auto-discovers within ~60 seconds
-- Configure service monitors via annotations or separate CRDs
+### Forcing Immediate ArgoCD Sync
 
-**For utility services (ntfy, uptime-kuma, etc.)**:
-- Add manifests to `kubernetes/infrastructure/<service-name>/`
-- Follow same label/annotation patterns as existing services
-- Use dedicated namespace per service
-- Document any external dependencies in nested README.md
+```bash
+# Re-discover all directories (ApplicationSet level)
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 sudo kubectl annotate applicationset infrastructure \
+   -n argocd argocd.argoproj.io/refresh=normal --overwrite'
 
-**For new Terraform modules**:
-- Create module in `modules/<module-name>/`
-- Add component wrapper in `components/terraform/<module-name>/`
-- Update `stacks/workflows/cluster.yaml` to include in workflow
-- Reference in `stacks/orgs/glg/prod/fra.yaml` if component-specific vars needed
+# Refresh a specific Application
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 sudo kubectl annotate application <app-name> \
+   -n argocd argocd.argoproj.io/refresh=normal --overwrite'
+
+# Hard refresh (clears cache, re-evaluates from scratch)
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 sudo kubectl annotate application <app-name> \
+   -n argocd argocd.argoproj.io/refresh=hard --overwrite'
+```
+
+### Adding New Terraform Modules
+
+```bash
+# 1. Create module
+mkdir -p modules/<module-name>
+touch modules/<module-name>/{main.tf,variables.tf,outputs.tf,versions.tf}
+
+# 2. Create Atmos component wrapper (copy from existing, e.g. components/terraform/cluster/)
+mkdir -p components/terraform/<module-name>
+
+# 3. Add to stacks/workflows/cluster.yaml (correct position in apply/plan/destroy/validate)
+
+# 4. Reference in stacks/orgs/glg/prod/fra.yaml if component-specific vars needed
+```
 
 ---
 
-## Constraints and Requirements
+## 8. Observability
 
-### OCI Free Tier Limits - CRITICAL
+### Grafana
 
-**NEVER exceed these limits to avoid charges**:
+- **URL**: `https://glg.fabianpiper.com/grafana`
+- **Login**: username `admin`, password from OCI Vault (`grafana-admin-password`)
+- **Datasource**: Prometheus — pre-provisioned via ConfigMap, no manual setup required
+- **Internal URL**: `http://grafana.grafana.svc.cluster.local:3000`
 
-| Resource | Free Tier Limit | Current Usage | Headroom |
-|----------|----------------|---------------|----------|
-| Compute (ARM) | 4 OCPUs, 24 GB RAM | 4 OCPUs, 24 GB RAM | 0 |
-| Block Storage | 200 GB total | ~120 GB (3 boot volumes) | 80 GB |
-| VCN | 2 VCNs | 1 VCN | 1 VCN |
-| Public IPs | 2 reserved IPs | 1 IP | 1 IP |
-| Load Balancer | 1 flexible LB (10 Mbps) | 0 (using NAT instance) | 1 LB |
-| Vault | Unlimited secrets | 1 vault, 4 secrets | Unlimited |
+**Local port-forward**:
+```bash
+# Start kubectl port-forward on server
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 "sudo kubectl port-forward svc/grafana 3000:3000 -n grafana &>/dev/null &"'
+# Tunnel through ingress
+ssh -i ~/.ssh/id_rsa -L 3000:10.0.2.10:3000 ubuntu@$INGRESS_IP -N &
+# Open: http://localhost:3000/grafana
+```
+
+### Prometheus
+
+- **Internal URL**: `http://prometheus.prometheus.svc.cluster.local:9090`
+- **No public HTTPRoute** — intentionally internal-only, accessible via Grafana datasource
+
+**Local port-forward**:
+```bash
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 "sudo kubectl port-forward svc/prometheus 9090:9090 -n prometheus &>/dev/null &"'
+ssh -i ~/.ssh/id_rsa -L 9090:10.0.2.10:9090 ubuntu@$INGRESS_IP -N &
+# Open: http://localhost:9090
+```
+
+**Verify targets are healthy** (after port-forward):
+```bash
+curl -s http://localhost:9090/api/v1/targets | \
+  jq '.data.activeTargets[] | {job: .labels.job, health: .health, error: .lastError}'
+# All entries should show "health": "up"
+```
+
+**Active scrape jobs**:
+
+| Job | Target | Auth |
+|-----|--------|------|
+| `prometheus` | Prometheus itself | None (localhost) |
+| `kubernetes-apiservers` | K8s API server | HTTPS + bearer token |
+| `kubernetes-nodes` | kubelet on each node | HTTPS + bearer token |
+| `kubernetes-cadvisor` | cAdvisor on each node | HTTPS + bearer token |
+| `kubernetes-pods` | Pods with scrape annotation | HTTP |
+| `kubernetes-service-endpoints` | Services with scrape annotation | HTTP |
+
+### Instrumenting Pods
+
+Add annotations to any pod template `spec.template.metadata.annotations`:
+
+```yaml
+annotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8080"      # Port exposing /metrics
+  prometheus.io/path: "/metrics"  # Optional, default: /metrics
+```
+
+### Recommended Grafana Dashboard Imports
+
+| Dashboard | Grafana ID | What it shows |
+|-----------|-----------|---------------|
+| Kubernetes cluster overview | `3119` | Node CPU / RAM / disk |
+| Kubernetes pod resources | `6417` | Per-pod resource usage |
+| Prometheus stats | `2` | Prometheus self-monitoring |
+
+Import: Grafana UI → Dashboards → New → Import → enter ID.
+
+---
+
+## 9. Testing
+
+### Pre-commit Checklist
+
+```bash
+# Terraform (run after any .tf change)
+terraform fmt -recursive
+cd modules/<changed>/ && terraform validate && cd ../..
+
+# Kubernetes manifests (run after any .yaml change)
+kubectl kustomize kubernetes/infrastructure/<changed>/
+kubectl kustomize kubernetes/apps/<changed>/
+
+# Secret audit — must produce ZERO output
+git grep -iE '(password|secret|token|private_key)\s*[:=]\s*[^$\{T]' \
+  -- '*.tf' '*.yaml' '*.yml' '*.sh' \
+  | grep -v 'TF_VAR' | grep -v 'secretKeyRef' | grep -v 'example' \
+  | grep -v 'argocd.argoproj.io'
+
+# Application (when apps/www changed)
+cd apps/www
+bun run astro check    # 0 type errors
+bun run build          # exits 0
+```
+
+### Kubernetes Dry-run
+
+```bash
+# Client-side (no cluster required)
+kubectl apply --dry-run=client -f kubernetes/infrastructure/<dir>/
+
+# Server-side (admission webhook validation, requires cluster)
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 sudo kubectl apply --dry-run=server -f -' \
+  < kubernetes/infrastructure/<dir>/deployment.yaml
+```
+
+### End-to-End CI/CD Smoke Test
+
+```bash
+# 1. Trigger
+echo "# smoke-test-$(date +%s)" >> apps/www/README.md
+git add apps/www/README.md
+git commit -m "test: CI/CD smoke test"
+git push origin main
+
+# 2. Watch build
+# https://github.com/fapiper/fabianpiper.com/actions
+
+# 3. Watch image updater (~2 min after image push)
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 sudo kubectl logs deploy/argocd-image-updater \
+   -n argocd --tail=20 -f'
+
+# 4. Verify rollout
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 sudo kubectl rollout status deployment/www -n www'
+# Expected: successfully rolled out
+
+# 5. Smoke test
+curl -sI https://www.fabianpiper.com | head -1
+# Expected: HTTP/2 200
+```
+
+---
+
+## 10. Constraints & Limits
+
+### OCI Free Tier — CRITICAL: Never Exceed
+
+| Resource | Limit | Current Usage | Headroom |
+|----------|-------|---------------|----------|
+| Compute — OCPUs (ARM) | 4 | 4 | **0 — cannot add nodes** |
+| Compute — RAM | 24 GB | 24 GB | **0** |
+| Block Storage | 200 GB | ~127 GB (~120 GB boot vols + 7 Gi PVCs) | ~73 GB |
+| VCNs | 2 | 1 | 1 |
+| Reserved Public IPs | 2 | 1 | 1 |
+| Flexible Load Balancers | 1 | 0 (using NAT instance) | 1 |
+| OCI Vault secrets | Unlimited | 1 vault, 5 secrets | Unlimited |
 | Object Storage | 20 GB | 0 GB | 20 GB |
 
-**Before provisioning new resources**:
-1. Calculate OCPU and RAM impact
-2. Check block storage consumption: `oci bv volume list --all`
-3. Verify fits within limits
-4. If limits exceeded, consider: reducing existing resources, using external services, or upgrading to paid tier
+**ARM Instance Sizing** (100% utilized — cannot add nodes):
 
-**ARM Instance Sizing**:
-- Minimum per instance: 1 OCPU, 1 GB RAM
-- Granularity: 1 OCPU increments, 1 GB RAM increments
-- Current allocation:
-  - Ingress: 1 OCPU, 6 GB RAM
-  - Server: 2 OCPUs, 12 GB RAM
-  - Worker: 1 OCPU, 6 GB RAM
-  - Total: 4 OCPUs, 24 GB RAM (100% of free tier)
+| Node | OCPUs | RAM | Schedulable RAM |
+|------|-------|-----|----------------|
+| ingress | 1 | 6 GB | ~5.5 GB |
+| server | 2 | 12 GB | ~10 GB |
+| worker | 1 | 6 GB | ~5.5 GB |
+
+**Before adding a new service**:
+1. Check current node pressure: `kubectl top nodes`
+2. Sum new pod's CPU + memory requests against available headroom
+3. Calculate PVC storage: `current ~127 GB + new PVC < 200 GB`
+4. Verify block storage via OCI CLI:
+   ```bash
+   oci bv volume list --all --compartment-id <COMPARTMENT_OCID> \
+     --query 'data[].{"name": "display-name", "size": "size-in-gbs"}' --output table
+   ```
 
 ### Security Requirements
-- **SSH Authentication**: Key-based only, password authentication disabled
-- **Private Subnets**: All non-public instances in private subnet (10.0.2.0/24)
-- **Security Lists**: Restrict traffic to minimum required ports:
-  - Ingress: 22 (SSH), 80 (HTTP), 443 (HTTPS), 6443 (K3s API)
-  - Server/Worker: Only internal cluster traffic
-- **TLS/SSL**: All external endpoints must use HTTPS (managed by cert-manager)
-- **Secrets**: Never commit plaintext secrets:
-  - Development: Encrypt with SOPS before commit
-  - Runtime: Store in OCI Vault
-  - CI/CD: Use OIDC, no long-lived credentials in GitHub
-- **Instance Principal**: K3s instances authenticate to OCI Vault via Instance Principal (no API keys on instances)
 
-### Networking Constraints
-- **VCN CIDR**: 10.0.0.0/16 (do not change, subnet calculations depend on this)
-- **Public Subnet**: 10.0.1.0/24 (for ingress/NAT instance)
-- **Private Subnet**: 10.0.2.0/24 (for server and worker instances)
-- **DNS**: Public DNS managed by Cloudflare via external-dns
-- **Ingress**: Single ingress instance acts as NAT gateway for private subnet
-  - Ingress private IP: 10.0.1.10
-  - Server private IP: 10.0.2.10
-  - Worker private IPs: 10.0.2.x (DHCP assigned)
-- **Flannel VXLAN**: Uses UDP port 8472 for pod networking (must be allowed in security lists)
+- **SSH**: Key-based only; password authentication disabled on all nodes
+- **Network isolation**: Server and worker are in private subnet — only reachable via ingress jump host
+- **TLS**: All public endpoints must be HTTPS (cert-manager + Let's Encrypt)
+- **Secrets**:
+  - Dev/IaC: SOPS+age — encrypt before commit; `*.decrypted.*` is gitignored
+  - Runtime: OCI Vault via Instance Principal (zero static credentials on nodes)
+  - CI/CD: SOPS-decrypted OCI creds + `GITHUB_TOKEN` for GHCR
+- **Minimum-permission security lists**:
+  - Ingress (public): TCP 22, 80, 443, 6443
+  - Private subnet: Internal cluster traffic + UDP 8472 (Flannel VXLAN)
+
+### Networking — Do Not Change
+
+- VCN CIDR: `10.0.0.0/16` (subnet calculations hard-coded)
+- Public subnet: `10.0.1.0/24`
+- Private subnet: `10.0.2.0/24`
+- Ingress static private IP: `10.0.1.10`
+- Server static private IP: `10.0.2.10`
 
 ---
 
-## Troubleshooting
+## 11. Troubleshooting
 
-### Common Issues
+### General Diagnostics
 
-**Issue**: `terraform apply` fails with "authentication error"
-**Cause**: OCI credentials expired or misconfigured
-**Fix**:
 ```bash
-# Verify OCI credentials
-oci iam user get --user-id $(grep TF_VAR_user_ocid secrets/prod/secrets.decrypted.yaml | cut -d: -f2 | tr -d ' ')
+# Overview
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 sudo kubectl get nodes,pods -A -o wide'
 
-# If expired, regenerate API key:
-# 1. Go to OCI Console → User Settings → API Keys
-# 2. Delete old key
-# 3. Generate new key
-# 4. Update secrets/prod/secrets.decrypted.yaml with new fingerprint and private key
-# 5. Re-encrypt: make sops-encrypt-prod
+# ArgoCD app health
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 sudo kubectl get applications -n argocd'
+
+# Resource pressure
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 sudo kubectl top nodes && sudo kubectl top pods -A --sort-by=memory'
+
+# Recent events
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 sudo kubectl get events -A --sort-by=.lastTimestamp | tail -30'
 ```
 
-**Issue**: K3s pods stuck in Pending
-**Cause**: Resource constraints or node issues
-**Fix**:
+---
+
+**Issue**: `terraform apply` — authentication error
+**Cause**: OCI API key expired or misconfigured
 ```bash
-# Check node resources
-ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_IP> \
-  'ssh ubuntu@10.0.2.10 sudo kubectl top nodes'
-
-# Check pod details
-ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_IP> \
-  'ssh ubuntu@10.0.2.10 sudo kubectl describe pod <pod-name> -n <namespace>'
-# Look for: Insufficient cpu/memory, ImagePullBackOff, etc.
-
-# If resource constrained:
-# - Reduce resource requests/limits in manifests
-# - Scale down replicas
-# - Consider adding capacity (within free tier limits)
-
-# If ImagePullBackOff:
-# - Verify image exists in GHCR
-# - Check GHCR credentials in OCI Vault (git-pat secret)
-```
-
-**Issue**: Portfolio website not accessible
-**Cause**: Ingress misconfiguration, DNS issues, or certificate problems
-**Fix**:
-```bash
-# Check Envoy Gateway
-ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_IP> \
-  'ssh ubuntu@10.0.2.10 sudo kubectl get pods -n envoy-gateway-system'
-
-# Check HTTPRoute
-ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_IP> \
-  'ssh ubuntu@10.0.2.10 sudo kubectl get httproute -n www -o yaml'
-
-# Check certificate
-ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_IP> \
-  'ssh ubuntu@10.0.2.10 sudo kubectl get certificate -n www'
-# Status should be: Ready=True
-
-# Check DNS
-dig www.fabianpiper.com
-# Should resolve to ingress public IP
-
-# If DNS not resolving:
-# - Check external-dns logs
-# - Verify Cloudflare API token in OCI Vault
-```
-
-**Issue**: GitHub Actions failing with "OCI authentication failed"
-**Cause**: SOPS secrets missing or OCI Vault secrets missing
-**Fix**:
-```bash
-# Verify SOPS secrets decrypt correctly
 make sops-decrypt-prod
-
-# Verify Vault secrets exist
-ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_IP> \
-  'ssh ubuntu@10.0.2.10 oci vault secret list --compartment-id <COMPARTMENT_OCID> --all'
-# Should show: git-pat, git-username, site-url, mixpanel-token
-
-# Re-run failed workflow
-# Go to: https://github.com/fapiper/fabianpiper.com/actions
-# Click failed run → Re-run jobs
+oci iam user get --user-id "$(grep TF_VAR_user_ocid secrets/prod/secrets.decrypted.yaml \
+  | cut -d: -f2 | tr -d ' ')"
+# If 401: regenerate in OCI Console → User Settings → API Keys
+# Update secrets.decrypted.yaml → make sops-encrypt-prod
 ```
 
-**Issue**: ArgoCD ApplicationSet controller crashing
-**Cause**: ApplicationSet CRD missing or version mismatch
-**Fix**:
-```bash
-# Check CRD exists
-ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_IP> \
-  'ssh ubuntu@10.0.2.10 sudo kubectl get crd applicationsets.argoproj.io'
-
-# If missing, reinstall ArgoCD
-ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_IP> \
-  'ssh ubuntu@10.0.2.10 sudo kubectl delete namespace argocd'
-# Wait 2 minutes, cloud-init will recreate it
-
-# Or manually reinstall
-ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_IP> \
-  'ssh ubuntu@10.0.2.10 "sudo kubectl create namespace argocd && sudo kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml"'
-```
+---
 
 **Issue**: Terraform state locked
-**Cause**: Previous apply interrupted
-**Fix**:
+**Cause**: Interrupted apply
 ```bash
-# ONLY if no apply is currently running!
-# Remove lock file for specific component
+# ONLY if confirmed no apply is currently running
 rm -f components/terraform/<component>/terraform.tfstate.d/glg-prod-fra/.terraform.tfstate.lock.info
-
-# Example for networking
-rm -f components/terraform/networking/terraform.tfstate.d/glg-prod-fra/.terraform.tfstate.lock.info
-```
-
-**Issue**: Cannot SSH to instances
-**Cause**: Security list or SSH key mismatch
-**Fix**:
-```bash
-# Verify security list allows SSH from your IP
-# 1. Get your public IP: curl ifconfig.me
-# 2. Check security list in OCI Console → Networking → VCN → Security Lists
-# 3. Ensure ingress rule: TCP 22 from <your-ip>/32
-
-# Verify SSH key path
-grep TF_VAR_ssh_public_key_path secrets/prod/secrets.decrypted.yaml
-# Ensure path matches your actual SSH public key
-
-# Verify public IP assigned to ingress
-make plan-prod-cluster | grep ingress_public_ip
-
-# Try verbose SSH
-ssh -v -i ~/.ssh/id_rsa ubuntu@<INGRESS_IP>
-# Look for authentication errors
 ```
 
 ---
 
-## Emergency Procedures
-
-### Rollback Infrastructure Changes
+**Issue**: Pod stuck in `Pending`
 ```bash
-# If recent apply broke infrastructure
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 sudo kubectl describe pod <pod-name> -n <namespace>'
+# "Insufficient cpu/memory"    → reduce requests in manifest
+# "0/3 nodes … taints"         → check node taints/tolerations
+# "ImagePullBackOff"           → check regcred secret / GHCR credentials
+# "WaitForFirstConsumer" (PVC) → PVC and Deployment must be in the same sync wave (see §2)
+```
 
-# 1. Identify last good state
-git log --oneline -10
-# Find commit before breaking change
+---
 
-# 2. Revert to last good commit
+**Issue**: PVC stuck in `Pending` — WaitForFirstConsumer deadlock
+```bash
+# Both must have the same argocd.argoproj.io/sync-wave value
+grep 'sync-wave' kubernetes/infrastructure/<app>/pvc.yaml
+grep 'sync-wave' kubernetes/infrastructure/<app>/deployment.yaml
+# Fix: align wave numbers, commit, force ArgoCD refresh
+```
+
+---
+
+**Issue**: Website not accessible / 502 / certificate error
+```bash
+# Envoy Gateway pods
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 sudo kubectl get pods -n envoy-gateway-system'
+
+# HTTPRoute status
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 sudo kubectl get httproute -A'
+
+# Certificate (must be Ready=True)
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 sudo kubectl get certificate -A'
+
+# DNS resolution
+dig www.fabianpiper.com +short      # Must return ingress public IP
+dig glg.fabianpiper.com +short
+
+# external-dns logs
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 sudo kubectl logs deploy/external-dns -n external-dns --tail=20'
+```
+
+---
+
+**Issue**: Grafana shows "No data" or datasource error
+```bash
+# 1. Prometheus running?
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 sudo kubectl get pods -n prometheus'
+
+# 2. Datasource ConfigMap mounted correctly?
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 sudo kubectl exec deploy/grafana -n grafana -- \
+   cat /etc/grafana/provisioning/datasources/datasources.yaml'
+
+# 3. Prometheus reachable from Grafana pod?
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 sudo kubectl exec deploy/grafana -n grafana -- \
+   wget -qO- http://prometheus.prometheus.svc.cluster.local:9090/-/healthy'
+# Expected: Prometheus is Healthy.
+
+# 4. Restart Grafana to reload provisioning
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 sudo kubectl rollout restart deploy/grafana -n grafana'
+```
+
+---
+
+**Issue**: ArgoCD not discovering new directory
+```bash
+# Force immediate ApplicationSet refresh
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 sudo kubectl annotate applicationset infrastructure \
+   -n argocd argocd.argoproj.io/refresh=normal --overwrite'
+
+# Validate kustomization locally first
+kubectl kustomize kubernetes/infrastructure/<new-dir>/
+
+# ApplicationSet controller logs
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 sudo kubectl logs deploy/argocd-applicationset-controller \
+   -n argocd --tail=30'
+```
+
+---
+
+**Issue**: ArgoCD ApplicationSet controller crash / missing CRDs
+```bash
+# Check CRD
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 sudo kubectl get crd applicationsets.argoproj.io'
+
+# If missing: delete namespace, cloud-init will recreate (~2 min)
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 sudo kubectl delete namespace argocd'
+```
+
+---
+
+**Issue**: GitHub Actions failing — SOPS/OCI auth error
+```bash
+# Test local decryption
+make sops-decrypt-prod
+# If fails: secrets/.sops.key must exist and match the SOPS_AGE_KEY GitHub secret
+# Check: https://github.com/fapiper/fabianpiper.com/settings/secrets/actions
+```
+
+---
+
+**Issue**: Cannot SSH to instances
+```bash
+# Your current IP
+curl -s ifconfig.me
+
+# Verify OCI security list (managed by Terraform)
+# OCI Console → Networking → VCN → Security Lists → public-sl
+# Rule required: TCP/22 ingress from your IP/32
+# Fix: update Terraform if your IP changed, then: make apply-prod-networking
+
+ssh -v -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP   # Verbose output shows auth errors
+```
+
+---
+
+## 12. Emergency Procedures
+
+### Rollback Application
+
+```bash
+# Option A: Revert git commit → ArgoCD auto-syncs
 git revert <bad-commit-hash>
 git push origin main
 
-# 3. Re-apply infrastructure
-make apply-prod-all
+# Option B: Roll back deployment revision
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 sudo kubectl rollout undo deployment/www -n www'
 
-# If state corruption (last resort):
-# 1. Destroy everything: make destroy-prod-all
-# 2. Restore from backup (if available)
-# 3. Re-deploy from scratch: make deploy-prod
+# Option C: Pin specific image SHA (bypasses Image Updater)
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 sudo kubectl set image deployment/www \
+   www=ghcr.io/fapiper/fabianpiper.com/www:<sha> -n www'
 ```
 
-### Restore from Backup
+### Rollback Infrastructure
+
 ```bash
-# Currently no automated backups implemented
+# Revert commit and re-apply
+git revert <bad-commit-hash>
+git push origin main
+make apply-prod-<component>
 
-# Manual backup procedure:
-# 1. Export Terraform state
-cd components/terraform/networking
-terraform state pull > networking-state-$(date +%Y%m%d).json
-
-# 2. Backup K8s cluster state
-ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_IP> \
-  'ssh ubuntu@10.0.2.10 sudo kubectl get all -A -o yaml' > k8s-backup-$(date +%Y%m%d).yaml
-
-# 3. Backup ArgoCD applications
-ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_IP> \
-  'ssh ubuntu@10.0.2.10 sudo kubectl get applications -n argocd -o yaml' > argocd-apps-$(date +%Y%m%d).yaml
-
-# Restore procedure:
-# 1. Recreate infrastructure: make deploy-prod
-# 2. Restore state: terraform state push <backup-file>
-# 3. Restore K8s resources: kubectl apply -f <k8s-backup-file>
+# If state is corrupted — backup first!
+cd components/terraform/<component>
+terraform state pull > state-backup-$(date +%Y%m%d-%H%M%S).json
+make destroy-prod-<component>
+make apply-prod-<component>
 ```
 
-### Force Restart Application
+### Manual State Backup
+
 ```bash
-# Restart www deployment
-ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_IP> \
-  'ssh ubuntu@10.0.2.10 sudo kubectl rollout restart deployment/www -n www'
+for component in networking iam vault cluster dns; do
+  cd components/terraform/$component
+  terraform state pull > ../../../../state-backup-${component}-$(date +%Y%m%d).json
+  cd ../../../../
+done
 
-# Restart specific pod
-ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_IP> \
-  'ssh ubuntu@10.0.2.10 sudo kubectl delete pod <pod-name> -n www'
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 sudo kubectl get all -A -o yaml' \
+  > k8s-backup-$(date +%Y%m%d).yaml
 
-# Restart all ArgoCD components
-ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_IP> \
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 sudo kubectl get applications -n argocd -o yaml' \
+  > argocd-apps-$(date +%Y%m%d).yaml
+```
+
+### Force Restart Services
+
+```bash
+# Generic
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 sudo kubectl rollout restart deployment/<name> -n <namespace>'
+
+# All ArgoCD components
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
   'ssh ubuntu@10.0.2.10 sudo kubectl rollout restart deployment -n argocd'
 ```
 
-### Complete Cluster Rebuild
+### Complete Cluster Rebuild (Nuclear Option)
+
 ```bash
-# Nuclear option: destroy and rebuild everything
+# 1. Back up state and K8s resources (see above)
 
-# 1. Backup critical data (see Restore from Backup above)
+# 2. Destroy
+make destroy-prod-all   # type "yes" to confirm
+# Wait ~10 min for full deletion
 
-# 2. Destroy all infrastructure
-make destroy-prod-all
-# Confirm with: yes
-
-# 3. Wait for complete deletion (~10 minutes)
-
-# 4. Re-deploy from scratch
+# 3. Redeploy (~15–20 min)
 make deploy-prod
+# ArgoCD reinstalls via cloud-init, root.yaml is re-applied automatically
 
-# 5. Verify deployment
-make plan-prod-all
-# Should show no changes
-
-# 6. Test application
-curl -I https://www.fabianpiper.com
+# 4. Verify
+make plan-prod-all   # Must show: No changes
+curl -sI https://www.fabianpiper.com | head -1   # HTTP/2 200
 ```
 
 ---
 
-## Maintenance Tasks
+## 13. Maintenance
 
-### Regular Operations
-- **Daily**: Check GitHub Actions runs for failures
-- **Weekly**:
-  - Monitor OCI Free Tier usage dashboard
-  - Review ArgoCD sync status
-  - Check for pending image updates
-- **Monthly**:
-  - Review K3s version for updates
-  - Check Terraform provider versions
-  - Audit security list rules
-  - Review OCI Vault secret rotation
-- **Quarterly**:
-  - Rotate Cloudflare API token
-  - Rotate GitHub PAT
-  - Review resource utilization and optimize
-  - Test disaster recovery procedure
+### Routine Schedule
 
-### Update Procedures
+| Frequency | Task |
+|-----------|------|
+| Daily | Check GitHub Actions for failures |
+| Weekly | Verify all ArgoCD apps are `Synced` + `Healthy` |
+| Weekly | OCI Free Tier usage dashboard |
+| Monthly | K3s version — update if security patch available |
+| Monthly | Terraform provider versions in `modules/*/versions.tf` |
+| Monthly | Audit OCI security list rules |
+| Quarterly | Rotate Cloudflare API token → update OCI Vault + re-deploy external-dns |
+| Quarterly | Rotate GitHub PAT → update OCI Vault `git-pat` secret |
+| Quarterly | Review Grafana + Prometheus image versions |
+| Quarterly | Test disaster recovery (full rebuild) |
 
-**Update Terraform Providers**:
+### Updating Infrastructure Image Versions
+
 ```bash
-# 1. Update provider versions in modules/*/versions.tf
-vim modules/networking/versions.tf
-# Change: version = "~> 6.0" to version = "~> 6.1"
+# Edit deployment.yaml with new tag
+vim kubernetes/infrastructure/<app>/deployment.yaml
+# e.g. image: prom/prometheus:v3.3.0 → prom/prometheus:v3.x.y
 
-# 2. Reinitialize modules
-cd modules/networking
-terraform init -upgrade
-cd ../iam
-terraform init -upgrade
-cd ../vault
-terraform init -upgrade
-cd ../cluster
-terraform init -upgrade
-cd ../..
-
-# 3. Test with plan
-make plan-prod-all
-
-# 4. Apply if no unexpected changes
-make apply-prod-all
+git add kubernetes/infrastructure/<app>/deployment.yaml
+git commit -m "chore(<app>): update to vX.Y.Z"
+git push origin main
+# ArgoCD auto-syncs within 30 seconds
 ```
 
-**Update K3s**:
+### Updating Terraform Providers
+
 ```bash
-# K3s updates automatically to latest stable
-# To pin specific version:
+# Edit version constraints in modules/*/versions.tf, then:
+for m in networking iam vault cluster dns; do
+  cd modules/$m && terraform init -upgrade && cd ../..
+done
 
-# 1. Edit cloud-init scripts
-vim modules/cluster/user-data/server.yaml
-# Change: curl -sfL https://get.k3s.io | K3S_VERSION=v1.28.5+k3s1 sh -
-
-# 2. Recreate instances (downtime!)
-make destroy-prod-cluster
-make apply-prod-cluster
-
-# Or upgrade in-place (on each node):
-ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_IP> \
-  'ssh ubuntu@10.0.2.10 "curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.28.5+k3s1 sh -"'
+make plan-prod-all    # Review
+make apply-prod-all   # Apply
 ```
 
-**Update Application**:
+### Updating K3s (In-Place)
+
 ```bash
-# Automatic via CI/CD:
-# 1. Push changes to apps/www/
-# 2. GitHub Actions builds and pushes
-# 3. ArgoCD Image Updater detects and deploys
-
-# Manual deployment:
-# 1. Build locally
-cd apps/www
-bun run build
-
-# 2. Build and push image
-docker build -t ghcr.io/fapiper/fabianpiper.com/www:manual .
-docker push ghcr.io/fapiper/fabianpiper.com/www:manual
-
-# 3. Update deployment
-ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_IP> \
-  'ssh ubuntu@10.0.2.10 sudo kubectl set image deployment/www www=ghcr.io/fapiper/fabianpiper.com/www:manual -n www'
+# Update server first, then worker
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 "curl -sfL https://get.k3s.io | \
+   INSTALL_K3S_VERSION=v1.29.x+k3s1 sh -"'
+# Repeat for worker node
 ```
 
 ---
 
-## Documentation Inventory
+## 14. Agent Completion Checklist
 
-✅ **Current and Accurate**:
-- `README.md` - High-level overview, quick start
-- `ARCHITECTURE.md` - Detailed system architecture
-- `ARGOCD_BOOTSTRAP.md` - ArgoCD bootstrap process
-- `KUBERNETES_REFACTOR_SUMMARY.md` - Recent refactoring changes
-- `.github/MIGRATION_CHECKLIST.md` - Migration guide for refactoring
+Before marking any task complete, verify **all applicable items**:
 
-⚠️ **Potentially Outdated** (verify before using):
-- `DEPLOYMENT_CHECKLIST.md` - May reference old argocd/ structure (check references)
-- `FINAL_SETUP_COMPLETE.md` - Final setup notes (may be superseded by README)
-- `SETUP_SUMMARY.md` - Initial setup (verify commands match Makefile)
-- `STATUS.md` - Project status (check date)
-- `docs/PRE-VERIFICATION-CHECKLIST.md` - Pre-deployment checks (verify against current process)
-- `docs/VERIFY-SETUP.md` - Verification steps (ensure matches current k8s structure)
-- `docs/TEST-CICD.md` - CI/CD testing (verify with build-and-push.yaml)
+**If Terraform files changed**:
+- [ ] `terraform fmt -recursive` — no output (already formatted)
+- [ ] `terraform validate` in each affected module directory — exits 0
+- [ ] `make plan-prod-<component>` reviewed — no unexpected changes
+- [ ] Block storage impact calculated if new PVCs added (current ~127 GB, limit 200 GB)
+- [ ] Compute unchanged — no new OCI instances (currently at 100% free tier)
 
-**Known Conflicts**:
-- If any doc references `argocd/` directory, it should be `kubernetes/` (refactored 2026-02-13)
-- If any doc mentions manual `application.yaml` files, they no longer exist (auto-discovered via ApplicationSets)
-- SOPS documentation scattered across files, consolidated in README.md
+**If Kubernetes manifests changed**:
+- [ ] `kubectl kustomize kubernetes/<path>/` — no YAML errors
+- [ ] `kubectl apply --dry-run=client -f kubernetes/<path>/` — all resources ok
+- [ ] Required labels on all resources (`app.kubernetes.io/name/instance/part-of`)
+- [ ] Resource `requests` AND `limits` defined on all containers
+- [ ] PVC sync wave == Deployment sync wave (WaitForFirstConsumer)
+- [ ] `kustomization.yaml` updated if new files added
 
----
+**Security**:
+- [ ] No plaintext secrets in code:
+  ```bash
+  git grep -iE '(password|secret|token|private_key)\s*[:=]\s*[^$\{T]' \
+    -- '*.tf' '*.yaml' '*.yml' '*.sh' \
+    | grep -v 'TF_VAR' | grep -v 'secretKeyRef' | grep -v 'example' \
+    | grep -v 'argocd.argoproj.io'
+  # Must produce ZERO output
+  ```
+- [ ] No `*.decrypted.*` files staged for commit (`git status` check)
 
-## Agent Completion Checklist
-
-Before marking any task as complete, the agent MUST:
-- [ ] Run `terraform fmt -recursive` if Terraform files changed
-- [ ] Run `terraform validate` in affected module directories if Terraform files changed
-- [ ] Run `kubectl apply --dry-run=client -f <file>` if K8s manifests changed
-- [ ] Verify no secrets in code: `git grep -i 'password\|secret\|token\|key' -- '*.tf' '*.yaml' '*.yml' '*.sh' | grep -v 'TF_VAR' | grep -v 'example'`
-- [ ] Update this AGENTS.md if project structure, commands, or workflows changed
-- [ ] Check OCI free tier impact for new compute/storage resources (calculate before apply)
-- [ ] Test changes in isolation before applying to production (use dry-run, plan, or local testing)
-- [ ] Commit with conventional commit message: `<type>(<scope>): <description>` (e.g., `feat(k8s): add prometheus`)
-- [ ] Verify CI/CD pipeline runs successfully if changes affect apps/ or .github/workflows/
+**Process**:
+- [ ] Commit uses conventional commit format: `<type>(<scope>): <description>`
+- [ ] AGENTS.md updated if project structure, component inventory, or commands changed
+- [ ] CI/CD pipeline passes if `apps/` or `.github/workflows/` changed
 
 ---
 
-## Reference Links
-- **Repository**: https://github.com/fapiper/fabianpiper.com
-- **OCI Free Tier**: https://www.oracle.com/cloud/free/
-- **OCI Documentation**: https://docs.oracle.com/en-us/iaas/Content/home.htm
-- **K3s Documentation**: https://docs.k3s.io/
-- **Atmos Documentation**: https://atmos.tools/
-- **ArgoCD Documentation**: https://argo-cd.readthedocs.io/
-- **SOPS Documentation**: https://github.com/mozilla/sops
-- **age Encryption**: https://github.com/FiloSottile/age
-- **Terraform OCI Provider**: https://registry.terraform.io/providers/oracle/oci/latest/docs
-- **GitHub Actions**: https://docs.github.com/en/actions
-- **GitHub Container Registry**: https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry
+## 15. Reference Links
+
+| Resource | URL |
+|----------|-----|
+| Repository | https://github.com/fapiper/fabianpiper.com |
+| OCI Free Tier | https://www.oracle.com/cloud/free/ |
+| OCI Documentation | https://docs.oracle.com/en-us/iaas/Content/home.htm |
+| K3s Documentation | https://docs.k3s.io/ |
+| Atmos Documentation | https://atmos.tools/ |
+| ArgoCD Documentation | https://argo-cd.readthedocs.io/ |
+| ArgoCD Image Updater | https://argocd-image-updater.readthedocs.io/ |
+| Envoy Gateway | https://gateway.envoyproxy.io/ |
+| Gateway API | https://gateway-api.sigs.k8s.io/ |
+| cert-manager | https://cert-manager.io/docs/ |
+| external-secrets | https://external-secrets.io/latest/ |
+| external-dns | https://kubernetes-sigs.github.io/external-dns/ |
+| Prometheus | https://prometheus.io/docs/ |
+| Grafana | https://grafana.com/docs/grafana/latest/ |
+| SOPS | https://github.com/mozilla/sops |
+| age | https://github.com/FiloSottile/age |
+| Terraform OCI Provider | https://registry.terraform.io/providers/oracle/oci/latest/docs |
+| GitHub Actions | https://docs.github.com/en/actions |
+| GHCR | https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry |
 
 ---
 
 **End of Agent Operations Manual**
 
-This document is the single source of truth for AI agents operating on this repository. All commands are tested and deterministic. For human-readable documentation, see README.md.
-
+This is the single source of truth for AI agents operating on this repository.
+For human-readable documentation, see `README.md`.

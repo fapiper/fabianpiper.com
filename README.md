@@ -5,14 +5,14 @@
 </p>
 
 <p align="center">
-  Portfolio deployment using K3s, Terraform, Atmos, and ArgoCD on Oracle Cloud Free Tier
+  Portfolio deployment using K3s, Terraform, Atmos, Cloudflare DNS, and ArgoCD on Oracle Cloud Free Tier
 </p>
 
 <p align="center">
   <a href="https://registry.terraform.io/">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/terraform-1.14+-1A202C?logo=terraform&logoColor=7B42BC&labelColor=1A202C">
-      <img src="https://img.shields.io/badge/terraform-1.14+-2D3748?logo=terraform&logoColor=7B42BC&labelColor=2D3748" alt="Terraform">
+      <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/terraform-1.5+-1A202C?logo=terraform&logoColor=7B42BC&labelColor=1A202C">
+      <img src="https://img.shields.io/badge/terraform-1.5+-2D3748?logo=terraform&logoColor=7B42BC&labelColor=2D3748" alt="Terraform">
     </picture>
   </a>
   <a href="https://k3s.io/">
@@ -33,11 +33,29 @@
       <img src="https://img.shields.io/badge/argocd-latest-2D3748?logo=argo&logoColor=EF7B4D&labelColor=2D3748" alt="ArgoCD">
     </picture>
   </a>
+  <a href="https://prometheus.io/">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/prometheus-v3.3.0-1A202C?logo=prometheus&logoColor=E6522C&labelColor=1A202C">
+      <img src="https://img.shields.io/badge/prometheus-v3.3.0-2D3748?logo=prometheus&logoColor=E6522C&labelColor=2D3748" alt="Prometheus">
+    </picture>
+  </a>
+  <a href="https://grafana.com/">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/grafana-11.6.0-1A202C?logo=grafana&logoColor=F46800&labelColor=1A202C">
+      <img src="https://img.shields.io/badge/grafana-11.6.0-2D3748?logo=grafana&logoColor=F46800&labelColor=2D3748" alt="Grafana">
+    </picture>
+  </a>
   <br />
   <a href="https://www.oracle.com/cloud/free/">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/oci-free_tier-1A202C?logo=oracle&logoColor=F80000&labelColor=1A202C">
       <img src="https://img.shields.io/badge/oci-free_tier-2D3748?logo=oracle&logoColor=F80000&labelColor=2D3748" alt="OCI Free Tier">
+    </picture>
+  </a>
+  <a href="https://www.cloudflare.com/">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/cloudflare-dns-1A202C?logo=cloudflare&logoColor=F38020&labelColor=1A202C">
+      <img src="https://img.shields.io/badge/cloudflare-dns-2D3748?logo=cloudflare&logoColor=F38020&labelColor=2D3748" alt="Cloudflare DNS">
     </picture>
   </a>
   <a href="https://github.com/fapiper/fabianpiper.com/blob/main/LICENSE">
@@ -79,22 +97,22 @@
 This repository demonstrates infrastructure automation and GitOps principles by deploying a portfolio website on Oracle Cloud Infrastructure Free Tier. The stack uses Terraform with Atmos for infrastructure orchestration, K3s for container orchestration, and ArgoCD for continuous deployment.
 
 Key capabilities:
-- Declarative infrastructure provisioning with Terraform
+- Declarative infrastructure provisioning with Terraform (networking, IAM, OCI Vault, K3s cluster, Cloudflare DNS)
 - GitOps workflow via ArgoCD ApplicationSets
 - Automated image updates and zero-downtime deployments
 - Secure secret management using SOPS and OCI Vault
-- CI/CD pipeline with minimal credentials via GitHub OIDC
+- CI/CD pipeline with SOPS-encrypted OCI credentials and `GITHUB_TOKEN` for GHCR
+- Observability with Prometheus metrics collection and Grafana dashboards
 
 ## Prerequisites
 
 Install the following tools before beginning:
 
 - [Make](https://www.gnu.org/software/make/) v4.3+
-- [Terraform](https://www.terraform.io/) v1.14+
+- [Terraform](https://www.terraform.io/) v1.5+
 - [Atmos](https://atmos.tools) v0.23+
 - [SOPS](https://github.com/mozilla/sops) v3.11+
 - [age](https://github.com/FiloSottile/age) v1.3+
-- [Docker](https://www.docker.com) v29.1+
 - [Bun](https://bun.sh) v1.3+
 
 ## Installation
@@ -122,13 +140,14 @@ make setup
 > [!NOTE]
 > This generates `secrets/.sops.key` and configures SOPS for all secret files.
 
-Copy the example secrets file and add your credentials:
+Copy the example secrets files and add your credentials:
 
 ```bash
-cp secrets/prod/secrets.example.yaml secrets/prod/secrets.decrypted.yaml
+cp secrets/prod/*.example.yaml secrets/prod/secrets.decrypted.yaml
+cp secrets/prod/www.example.yaml secrets/prod/www.decrypted.yaml
 ```
 
-Edit `secrets/prod/secrets.decrypted.yaml` with your actual values, then encrypt:
+Edit `secrets/prod/*.decrypted.yaml` with your actual values, then encrypt:
 
 ```bash
 make sops-encrypt-prod
@@ -142,7 +161,7 @@ Deploy the complete stack with a single command:
 make deploy-prod
 ```
 
-This provisions networking, IAM policies, OCI Vault, OIDC configuration, and a K3s cluster with ArgoCD automatically installed.
+This provisions networking, IAM policies, OCI Vault, and a K3s cluster with ArgoCD automatically installed. DNS records are synced to Cloudflare after cluster bootstrap.
 
 Verify deployment health:
 
@@ -173,9 +192,10 @@ The infrastructure consists of:
 
 - VCN with public (10.0.1.0/24) and private (10.0.2.0/24) subnets
 - Three ARM Ampere A1 instances running K3s
-- OCI Vault for runtime secret storage
-- GitHub OIDC provider for CI/CD authentication
+- OCI Vault for runtime secret storage via Instance Principal
+- Cloudflare DNS — static A records provisioned by Terraform, dynamic records synced by `external-dns` from HTTPRoutes
 - ArgoCD managing GitOps deployments
+- Prometheus + Grafana for observability (`https://glg.fabianpiper.com/grafana`)
 
 ### Directory Structure
 
@@ -185,21 +205,27 @@ fabianpiper.com/
 │   ├── networking/            # VCN, subnets, security lists
 │   ├── iam/                   # Dynamic groups and policies
 │   ├── vault/                 # OCI Vault and stored secrets
-│   ├── oidc/                  # GitHub OIDC provider
-│   └── cluster/           # K3s instances and cloud-init
+│   ├── dns/                   # Cloudflare DNS records
+│   └── cluster/               # K3s instances and cloud-init
 ├── modules/                    # Terraform module implementations
 ├── stacks/                     # Atmos stack configurations
 │   ├── orgs/glg/prod/fra.yaml # Production deployment config
 │   ├── mixins/                # Reusable configuration snippets
 │   └── workflows/             # Multi-component workflows
 ├── kubernetes/                 # GitOps manifests
-│   ├── bootstrap/             # ArgoCD installation and root app
-│   │   ├── root.yaml         # Single entry point
-│   │   ├── templates/        # ApplicationSets
-│   │   └── argocd/           # ArgoCD manifests
+│   ├── bootstrap/             # ArgoCD root app and ApplicationSets
+│   │   ├── root.yaml         # Single entry point (applied via cloud-init)
+│   │   └── templates/        # ApplicationSets (auto-discover apps + infra)
 │   ├── infrastructure/        # Platform services
+│   │   ├── cert-manager/     # TLS via Let's Encrypt
+│   │   ├── envoy-gateway/    # Ingress (Gateway API)
+│   │   ├── external-dns/     # Cloudflare DNS sync
+│   │   ├── external-secrets/ # OCI Vault → K8s Secrets
+│   │   ├── argocd-image-updater/ # Automated image updates
+│   │   ├── grafana/          # Metrics dashboard (Grafana 11.6.0)
+│   │   └── prometheus/       # Metrics collection (Prometheus v3.3.0)
 │   └── apps/                  # Application deployments
-├── apps/www/                   # Website source code
+├── apps/www/                   # Website source code (Astro 5.7)
 ├── secrets/prod/               # SOPS-encrypted secrets
 └── .github/workflows/          # CI/CD automation
 ```
@@ -231,11 +257,6 @@ Build production bundle:
 make build-www
 ```
 
-Build Docker image:
-
-```bash
-make docker-build-prod-www
-```
 
 ## Common Operations
 
@@ -246,8 +267,8 @@ make plan-prod-all             # Review planned changes for all components
 make apply-prod-networking     # Deploy VCN and subnets
 make apply-prod-iam            # Deploy IAM policies
 make apply-prod-vault          # Deploy OCI Vault
-make apply-prod-oidc           # Deploy OIDC provider
-make apply-prod-cluster    # Deploy K3s cluster
+make apply-prod-cluster        # Deploy K3s cluster
+make apply-prod-dns            # Deploy DNS records
 ```
 
 ### Secret Management
