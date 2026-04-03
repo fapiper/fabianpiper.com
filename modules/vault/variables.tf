@@ -39,3 +39,10 @@ variable "cloudflare_api_token" {
   description = "Cloudflare API token for DNS management"
   sensitive   = true
 }
+
+variable "grafana_admin_password" {
+  type        = string
+  description = "Grafana admin user password"
+  sensitive   = true
+}
+

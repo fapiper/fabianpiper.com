@@ -1,0 +1,28 @@
+# Routes glg.fabianpiper.com/grafana → grafana service.
+# PathPrefix /grafana is more specific than the www route's PathPrefix /,
+# so Gateway API correctly directs Grafana traffic here.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: grafana-route
+  namespace: grafana
+  labels:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/instance: grafana
+    app.kubernetes.io/part-of: infrastructure
+  annotations:
+    argocd.argoproj.io/sync-wave: "25"
+spec:
+  parentRefs:
+    - name: public-gateway
+      namespace: envoy-gateway-system
+      sectionName: https
+  hostnames:
+    - "glg.fabianpiper.com"
+  rules:
+    - matches:
+        - path: { type: PathPrefix, value: /grafana }
+      backendRefs:
+        - name: grafana
+          port: 3000
+

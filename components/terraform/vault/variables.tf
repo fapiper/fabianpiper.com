@@ -72,3 +72,8 @@ variable "cloudflare_api_token" {
   sensitive   = true
 }
 
+variable "grafana_admin_password" {
+  type        = string
+  description = "Grafana admin user password"
+  sensitive   = true
+}
