@@ -12,6 +12,7 @@ spec:
     - git:
         repoURL: https://github.com/fapiper/fabianpiper.com.git
         revision: HEAD
+        requeueAfterSeconds: 30
         directories:
           - path: kubernetes/infrastructure/*
   template:
