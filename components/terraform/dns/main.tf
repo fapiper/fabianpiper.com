@@ -3,7 +3,6 @@ module "dns" {
 
   enabled    = var.enabled
   zone_id    = var.zone_id
-  # Use try() so plan succeeds before cluster has been applied
   ingress_ip = try(data.terraform_remote_state.cluster.outputs.ingress_public_ip, "")
   records    = var.records
 }

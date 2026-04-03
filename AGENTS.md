@@ -1,8 +1,8 @@
 # fabianpiper.com | Agent Operations Manual
 
-Last Updated: 2026-02-13  
-Generated for: AI Agents  
-Repository: https://github.com/fapiper/fabianpiper.com  
+Last Updated: 2026-02-13
+Generated for: AI Agents
+Repository: https://github.com/fapiper/fabianpiper.com
 Validation Status: Docs reviewed, Code cross-referenced, Ready for autonomous operation
 
 ---
@@ -16,7 +16,7 @@ Validation Status: Docs reviewed, Code cross-referenced, Ready for autonomous op
 - **Application**: Astro v5.7+ (portfolio website)
 - **GitOps**: ArgoCD with ApplicationSets (auto-discovery pattern)
 - **CI/CD**: GitHub Actions
-- **Secret Management**: 
+- **Secret Management**:
   - Development: SOPS + age encryption
   - Runtime: OCI Vault + Instance Principal
   - CI/CD: OIDC (no long-lived credentials)
@@ -47,13 +47,12 @@ fabianpiper.com/
 │   ├── networking/
 │   ├── iam/
 │   ├── vault/
-│   ├── oidc/
+
 │   └── cluster/
 ├── modules/                  # Terraform modules (actual logic)
 │   ├── networking/           # VCN, subnets, security lists
 │   ├── iam/                  # Dynamic group, policies
 │   ├── vault/                # OCI Vault + secrets
-│   ├── oidc/                 # GitHub OIDC provider
 │   └── cluster/          # 3 instances (ingress, server, worker)
 │       ├── main.tf
 │       ├── user-data/        # Cloud-init templates
@@ -165,7 +164,7 @@ cat secrets/.sops.key
 # 6. Deploy infrastructure (15-20 minutes total)
 make deploy-prod
 # This runs: atmos workflow apply -s glg-prod-fra
-# Order: networking → iam → vault → oidc → cluster
+# Order: networking → iam → vault → cluster
 # Output: Terraform will create VCN, instances, vault, and K3s cluster
 # ArgoCD is installed automatically via cloud-init on server instance
 ```
@@ -234,7 +233,7 @@ kubectl get pods -A
 ### Terraform Conventions
 - **Formatting**: Run `terraform fmt -recursive` before every commit (enforced)
 - **Validation**: Run `terraform validate` in each module directory before commit
-- **Naming**: 
+- **Naming**:
   - Resources: `<provider>_<resource_type>.<descriptive_name>` (e.g., `oci_core_vcn.default`)
   - Variables: snake_case (e.g., `compartment_ocid`, `vcn_cidr_blocks`)
   - Modules: kebab-case directory names (e.g., `cluster`, `networking`)
@@ -244,11 +243,11 @@ kubectl get pods -A
   - `outputs.tf` (outputs with descriptions)
   - `versions.tf` (required_version and required_providers)
   - Optional: `data.tf` (data sources), `locals.tf` (local values)
-- **Variables**: 
+- **Variables**:
   - All variables must have `type` and `description`
   - Use `default = null` for optional variables
   - Use `validation` blocks for complex constraints
-- **Sensitive Data**: 
+- **Sensitive Data**:
   - NEVER commit `.tfstate` files
   - NEVER commit `.tfvars` files with real values
   - Mark sensitive outputs with `sensitive = true`
@@ -267,7 +266,7 @@ kubectl get pods -A
     app.kubernetes.io/instance: <app-name>
     app.kubernetes.io/part-of: <system-name>  # e.g., "portfolio", "infrastructure"
   ```
-- **Namespaces**: 
+- **Namespaces**:
   - Apps: Use namespace matching directory name (e.g., `www`, `blog`)
   - Infrastructure: Use component namespace (e.g., `cert-manager`, `external-secrets`)
   - ArgoCD itself: `argocd` namespace
@@ -321,8 +320,6 @@ terraform validate
 cd ../iam
 terraform validate
 cd ../vault
-terraform validate
-cd ../oidc
 terraform validate
 cd ../cluster
 terraform validate
@@ -615,8 +612,8 @@ ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_IP> \
 
 ### Common Issues
 
-**Issue**: `terraform apply` fails with "authentication error"  
-**Cause**: OCI credentials expired or misconfigured  
+**Issue**: `terraform apply` fails with "authentication error"
+**Cause**: OCI credentials expired or misconfigured
 **Fix**:
 ```bash
 # Verify OCI credentials
@@ -630,8 +627,8 @@ oci iam user get --user-id $(grep TF_VAR_user_ocid secrets/prod/secrets.decrypte
 # 5. Re-encrypt: make sops-encrypt-prod
 ```
 
-**Issue**: K3s pods stuck in Pending  
-**Cause**: Resource constraints or node issues  
+**Issue**: K3s pods stuck in Pending
+**Cause**: Resource constraints or node issues
 **Fix**:
 ```bash
 # Check node resources
@@ -653,8 +650,8 @@ ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_IP> \
 # - Check GHCR credentials in OCI Vault (git-pat secret)
 ```
 
-**Issue**: Portfolio website not accessible  
-**Cause**: Ingress misconfiguration, DNS issues, or certificate problems  
+**Issue**: Portfolio website not accessible
+**Cause**: Ingress misconfiguration, DNS issues, or certificate problems
 **Fix**:
 ```bash
 # Check Envoy Gateway
@@ -679,13 +676,12 @@ dig www.fabianpiper.com
 # - Verify Cloudflare API token in OCI Vault
 ```
 
-**Issue**: GitHub Actions failing with "OCI authentication failed"  
-**Cause**: OIDC misconfigured or Vault secrets missing  
+**Issue**: GitHub Actions failing with "OCI authentication failed"
+**Cause**: SOPS secrets missing or OCI Vault secrets missing
 **Fix**:
 ```bash
-# Verify OIDC provider exists
-make plan-prod-oidc
-# Should show provider with GitHub issuer
+# Verify SOPS secrets decrypt correctly
+make sops-decrypt-prod
 
 # Verify Vault secrets exist
 ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_IP> \
@@ -697,8 +693,8 @@ ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_IP> \
 # Click failed run → Re-run jobs
 ```
 
-**Issue**: ArgoCD ApplicationSet controller crashing  
-**Cause**: ApplicationSet CRD missing or version mismatch  
+**Issue**: ArgoCD ApplicationSet controller crashing
+**Cause**: ApplicationSet CRD missing or version mismatch
 **Fix**:
 ```bash
 # Check CRD exists
@@ -715,8 +711,8 @@ ssh -i ~/.ssh/id_rsa ubuntu@<INGRESS_IP> \
   'ssh ubuntu@10.0.2.10 "sudo kubectl create namespace argocd && sudo kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml"'
 ```
 
-**Issue**: Terraform state locked  
-**Cause**: Previous apply interrupted  
+**Issue**: Terraform state locked
+**Cause**: Previous apply interrupted
 **Fix**:
 ```bash
 # ONLY if no apply is currently running!
@@ -727,8 +723,8 @@ rm -f components/terraform/<component>/terraform.tfstate.d/glg-prod-fra/.terrafo
 rm -f components/terraform/networking/terraform.tfstate.d/glg-prod-fra/.terraform.tfstate.lock.info
 ```
 
-**Issue**: Cannot SSH to instances  
-**Cause**: Security list or SSH key mismatch  
+**Issue**: Cannot SSH to instances
+**Cause**: Security list or SSH key mismatch
 **Fix**:
 ```bash
 # Verify security list allows SSH from your IP
@@ -840,16 +836,16 @@ curl -I https://www.fabianpiper.com
 
 ### Regular Operations
 - **Daily**: Check GitHub Actions runs for failures
-- **Weekly**: 
+- **Weekly**:
   - Monitor OCI Free Tier usage dashboard
   - Review ArgoCD sync status
   - Check for pending image updates
-- **Monthly**: 
+- **Monthly**:
   - Review K3s version for updates
   - Check Terraform provider versions
   - Audit security list rules
   - Review OCI Vault secret rotation
-- **Quarterly**: 
+- **Quarterly**:
   - Rotate Cloudflare API token
   - Rotate GitHub PAT
   - Review resource utilization and optimize
@@ -869,8 +865,6 @@ terraform init -upgrade
 cd ../iam
 terraform init -upgrade
 cd ../vault
-terraform init -upgrade
-cd ../oidc
 terraform init -upgrade
 cd ../cluster
 terraform init -upgrade
