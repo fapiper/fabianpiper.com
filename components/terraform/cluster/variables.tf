@@ -43,7 +43,6 @@ variable "name" {
   type = string
 }
 
-# Networking
 variable "vcn_cidr_block" {
   description = "VCN CIDR block"
   type        = string

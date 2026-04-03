@@ -4,6 +4,7 @@ import:
   - catalog/oidc/defaults
   - catalog/networking/defaults
   - catalog/cluster/defaults
+  - catalog/dns/defaults
 
 vars:
   region: "eu-frankfurt-1"

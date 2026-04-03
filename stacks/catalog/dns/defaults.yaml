@@ -1,0 +1,13 @@
+components:
+  terraform:
+    dns:
+      metadata:
+        component: dns
+      vars:
+        enabled: true
+        name: dns
+        zone_id: "537a18e193fc9874b0f3c3ddcd12912f"  # fabianpiper.com
+        records:
+          - name: glg
+            proxied: false
+            ttl: 60

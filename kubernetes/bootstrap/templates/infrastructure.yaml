@@ -36,7 +36,6 @@ spec:
           kind: Gateway
           jqPathExpressions:
             - .spec.addresses
-            - .metadata.annotations["external-dns.alpha.kubernetes.io/target"]
         - group: external-secrets.io
           kind: ClusterSecretStore
           jqPathExpressions:
