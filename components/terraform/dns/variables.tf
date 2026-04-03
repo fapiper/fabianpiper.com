@@ -34,9 +34,10 @@ variable "cloudflare_api_token" {
   sensitive   = true
 }
 
-variable "zone_id" {
+variable "zone_name" {
   type        = string
-  description = "Cloudflare zone ID (from the Cloudflare dashboard)"
+  description = "Cloudflare DNS zone name"
+  default     = null
 }
 
 variable "records" {

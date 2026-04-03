@@ -1,6 +1,6 @@
 output "zone_id" {
-  description = "Cloudflare zone ID (passed through)"
-  value       = var.zone_id
+  description = "Cloudflare zone ID (resolved from zone_name)"
+  value       = local.enabled ? data.cloudflare_zone.default[0].id : null
 }
 
 output "record_ids" {

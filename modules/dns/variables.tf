@@ -4,8 +4,8 @@ variable "enabled" {
   default     = true
 }
 
-variable "zone_id" {
-  description = "Cloudflare zone ID (find it in the Cloudflare dashboard or via API)"
+variable "zone_name" {
+  description = "Cloudflare DNS zone name (e.g. fabianpiper.com) — zone ID is resolved automatically"
   type        = string
 }
 

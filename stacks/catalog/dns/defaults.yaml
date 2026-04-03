@@ -6,7 +6,7 @@ components:
       vars:
         enabled: true
         name: dns
-        zone_id: "537a18e193fc9874b0f3c3ddcd12912f"  # fabianpiper.com
+        zone_name: fabianpiper.com
         records:
           - name: glg
             proxied: false

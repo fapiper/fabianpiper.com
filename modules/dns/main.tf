@@ -4,10 +4,19 @@ locals {
   records_map = local.enabled ? { for r in var.records : r.name => r } : {}
 }
 
+# Resolve zone ID dynamically from the domain name
+data "cloudflare_zone" "default" {
+  count = local.enabled ? 1 : 0
+
+  filter = {
+    name = var.zone_name
+  }
+}
+
 resource "cloudflare_dns_record" "a" {
   for_each = local.records_map
 
-  zone_id = var.zone_id
+  zone_id = data.cloudflare_zone.default[0].id
   name    = each.value.name
   type    = "A"
   content = var.ingress_ip
