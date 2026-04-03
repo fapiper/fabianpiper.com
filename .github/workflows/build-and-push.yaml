@@ -125,15 +125,15 @@ jobs:
         id: setup_oci_config
         run: |
           set -euo pipefail
-          
+
           # Create OCI config directory
           mkdir -p ~/.oci
           chmod 700 ~/.oci
-          
+
           # Write private key to file
           echo "$OCI_CLI_KEY_CONTENT" > ~/.oci/key.pem
           chmod 600 ~/.oci/key.pem
-          
+
           # Create OCI config file
           cat > ~/.oci/config <<EOF
           [DEFAULT]
@@ -144,7 +144,7 @@ jobs:
           key_file=~/.oci/key.pem
           EOF
           chmod 600 ~/.oci/config
-          
+
           echo "✓ OCI CLI configured"
 
       - name: Install OCI CLI
@@ -157,7 +157,7 @@ jobs:
         id: list_secrets
         run: |
           set -euo pipefail
-          
+
           SECRETS_JSON=$(oci vault secret list \
             --config-file ~/.oci/config \
             --compartment-id "$OCI_COMPARTMENT_ID" \
@@ -165,38 +165,38 @@ jobs:
             --lifecycle-state ACTIVE \
             --query 'data[].{"name": "secret-name", "id": id}' \
             --output json)
-          
+
           {
             echo "secrets<<EOF_SECRETS_JSON"
             echo "$SECRETS_JSON"
             echo "EOF_SECRETS_JSON"
           } >> "$GITHUB_OUTPUT"
-          
+
           echo "✓ Found $(echo "$SECRETS_JSON" | jq '. | length') secrets"
 
       - name: Resolve Vault Secrets
         id: vault_secrets
         run: |
           set -euo pipefail
-          
+
           VAULT_SECRETS='${{ steps.list_secrets.outputs.secrets }}'
-          
+
           SECRET_FILE="$RUNNER_TEMP/vault-secrets-${{ github.run_id }}.env"
           > "$SECRET_FILE"
           chmod 600 "$SECRET_FILE"
-          
+
           if [ -n "$VAULT_SECRETS" ] && [ "$VAULT_SECRETS" != "[]" ]; then
             while IFS= read -r secret; do
               NAME=$(echo "$secret" | jq -r '.name')
               ID=$(echo "$secret" | jq -r '.id')
-          
+
               if ! echo "$NAME" | grep -qE '^[a-zA-Z0-9_-]+$'; then
                 echo "::warning::Skipping secret with unsafe name: $NAME"
                 continue
               fi
-          
+
               echo "Fetching secret: $NAME"
-          
+
               BUNDLE=$(oci secrets secret-bundle get \
                 --config-file ~/.oci/config \
                 --secret-id "$ID" \
@@ -204,21 +204,21 @@ jobs:
                 echo "::warning::Could not fetch secret: $NAME" >&2
                 continue
               }
-          
+
               VAL=$(echo "$BUNDLE" | jq -r '.data."secret-bundle-content".content' 2>/dev/null | base64 -d 2>/dev/null) || {
                 echo "::warning::Could not decode secret: $NAME" >&2
                 continue
               }
-          
+
               if [ -n "$VAL" ]; then
                 echo "::add-mask::$VAL"
-          
+
                 while IFS= read -r line; do
                   [ -n "$line" ] && echo "::add-mask::$line"
                 done <<< "$VAL"
-          
+
                 ARG_NAME=$(echo "$NAME" | tr '-' '_' | tr '[:lower:]' '[:upper:]')
-          
+
                 # Write to file
                 echo "${ARG_NAME}=${VAL}" >> "$SECRET_FILE"
                 echo "✓ Added secret: $ARG_NAME"
@@ -227,15 +227,13 @@ jobs:
           else
             echo "::warning::No secrets found or empty list"
           fi
-          
+
           echo "secret_file=$SECRET_FILE" >> "$GITHUB_OUTPUT"
           echo "::notice::Secrets written to secure file ($(wc -l < "$SECRET_FILE") lines)"
 
-      # Install QEMU for ARM-Emulation
+      # Install QEMU for arm64 cross-build
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-
-      - uses: docker/setup-qemu-action@v3  # required for arm64 cross-build
 
       - uses: docker/setup-buildx-action@v3
 
@@ -251,14 +249,9 @@ jobs:
           context: apps/${{ matrix.app }}
           push: true
           platforms: linux/amd64,linux/arm64
-
-          tags: |
-          platforms: linux/amd64,linux/arm64
-
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.app }}:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.app }}:${{ github.sha }}
-
           secret-files: |
             secrets=${{ steps.vault_secrets.outputs.secret_file }}
 
