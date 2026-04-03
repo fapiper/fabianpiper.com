@@ -9,6 +9,7 @@ spec:
   parentRefs:
     - name: public-gateway
       namespace: envoy-gateway-system
+      sectionName: https
   hostnames:
     - "glg.fabianpiper.com"
   rules:
@@ -17,3 +18,24 @@ spec:
       backendRefs:
         - name: www
           port: 80
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: www-redirect
+  namespace: www
+  annotations:
+    argocd.argoproj.io/sync-wave: "25"
+spec:
+  parentRefs:
+    - name: public-gateway
+      namespace: envoy-gateway-system
+      sectionName: http
+  hostnames:
+    - "glg.fabianpiper.com"
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 301
