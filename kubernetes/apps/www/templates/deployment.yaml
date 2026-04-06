@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "www.name" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "www.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "www.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "www.labels" . | nindent 8 }}
+    spec:
+      imagePullSecrets:
+        - name: regcred
+      containers:
+        - name: {{ include "www.name" . }}
+          image: {{ include "www.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.service.port }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+

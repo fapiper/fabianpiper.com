@@ -1,0 +1,38 @@
+# Number of pod replicas
+replicaCount: 2
+
+image:
+  repository: ghcr.io/fapiper/fabianpiper.com/www
+  # tag is the fallback used on first deploy.
+  # ArgoCD Image Updater (digest strategy) overwrites image.digest at runtime
+  # via .argocd-source-www.yaml, so the running pod references the exact digest.
+  tag: latest
+  # digest is populated automatically by ArgoCD Image Updater (sha256:...).
+  # When set the image reference becomes repository@digest (ignoring tag).
+  digest: ""
+  pullPolicy: IfNotPresent
+
+service:
+  port: 80
+
+# Ingress / Gateway API settings
+ingress:
+  hostname: glg.fabianpiper.com
+  # Namespace where the public-gateway lives
+  gatewayNamespace: envoy-gateway-system
+
+# TLS certificate (cert-manager ClusterIssuer)
+tls:
+  secretName: www-tls
+  issuerName: cloudflare-issuer
+  issuerKind: ClusterIssuer
+
+# Container resource requests and limits
+resources:
+  requests:
+    memory: "128Mi"
+    cpu: "100m"
+  limits:
+    memory: "256Mi"
+    cpu: "200m"
+

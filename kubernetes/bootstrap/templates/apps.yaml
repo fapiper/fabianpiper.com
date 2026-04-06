@@ -13,6 +13,10 @@ spec:
         requeueAfterSeconds: 30
         directories:
           - path: kubernetes/apps/*
+          # www has its own Application (bootstrap/templates/www.yaml) with
+          # ArgoCD Image Updater annotations – exclude it here to avoid conflicts.
+          - path: kubernetes/apps/www
+            exclude: true
   template:
     metadata:
       name: "{{.path.basename}}"

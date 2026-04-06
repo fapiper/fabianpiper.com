@@ -1,0 +1,14 @@
+apiVersion: v2
+name: loki
+description: >
+  Wrapper chart — deploys grafana/loki-stack (Loki monolithic + Promtail)
+  tuned for OCI ARM64 Free Tier. Loki service exposed as loki:3100 in this namespace.
+type: application
+version: 0.1.0
+appVersion: "2.9.3"
+
+dependencies:
+  - name: loki-stack
+    version: "2.10.2"
+    repository: https://grafana.github.io/helm-charts
+

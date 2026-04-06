@@ -1,0 +1,14 @@
+apiVersion: v2
+name: kube-prometheus-stack
+description: >
+  Wrapper chart — deploys prometheus-community/kube-prometheus-stack (Prometheus Operator,
+  Prometheus, Grafana, node-exporter, kube-state-metrics) tuned for OCI ARM64 Free Tier.
+type: application
+version: 0.1.0
+appVersion: "82.18.0"
+
+dependencies:
+  - name: kube-prometheus-stack
+    version: "82.18.0"
+    repository: https://prometheus-community.github.io/helm-charts
+

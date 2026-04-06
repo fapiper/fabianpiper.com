@@ -1,0 +1,122 @@
+# ─── Wrapper-chart tunables (consumed by templates/ only) ───────────────────
+
+ingress:
+  hostname: glg.fabianpiper.com
+  gatewayNamespace: envoy-gateway-system
+  subPath: /grafana
+
+# Admin credentials — ExternalSecret pulls the password from OCI Vault.
+# The resulting K8s Secret is referenced by grafana.admin.existingSecret below.
+grafanaAdmin:
+  secretName: grafana-admin
+  userKey: admin-user
+  passwordKey: admin-password
+
+# Must match kube-prometheus-stack.grafana.fullnameOverride so the HTTPRoute
+# backend points at the correct service.
+grafanaServiceName: grafana
+
+# ─── kube-prometheus-stack sub-chart values ─────────────────────────────────
+kube-prometheus-stack:
+
+  # Shorten all resource names to avoid hitting the 63-char label limit.
+  fullnameOverride: "kps"
+
+  # ── Alertmanager — disabled (no alert routing needed, saves ~200 Mi RAM) ──
+  alertmanager:
+    enabled: false
+
+  # ── Grafana ──────────────────────────────────────────────────────────────
+  grafana:
+    enabled: true
+    fullnameOverride: "grafana"   # service name = grafana (referenced by HTTPRoute)
+
+    # Admin credentials loaded from ExternalSecret (wave -5 in templates/).
+    admin:
+      existingSecret: "grafana-admin"
+      userKey: "admin-user"
+      passwordKey: "admin-password"
+
+    # Serve Grafana at /grafana sub-path behind the Gateway.
+    grafana.ini:
+      server:
+        root_url: "https://glg.fabianpiper.com/grafana"
+        serve_from_sub_path: true
+
+    # kube-prometheus-stack already provisions the default Prometheus datasource.
+    # Add Loki as an additional datasource pointing at the loki namespace.
+    additionalDataSources:
+      - name: Loki
+        type: loki
+        url: "http://loki.loki.svc.cluster.local:3100"
+        access: proxy
+        isDefault: false
+
+    persistence:
+      enabled: true
+      size: 2Gi
+
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+      limits:
+        cpu: "200m"
+        memory: "256Mi"
+
+  # ── Prometheus ───────────────────────────────────────────────────────────
+  prometheus:
+    prometheusSpec:
+      retention: 15d
+      storageSpec:
+        volumeClaimTemplate:
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 5Gi
+      resources:
+        requests:
+          cpu: "200m"
+          memory: "512Mi"
+        limits:
+          cpu: "500m"
+          memory: "1Gi"
+
+  # ── Prometheus Operator ───────────────────────────────────────────────────
+  prometheusOperator:
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+      limits:
+        cpu: "200m"
+        memory: "256Mi"
+
+  # ── node-exporter (DaemonSet — all 3 nodes) ───────────────────────────────
+  nodeExporter:
+    enabled: true
+
+  prometheus-node-exporter:
+    resources:
+      requests:
+        cpu: "50m"
+        memory: "64Mi"
+      limits:
+        cpu: "100m"
+        memory: "128Mi"
+
+  # ── kube-state-metrics ────────────────────────────────────────────────────
+  kubeStateMetrics:
+    enabled: true
+
+  kube-state-metrics:
+    resources:
+      requests:
+        cpu: "50m"
+        memory: "64Mi"
+      limits:
+        cpu: "100m"
+        memory: "128Mi"
+

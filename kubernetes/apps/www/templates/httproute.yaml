@@ -1,0 +1,49 @@
+# HTTPS route: glg.fabianpiper.com → www Service
+# PathPrefix / (least specific) catches everything not matched by /grafana.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "www.name" . }}-route
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "www.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "25"
+spec:
+  parentRefs:
+    - name: public-gateway
+      namespace: {{ .Values.ingress.gatewayNamespace }}
+      sectionName: https
+  hostnames:
+    - {{ .Values.ingress.hostname | quote }}
+  rules:
+    - matches:
+        - path: { type: PathPrefix, value: / }
+      backendRefs:
+        - name: {{ include "www.name" . }}
+          port: {{ .Values.service.port }}
+---
+# HTTP → HTTPS redirect
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "www.name" . }}-redirect
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "www.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "25"
+spec:
+  parentRefs:
+    - name: public-gateway
+      namespace: {{ .Values.ingress.gatewayNamespace }}
+      sectionName: http
+  hostnames:
+    - {{ .Values.ingress.hostname | quote }}
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 301
+

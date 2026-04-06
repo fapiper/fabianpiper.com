@@ -1,6 +1,6 @@
 # fabianpiper.com | Agent Operations Manual
 
-Last Updated: 2026-04-03
+Last Updated: 2026-04-06
 Generated for: AI Agents
 Repository: https://github.com/fapiper/fabianpiper.com
 Validation Status: Docs reviewed, Code cross-referenced, Ready for autonomous operation
@@ -53,7 +53,7 @@ Validation Status: Docs reviewed, Code cross-referenced, Ready for autonomous op
 ```
 GitHub Push → GitHub Actions (build image, push to ghcr.io)
                     ↓
-ArgoCD Image Updater (detects :latest, writes back to git)
+ArgoCD Image Updater (resolves digest of :latest, writes sha256 to git)
                     ↓
 ArgoCD (polls git every 30s, syncs K8s manifests)
                     ↓
@@ -95,7 +95,8 @@ cloud-init (server node)
        └─ ArgoCD Application "root"
             └─ watches kubernetes/bootstrap/templates/*.yaml
                  ├─ ApplicationSet "infrastructure" (discovers kubernetes/infrastructure/*)
-                 └─ ApplicationSet "apps"           (discovers kubernetes/apps/*)
+                 ├─ ApplicationSet "apps"           (discovers kubernetes/apps/*, excludes www)
+                 └─ Application    "www"            (dedicated, with Image Updater annotations)
 ```
 
 Git polling interval: **30 seconds** (`requeueAfterSeconds: 30` in both ApplicationSets).
@@ -136,17 +137,19 @@ fabianpiper.com/
 │   │   ├── root.yaml             # Single ArgoCD Application (applied via cloud-init)
 │   │   └── templates/
 │   │       ├── infrastructure.yaml  # ApplicationSet → kubernetes/infrastructure/*
-│   │       └── apps.yaml            # ApplicationSet → kubernetes/apps/*
+│   │       ├── apps.yaml            # ApplicationSet → kubernetes/apps/* (excludes www)
+│   │       └── www.yaml             # Dedicated Application for www (Image Updater annotations)
 │   ├── apps/
-│   │   └── www/                  # Portfolio deployment (2 replicas, :latest tag)
+│   │   └── www/                  # Portfolio – Helm chart (Chart.yaml + values.yaml + templates/)
 │   └── infrastructure/
-│       ├── argocd-image-updater/ # Auto-updates image tags, git write-back
-│       ├── cert-manager/         # TLS via Let's Encrypt (K3s HelmChart CRD)
-│       ├── envoy-gateway/        # Gateway API ingress (hostNetwork on ingress node)
-│       ├── external-dns/         # Cloudflare DNS sync
-│       ├── external-secrets/     # OCI Vault → K8s Secrets (K3s HelmChart CRD)
-│       ├── grafana/              # Grafana 11.6.0 at /grafana, Prometheus datasource
-│       └── prometheus/           # Prometheus v3.3.0, 15d retention, K8s SD
+│       ├── argocd-image-updater/   # Auto-updates image digest, git write-back   [Kustomize]
+│       ├── cert-manager/           # TLS via Let's Encrypt (K3s HelmChart CRD)   [Kustomize]
+│       ├── envoy-gateway/          # Gateway API ingress (hostNetwork on ingress) [Kustomize]
+│       ├── external-dns/           # Cloudflare DNS sync                          [Kustomize]
+│       ├── external-secrets/       # OCI Vault → K8s Secrets (K3s HelmChart CRD) [Kustomize]
+│       ├── gatus/                  # Status page at /status                       [Helm chart]
+│       ├── kube-prometheus-stack/  # Prometheus+Grafana+node-exporter+KSM         [Helm chart wrapper]
+│       └── loki/                   # Loki (monolithic) + Promtail                 [Helm chart wrapper]
 ├── components/terraform/         # Atmos thin wrappers (no logic, just delegation)
 │   ├── cluster/
 │   ├── dns/
@@ -201,7 +204,9 @@ fabianpiper.com/
 #### `kubernetes/apps/www` — Portfolio Website
 - **Image**: `ghcr.io/fapiper/fabianpiper.com/www:latest`
 - **Replicas**: 2
-- **Image updates**: ArgoCD Image Updater detects new `:latest` push → writes tag back to git → ArgoCD syncs
+- **Deployed as**: Custom **Helm chart** (`Chart.yaml` + `values.yaml` + `templates/`)
+- **Image updates**: ArgoCD Image Updater (digest strategy) monitors `:latest` tag → resolves sha256 digest → writes to `.argocd-source-www.yaml` via git → ArgoCD syncs with `image@sha256:…` reference
+- **Image Updater annotations**: Live on the dedicated `bootstrap/templates/www.yaml` Application (NOT on the Deployment)
 - **URLs**: `https://www.fabianpiper.com`, `https://glg.fabianpiper.com`
 - **Secrets**: `regcred` (GHCR pull secret), app env vars from OCI Vault via ExternalSecret
 
@@ -232,26 +237,48 @@ fabianpiper.com/
 - `ExternalSecret` → creates K8s `Secret` by referencing OCI Vault secret names
 
 #### `kubernetes/infrastructure/argocd-image-updater` — Image Automation
-- Polls GHCR for new `:latest` tags on the `www` image
+- Polls GHCR for the `:latest` tag on the `www` image every 2 minutes
 - Write-back: `git` method using `argocd/argocd-image-updater-github-creds` secret
-- Update strategy: `latest`, tag filter `regexp:^latest$`
+- Update strategy: `digest` — resolves the sha256 digest of `:latest` and writes it to `image.digest` Helm value
+- Annotations live on the **Application** resource (`bootstrap/templates/www.yaml`), not on the Deployment
 
-#### `kubernetes/infrastructure/grafana` — Metrics Dashboard
-- **Image**: `grafana/grafana:11.6.0`
-- **URL**: `https://glg.fabianpiper.com/grafana`
-- **Admin credentials**: OCI Vault → ExternalSecret → `grafana-admin` K8s Secret
-- **Datasource**: Prometheus, auto-provisioned via ConfigMap at `/etc/grafana/provisioning/datasources/`
-- **Storage**: 2 Gi PVC `grafana-data` (K3s local-path)
-- **Sync waves**: PVC + Deployment wave `20`, datasource ConfigMap wave `15`, HTTPRoute wave `25`
+#### `kubernetes/infrastructure/kube-prometheus-stack` — Metrics Collection + Dashboard
+- **Deployed as**: **Helm chart wrapper** around `prometheus-community/kube-prometheus-stack`
+- **Chart version**: `82.18.0` (Prometheus Operator v0.89.0)
+- **Namespace**: `kube-prometheus-stack`
+- **Components enabled**: Prometheus (v3.x), Grafana (via sub-chart), node-exporter (DaemonSet), kube-state-metrics
+- **Components disabled**: Alertmanager, Pushgateway
+- **Grafana URL**: `https://glg.fabianpiper.com/grafana`
+- **Grafana admin credentials**: OCI Vault → ExternalSecret (wave `-5`) → `grafana-admin` K8s Secret
+- **Grafana datasources**: Prometheus (default, auto-provisioned by chart) + Loki (additionalDataSources)
+- **Grafana service**: `grafana.kube-prometheus-stack.svc.cluster.local:80` (fullnameOverride: grafana)
+- **Prometheus access**: ClusterIP only — `prometheus-operated.kube-prometheus-stack.svc.cluster.local:9090`
+- **Prometheus storage**: 5 Gi PVC (K3s local-path)
+- **Grafana storage**: 2 Gi PVC (K3s local-path)
+- **Scraping**: ServiceMonitor-based (Kubernetes API, nodes, kubelet, cAdvisor, kube-state-metrics)
+- **Sync waves**: ExternalSecret wave `-5` (before upstream chart default wave `0`), HTTPRoute wave `25`
+- **fullnameOverride**: `kps` (for kube-prometheus-stack resources), `grafana` (for Grafana service)
+- **Dependency lock**: `Chart.lock` committed — run `helm dep update` after every version bump
 
-#### `kubernetes/infrastructure/prometheus` — Metrics Collection
-- **Image**: `prom/prometheus:v3.3.0`
-- **Retention**: 15 days
-- **Storage**: 5 Gi PVC `prometheus-data` (K3s local-path)
-- **Access**: ClusterIP only — `prometheus.prometheus.svc.cluster.local:9090` (no public route)
-- **RBAC**: ClusterRole with read on nodes, pods, services, endpoints, namespaces
-- **Sync waves**: RBAC + ConfigMap wave `5`, PVC + Deployment + Service wave `10`
-- **Auto-instrumentation**: Pods annotated with `prometheus.io/scrape: "true"` are auto-discovered
+#### `kubernetes/infrastructure/loki` — Log Aggregation
+- **Deployed as**: **Helm chart wrapper** around `grafana/loki-stack`
+- **Chart version**: `2.10.2` (Loki v2.9.3)
+- **Namespace**: `loki`
+- **Components**: Loki (monolithic/single-binary, filesystem storage) + Promtail (DaemonSet)
+- **Loki service**: `loki.loki.svc.cluster.local:3100` (fullnameOverride: loki)
+- **Grafana datasource URL**: `http://loki.loki.svc.cluster.local:3100`
+- **Storage**: 5 Gi PVC (K3s local-path, no public route)
+- **fullnameOverride**: `loki`
+- **Dependency lock**: `Chart.lock` committed — run `helm dep update` after every version bump
+
+#### `kubernetes/infrastructure/gatus` — Status Page
+- **Deployed as**: Custom **Helm chart** (`Chart.yaml` + `values.yaml` + `templates/`)
+- **Namespace**: `gatus`
+- **URL**: `https://glg.fabianpiper.com/status` (no authentication)
+- **Config**: Endpoints defined in `values.yaml` under `config.endpoints`, rendered into a ConfigMap
+- **Monitored endpoints**: `www.fabianpiper.com`, `glg.fabianpiper.com`, `glg.fabianpiper.com/grafana`
+- **Storage**: none (in-memory)
+- **Sync waves**: ConfigMap wave `5`, Deployment + Service wave `10`, HTTPRoute wave `25`
 
 ### OCI Vault Secrets (Runtime)
 
@@ -261,7 +288,7 @@ fabianpiper.com/
 | `git-username` | argocd-image-updater | GitHub username |
 | `site-url` | www app | Public site URL |
 | `mixpanel-token` | www app | Analytics token (optional) |
-| `grafana-admin-password` | grafana | Grafana admin password |
+| `grafana-admin-password` | kube-prometheus-stack (Grafana) | Grafana admin password |
 
 ---
 
@@ -447,7 +474,8 @@ kubectl get pods -A
 ### Kubernetes Manifests
 
 - **One resource type per file**: `deployment.yaml`, `service.yaml`, `httproute.yaml`, etc.
-- **Every directory must have `kustomization.yaml`** listing all resources
+- **Kustomize dirs** (argocd-image-updater, cert-manager, envoy-gateway, external-dns, external-secrets): must have `kustomization.yaml` listing all resources
+- **Helm chart dirs** (prometheus, grafana, www): must have `Chart.yaml` + `values.yaml` + `templates/` — no `kustomization.yaml` needed (ArgoCD auto-detects Helm when `Chart.yaml` is present)
 - **Required labels on ALL resources**:
   ```yaml
   labels:
@@ -470,6 +498,29 @@ kubectl get pods -A
   **PVC and Deployment must always share the same sync wave.**
 - **Namespaces**: Directory name == namespace (apps and infrastructure components both).
 - **Image tags**: App images use `:latest` (managed by ArgoCD Image Updater). Infrastructure images use explicit pinned version tags.
+
+### Helm Charts
+
+All custom charts in this repo follow these conventions:
+
+- **Structure** (mandatory files):
+  ```
+  Chart.yaml          # apiVersion: v2, name, description, type: application, version, appVersion
+  values.yaml         # All tuneable defaults — every value must be used in a template
+  templates/
+    _helpers.tpl      # Named templates: <chart>.name, <chart>.labels, <chart>.selectorLabels
+    <resource>.yaml   # One resource kind per file (same as raw manifest convention)
+  ```
+- **Named templates** (`_helpers.tpl`): always define `<chart>.name`, `<chart>.labels`, `<chart>.selectorLabels`
+- **Common labels**: use `{{- include "<chart>.labels" . | nindent 4 }}` on every resource
+- **Resources block**: use `{{- toYaml .Values.resources | nindent 12 }}` — never hard-code limits
+- **Sync waves**: keep `argocd.argoproj.io/sync-wave` annotations in templates (same rules as raw manifests)
+- **PVC + Deployment same wave**: still required even inside a Helm chart — annotate both templates identically
+- **ESO template escaping**: External Secrets Operator uses `{{ }}` Go-template expressions evaluated at runtime. To embed them in a Helm template without Helm interpreting them, use `{{ "{{" }}` and `{{ "}}" }}`:
+  ```yaml
+  "username": "{{ "{{" }} .my_secret | trim {{ "}}" }}"
+  ```
+- **Validation**: `helm lint kubernetes/<path>/` before committing a chart change
 
 ### Shell Scripts
 
@@ -515,8 +566,8 @@ git commit -m "feat(www): <description>"
 git push origin main
 # → GitHub Actions builds linux/amd64 + linux/arm64
 # → Pushes ghcr.io/fapiper/fabianpiper.com/www:latest and www:<sha>
-# → ArgoCD Image Updater detects :latest (~2 min), writes tag back to git
-# → ArgoCD syncs deployment (~30 sec)
+# → ArgoCD Image Updater detects :latest digest change (~2 min), writes sha256 to git
+# → ArgoCD syncs deployment with new image@sha256 reference (~30 sec)
 ```
 
 ### Infrastructure Changes
@@ -539,12 +590,15 @@ git commit -m "feat(<module>): <description>"
 
 ### Adding a New Kubernetes Service
 
+Two patterns — choose based on complexity:
+
+**Option A – Kustomize (simple, few resources, no parameterisation needed)**:
 ```bash
 # 1. Create directory (name = ArgoCD app name = namespace)
 mkdir -p kubernetes/infrastructure/<service-name>
 
 # 2. Create required files:
-#    namespace.yaml, deployment.yaml, service.yaml, kustomization.yaml
+#    deployment.yaml, service.yaml, kustomization.yaml
 #    Optional: httproute.yaml, external-secret.yaml, pvc.yaml
 
 # 3. Validate locally
@@ -554,7 +608,28 @@ kubectl kustomize kubernetes/infrastructure/<service-name>/
 git add kubernetes/infrastructure/<service-name>/
 git commit -m "feat(k8s): add <service-name>"
 git push origin main
+```
 
+**Option B – Helm chart (recommended for new services; reusable, parameterised)**:
+```bash
+# 1. Create directory (name = ArgoCD app name = namespace)
+mkdir -p kubernetes/infrastructure/<service-name>/templates
+
+# 2. Create Chart.yaml, values.yaml, templates/_helpers.tpl, templates/<resource>.yaml
+#    ArgoCD auto-detects Chart.yaml → switches to Helm mode automatically
+
+# 3. Validate locally
+helm lint kubernetes/infrastructure/<service-name>/
+helm template <service-name> kubernetes/infrastructure/<service-name>/
+
+# 4. Commit and push
+git add kubernetes/infrastructure/<service-name>/
+git commit -m "feat(k8s): add <service-name>"
+git push origin main
+```
+
+**After pushing (both options)**:
+```bash
 # 5. Trigger immediate ArgoCD discovery
 ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
   'ssh ubuntu@10.0.2.10 sudo kubectl annotate applicationset infrastructure \
@@ -607,28 +682,26 @@ mkdir -p components/terraform/<module-name>
 
 - **URL**: `https://glg.fabianpiper.com/grafana`
 - **Login**: username `admin`, password from OCI Vault (`grafana-admin-password`)
-- **Datasource**: Prometheus — pre-provisioned via ConfigMap, no manual setup required
-- **Internal URL**: `http://grafana.grafana.svc.cluster.local:3000`
+- **Datasources**: Prometheus (default, auto-provisioned by kube-prometheus-stack) + Loki (additionalDataSources)
+- **Internal service**: `grafana.kube-prometheus-stack.svc.cluster.local:80`
 
 **Local port-forward**:
 ```bash
-# Start kubectl port-forward on server
 ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
-  'ssh ubuntu@10.0.2.10 "sudo kubectl port-forward svc/grafana 3000:3000 -n grafana &>/dev/null &"'
-# Tunnel through ingress
+  'ssh ubuntu@10.0.2.10 "sudo kubectl port-forward svc/grafana 3000:80 -n kube-prometheus-stack &>/dev/null &"'
 ssh -i ~/.ssh/id_rsa -L 3000:10.0.2.10:3000 ubuntu@$INGRESS_IP -N &
 # Open: http://localhost:3000/grafana
 ```
 
 ### Prometheus
 
-- **Internal URL**: `http://prometheus.prometheus.svc.cluster.local:9090`
+- **Internal URL**: `http://prometheus-operated.kube-prometheus-stack.svc.cluster.local:9090`
 - **No public HTTPRoute** — intentionally internal-only, accessible via Grafana datasource
 
 **Local port-forward**:
 ```bash
 ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
-  'ssh ubuntu@10.0.2.10 "sudo kubectl port-forward svc/prometheus 9090:9090 -n prometheus &>/dev/null &"'
+  'ssh ubuntu@10.0.2.10 "sudo kubectl port-forward svc/prometheus-operated 9090:9090 -n kube-prometheus-stack &>/dev/null &"'
 ssh -i ~/.ssh/id_rsa -L 9090:10.0.2.10:9090 ubuntu@$INGRESS_IP -N &
 # Open: http://localhost:9090
 ```
@@ -640,7 +713,7 @@ curl -s http://localhost:9090/api/v1/targets | \
 # All entries should show "health": "up"
 ```
 
-**Active scrape jobs**:
+**Active scrape jobs** (ServiceMonitor-based, managed by kube-prometheus-stack):
 
 | Job | Target | Auth |
 |-----|--------|------|
@@ -648,19 +721,21 @@ curl -s http://localhost:9090/api/v1/targets | \
 | `kubernetes-apiservers` | K8s API server | HTTPS + bearer token |
 | `kubernetes-nodes` | kubelet on each node | HTTPS + bearer token |
 | `kubernetes-cadvisor` | cAdvisor on each node | HTTPS + bearer token |
-| `kubernetes-pods` | Pods with scrape annotation | HTTP |
-| `kubernetes-service-endpoints` | Services with scrape annotation | HTTP |
+| `kube-state-metrics` | kube-state-metrics pod | HTTP |
+| `node-exporter` | node-exporter DaemonSet (all nodes) | HTTP |
 
-### Instrumenting Pods
+### Loki
 
-Add annotations to any pod template `spec.template.metadata.annotations`:
+- **Internal URL**: `http://loki.loki.svc.cluster.local:3100`
+- **No public route** — accessed via Grafana Loki datasource
+- **Promtail**: DaemonSet on all 3 nodes, scrapes `/var/log/containers`
 
-```yaml
-annotations:
-  prometheus.io/scrape: "true"
-  prometheus.io/port: "8080"      # Port exposing /metrics
-  prometheus.io/path: "/metrics"  # Optional, default: /metrics
-```
+### Gatus Status Page
+
+- **URL**: `https://glg.fabianpiper.com/status`
+- **No authentication** — public read-only status page
+- **Endpoints monitored**: www.fabianpiper.com, glg.fabianpiper.com, glg.fabianpiper.com/grafana
+- **Config**: edit `kubernetes/infrastructure/gatus/values.yaml` → `config.endpoints`
 
 ### Recommended Grafana Dashboard Imports
 
@@ -669,6 +744,7 @@ annotations:
 | Kubernetes cluster overview | `3119` | Node CPU / RAM / disk |
 | Kubernetes pod resources | `6417` | Per-pod resource usage |
 | Prometheus stats | `2` | Prometheus self-monitoring |
+| Loki Logs Explorer | `13639` | Log browsing via Loki |
 
 Import: Grafana UI → Dashboards → New → Import → enter ID.
 
@@ -684,8 +760,11 @@ terraform fmt -recursive
 cd modules/<changed>/ && terraform validate && cd ../..
 
 # Kubernetes manifests (run after any .yaml change)
+# Kustomize dirs (argocd-image-updater, cert-manager, envoy-gateway, external-dns, external-secrets):
 kubectl kustomize kubernetes/infrastructure/<changed>/
-kubectl kustomize kubernetes/apps/<changed>/
+# Helm chart dirs (kube-prometheus-stack, loki, gatus, www):
+helm lint kubernetes/infrastructure/<changed>/
+helm template <changed> kubernetes/infrastructure/<changed>/
 
 # Secret audit — must produce ZERO output
 git grep -iE '(password|secret|token|private_key)\s*[:=]\s*[^$\{T]' \
@@ -748,7 +827,7 @@ curl -sI https://www.fabianpiper.com | head -1
 |----------|-------|---------------|----------|
 | Compute — OCPUs (ARM) | 4 | 4 | **0 — cannot add nodes** |
 | Compute — RAM | 24 GB | 24 GB | **0** |
-| Block Storage | 200 GB | ~127 GB (~120 GB boot vols + 7 Gi PVCs) | ~73 GB |
+| Block Storage | 200 GB | ~132 GB (~120 GB boot vols + 12 Gi PVCs) | ~68 GB |
 | VCNs | 2 | 1 | 1 |
 | Reserved Public IPs | 2 | 1 | 1 |
 | Flexible Load Balancers | 1 | 0 (using NAT instance) | 1 |
@@ -892,22 +971,23 @@ ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
 ```bash
 # 1. Prometheus running?
 ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
-  'ssh ubuntu@10.0.2.10 sudo kubectl get pods -n prometheus'
+  'ssh ubuntu@10.0.2.10 sudo kubectl get pods -n kube-prometheus-stack'
 
-# 2. Datasource ConfigMap mounted correctly?
+# 2. Prometheus reachable from Grafana pod?
 ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
-  'ssh ubuntu@10.0.2.10 sudo kubectl exec deploy/grafana -n grafana -- \
-   cat /etc/grafana/provisioning/datasources/datasources.yaml'
-
-# 3. Prometheus reachable from Grafana pod?
-ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
-  'ssh ubuntu@10.0.2.10 sudo kubectl exec deploy/grafana -n grafana -- \
-   wget -qO- http://prometheus.prometheus.svc.cluster.local:9090/-/healthy'
+  'ssh ubuntu@10.0.2.10 sudo kubectl exec deploy/grafana -n kube-prometheus-stack -- \
+   wget -qO- http://prometheus-operated:9090/-/healthy'
 # Expected: Prometheus is Healthy.
 
-# 4. Restart Grafana to reload provisioning
+# 3. Loki reachable from Grafana pod?
 ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
-  'ssh ubuntu@10.0.2.10 sudo kubectl rollout restart deploy/grafana -n grafana'
+  'ssh ubuntu@10.0.2.10 sudo kubectl exec deploy/grafana -n kube-prometheus-stack -- \
+   wget -qO- http://loki.loki.svc.cluster.local:3100/ready'
+# Expected: ready
+
+# 4. Restart Grafana to reload datasource provisioning
+ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
+  'ssh ubuntu@10.0.2.10 sudo kubectl rollout restart deploy/grafana -n kube-prometheus-stack'
 ```
 
 ---
@@ -1066,17 +1146,32 @@ curl -sI https://www.fabianpiper.com | head -1   # HTTP/2 200
 | Monthly | Audit OCI security list rules |
 | Quarterly | Rotate Cloudflare API token → update OCI Vault + re-deploy external-dns |
 | Quarterly | Rotate GitHub PAT → update OCI Vault `git-pat` secret |
-| Quarterly | Review Grafana + Prometheus image versions |
+| Quarterly | Review kube-prometheus-stack chart version (`kubernetes/infrastructure/kube-prometheus-stack/Chart.yaml`) |
 | Quarterly | Test disaster recovery (full rebuild) |
 
 ### Updating Infrastructure Image Versions
 
 ```bash
-# Edit deployment.yaml with new tag
-vim kubernetes/infrastructure/<app>/deployment.yaml
-# e.g. image: prom/prometheus:v3.3.0 → prom/prometheus:v3.x.y
+# For wrapper charts (kube-prometheus-stack, loki): bump the dependency version
+# in Chart.yaml and appVersion, then regenerate Chart.lock, then push.
+# ArgoCD uses Chart.lock for reproducible dependency resolution — NEVER skip this step.
+vim kubernetes/infrastructure/kube-prometheus-stack/Chart.yaml   # version: X.Y.Z
+helm dependency update kubernetes/infrastructure/kube-prometheus-stack/
+git add kubernetes/infrastructure/kube-prometheus-stack/Chart.yaml \
+        kubernetes/infrastructure/kube-prometheus-stack/Chart.lock
 
-git add kubernetes/infrastructure/<app>/deployment.yaml
+vim kubernetes/infrastructure/loki/Chart.yaml                    # version: X.Y.Z
+helm dependency update kubernetes/infrastructure/loki/
+git add kubernetes/infrastructure/loki/Chart.yaml \
+        kubernetes/infrastructure/loki/Chart.lock
+
+# For the gatus custom chart: bump image.tag in values.yaml (no Chart.lock needed)
+vim kubernetes/infrastructure/gatus/values.yaml
+# e.g. tag: "v5.12.1" → "v5.x.x"
+
+# For Kustomize apps: edit the deployment.yaml image field
+vim kubernetes/infrastructure/<app>/deployment.yaml
+
 git commit -m "chore(<app>): update to vX.Y.Z"
 git push origin main
 # ArgoCD auto-syncs within 30 seconds
@@ -1114,16 +1209,18 @@ Before marking any task complete, verify **all applicable items**:
 - [ ] `terraform fmt -recursive` — no output (already formatted)
 - [ ] `terraform validate` in each affected module directory — exits 0
 - [ ] `make plan-prod-<component>` reviewed — no unexpected changes
-- [ ] Block storage impact calculated if new PVCs added (current ~127 GB, limit 200 GB)
+- [ ] Block storage impact calculated if new PVCs added (current ~132 GB, limit 200 GB)
 - [ ] Compute unchanged — no new OCI instances (currently at 100% free tier)
 
 **If Kubernetes manifests changed**:
-- [ ] `kubectl kustomize kubernetes/<path>/` — no YAML errors
-- [ ] `kubectl apply --dry-run=client -f kubernetes/<path>/` — all resources ok
+- [ ] For **Kustomize** dirs: `kubectl kustomize kubernetes/<path>/` — no YAML errors
+- [ ] For **Helm** chart dirs: `helm lint kubernetes/<path>/` — exits 0
 - [ ] Required labels on all resources (`app.kubernetes.io/name/instance/part-of`)
 - [ ] Resource `requests` AND `limits` defined on all containers
 - [ ] PVC sync wave == Deployment sync wave (WaitForFirstConsumer)
-- [ ] `kustomization.yaml` updated if new files added
+- [ ] `kustomization.yaml` updated if new files added to a **Kustomize** dir
+- [ ] `Chart.yaml` present and `helm lint` passes if using Helm
+- [ ] For **wrapper charts** (kube-prometheus-stack, loki): `helm dependency update kubernetes/<path>/` run and `Chart.lock` committed
 
 **Security**:
 - [ ] No plaintext secrets in code:
@@ -1161,6 +1258,7 @@ Before marking any task complete, verify **all applicable items**:
 | external-dns | https://kubernetes-sigs.github.io/external-dns/ |
 | Prometheus | https://prometheus.io/docs/ |
 | Grafana | https://grafana.com/docs/grafana/latest/ |
+| Helm | https://helm.sh/docs/ |
 | SOPS | https://github.com/mozilla/sops |
 | age | https://github.com/FiloSottile/age |
 | Terraform OCI Provider | https://registry.terraform.io/providers/oracle/oci/latest/docs |

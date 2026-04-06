@@ -1,0 +1,28 @@
+# Routes glg.fabianpiper.com/status → gatus Service.
+# TLS is already terminated by the existing www-tls certificate on the Gateway
+# https listener — no Certificate resource needed here.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "gatus.name" . }}-route
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "gatus.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "25"
+spec:
+  parentRefs:
+    - name: public-gateway
+      namespace: {{ .Values.ingress.gatewayNamespace }}
+      sectionName: https
+  hostnames:
+    - {{ .Values.ingress.hostname | quote }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: {{ .Values.ingress.subPath }}
+      backendRefs:
+        - name: {{ include "gatus.name" . }}
+          port: {{ .Values.service.port }}
+

@@ -33,16 +33,22 @@
       <img src="https://img.shields.io/badge/argocd-latest-2D3748?logo=argo&logoColor=EF7B4D&labelColor=2D3748" alt="ArgoCD">
     </picture>
   </a>
+  <a href="https://helm.sh/">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/helm-3-1A202C?logo=helm&logoColor=0F1689&labelColor=1A202C">
+      <img src="https://img.shields.io/badge/helm-3-2D3748?logo=helm&logoColor=0F1689&labelColor=2D3748" alt="Helm">
+    </picture>
+  </a>
   <a href="https://prometheus.io/">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/prometheus-v3.3.0-1A202C?logo=prometheus&logoColor=E6522C&labelColor=1A202C">
-      <img src="https://img.shields.io/badge/prometheus-v3.3.0-2D3748?logo=prometheus&logoColor=E6522C&labelColor=2D3748" alt="Prometheus">
+      <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/prometheus-v3.x-1A202C?logo=prometheus&logoColor=E6522C&labelColor=1A202C">
+      <img src="https://img.shields.io/badge/prometheus-v3.x-2D3748?logo=prometheus&logoColor=E6522C&labelColor=2D3748" alt="Prometheus">
     </picture>
   </a>
   <a href="https://grafana.com/">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/grafana-11.6.0-1A202C?logo=grafana&logoColor=F46800&labelColor=1A202C">
-      <img src="https://img.shields.io/badge/grafana-11.6.0-2D3748?logo=grafana&logoColor=F46800&labelColor=2D3748" alt="Grafana">
+      <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/grafana-11.x-1A202C?logo=grafana&logoColor=F46800&labelColor=1A202C">
+      <img src="https://img.shields.io/badge/grafana-11.x-2D3748?logo=grafana&logoColor=F46800&labelColor=2D3748" alt="Grafana">
     </picture>
   </a>
   <a href="https://www.oracle.com/cloud/free/">
@@ -78,15 +84,19 @@
 </p>
 
 <p align="center">
+  <a href="#overview">Overview</a>
+  <strong>·</strong>
+  <a href="#prerequisites">Prerequisites</a>
   <strong>·</strong>
   <a href="#installation">Installation</a>
   <strong>·</strong>
   <a href="#architecture">Architecture</a>
   <strong>·</strong>
-  <a href="#development">Development</a>
+  <a href="#cicd-pipeline">CI/CD Pipeline</a>
   <strong>·</strong>
-  <a href="#common-operations">Common operations</a>
+  <a href="#documentation">Documentation</a>
   <strong>·</strong>
+  <a href="#license">License</a>
 </p>
 
 ---
@@ -101,7 +111,7 @@ Key capabilities:
 - Automated image updates and zero-downtime deployments
 - Secure secret management using SOPS and OCI Vault
 - CI/CD pipeline with SOPS-encrypted OCI credentials and `GITHUB_TOKEN` for GHCR
-- Observability with Prometheus metrics collection and Grafana dashboards
+- Observability with kube-prometheus-stack (Prometheus + Grafana), Loki log aggregation, and Gatus status page
 
 ## Prerequisites
 
@@ -193,40 +203,36 @@ The infrastructure consists of:
 - OCI Vault for runtime secret storage via Instance Principal
 - Cloudflare DNS with static A records provisioned by Terraform, dynamic records synced by `external-dns` from HTTPRoutes
 - ArgoCD managing GitOps deployments
-- Prometheus + Grafana
+- kube-prometheus-stack (Prometheus + Grafana) + Loki for observability
 
 ### Directory Structure
+
+<details>
+<summary><code>fabianpiper.com/</code></summary>
 
 ```
 fabianpiper.com/
 ├── components/terraform/       # Atmos component wrappers
-│   ├── networking/            # VCN, subnets, security lists
-│   ├── iam/                   # Dynamic groups and policies
-│   ├── vault/                 # OCI Vault and stored secrets
-│   ├── dns/                   # Cloudflare DNS records
-│   └── cluster/               # K3s instances and cloud-init
+│   ├── networking/             # VCN, subnets, security lists
+│   ├── iam/                    # Dynamic groups and policies
+│   ├── vault/                  # OCI Vault and stored secrets
+│   ├── dns/                    # Cloudflare DNS records
+│   └── cluster/                # K3s instances and cloud-init
 ├── modules/                    # Terraform module implementations
 ├── stacks/                     # Atmos stack configurations
-│   ├── orgs/glg/prod/fra.yaml # Production deployment config
-│   ├── mixins/                # Reusable configuration snippets
-│   └── workflows/             # Multi-component workflows
+│   ├── orgs/glg/prod/fra.yaml  # Production deployment config
+│   ├── mixins/                 # Reusable configuration snippets
+│   └── workflows/              # Multi-component workflows
 ├── kubernetes/                 # GitOps manifests
-│   ├── bootstrap/             # ArgoCD root app and ApplicationSets
-│   │   ├── root.yaml         # Single entry point (applied via cloud-init)
-│   │   └── templates/        # ApplicationSets (auto-discover apps + infra)
-│   ├── infrastructure/        # Platform services
-│   │   ├── cert-manager/     # TLS via Let's Encrypt
-│   │   ├── envoy-gateway/    # Ingress (Gateway API)
-│   │   ├── external-dns/     # Cloudflare DNS sync
-│   │   ├── external-secrets/ # OCI Vault → K8s Secrets
-│   │   ├── argocd-image-updater/ # Automated image updates
-│   │   ├── grafana/          # Metrics dashboard (Grafana 11.6.0)
-│   │   └── prometheus/       # Metrics collection (Prometheus v3.3.0)
-│   └── apps/                  # Application deployments
+│   ├── bootstrap/              # ArgoCD root app and ApplicationSets
+│   ├── infrastructure/         # Platform services (cert-manager, gateway, monitoring…)
+│   └── apps/                   # Application deployments
 ├── apps/www/                   # Website source code (Astro 5.7)
 ├── secrets/prod/               # SOPS-encrypted secrets
 └── .github/workflows/          # CI/CD automation
 ```
+
+</details>
 
 ## CI/CD Pipeline
 
@@ -248,4 +254,3 @@ For detailed operational procedures and agent-friendly instructions, refer to [A
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-

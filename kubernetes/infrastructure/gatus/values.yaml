@@ -1,0 +1,62 @@
+image:
+  repository: twinproduction/gatus
+  tag: "v5.12.1"
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+service:
+  port: 8080
+
+# Ingress / Gateway API settings
+ingress:
+  hostname: glg.fabianpiper.com
+  gatewayNamespace: envoy-gateway-system
+  subPath: /status
+
+# Container resource requests and limits
+resources:
+  requests:
+    cpu: "25m"
+    memory: "32Mi"
+  limits:
+    cpu: "100m"
+    memory: "64Mi"
+
+# Gatus configuration — rendered into a ConfigMap and mounted at /config/config.yaml.
+# Add or remove endpoints here; no template changes needed.
+config:
+  web:
+    port: 8080
+    address: "0.0.0.0"
+    base-path: "/status"
+
+  ui:
+    title: "Status | fabianpiper.com"
+    header: "Status"
+
+  storage:
+    type: memory
+
+  endpoints:
+    - name: "www.fabianpiper.com"
+      url: "https://www.fabianpiper.com"
+      interval: 5m
+      conditions:
+        - "[STATUS] == 200"
+        - "[RESPONSE_TIME] < 2000"
+
+    - name: "glg.fabianpiper.com"
+      url: "https://glg.fabianpiper.com"
+      interval: 5m
+      conditions:
+        - "[STATUS] == 200"
+        - "[RESPONSE_TIME] < 2000"
+
+    - name: "Grafana"
+      url: "https://glg.fabianpiper.com/grafana"
+      interval: 5m
+      conditions:
+        - "[STATUS] == 200"
+        - "[RESPONSE_TIME] < 5000"
+

@@ -1,0 +1,7 @@
+apiVersion: v2
+name: www
+description: Portfolio website – Astro 5.7, deployed via GitOps on K3s
+type: application
+version: 0.1.0
+appVersion: "latest"
+

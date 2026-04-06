@@ -1,0 +1,32 @@
+loki-stack:
+
+  loki:
+    enabled: true
+    fullnameOverride: "loki"   # service name = loki  (used by Grafana datasource)
+
+    persistence:
+      enabled: true
+      size: 5Gi
+      # storageClassName: ""  → default (local-path on K3s)
+
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+      limits:
+        cpu: "200m"
+        memory: "256Mi"
+
+  promtail:
+    enabled: true
+    resources:
+      requests:
+        cpu: "50m"
+        memory: "64Mi"
+      limits:
+        cpu: "100m"
+        memory: "128Mi"
+
+  grafana:
+    enabled: false
+
