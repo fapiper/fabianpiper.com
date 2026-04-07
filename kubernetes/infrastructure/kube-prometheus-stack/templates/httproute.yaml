@@ -1,7 +1,7 @@
 # Routes glg.fabianpiper.com/grafana → grafana Service (kube-prometheus-stack namespace).
 # PathPrefix /grafana is more specific than the www PathPrefix /, so the Gateway
 # correctly directs Grafana traffic here.
-# TLS is terminated by the existing www-tls certificate on the Gateway listener.
+# TLS is terminated by the existing glg-tls certificate on the Gateway listener.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -10,7 +10,7 @@ metadata:
   labels:
     {{- include "kube-prometheus-stack.labels" . | nindent 4 }}
   annotations:
-    argocd.argoproj.io/sync-wave: "-3"
+    argocd.argoproj.io/sync-wave: "25"
 spec:
   parentRefs:
     - name: public-gateway
