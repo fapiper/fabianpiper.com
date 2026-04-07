@@ -37,6 +37,7 @@ spec:
           kind: Gateway
           jqPathExpressions:
             - .spec.addresses
+            - .spec.listeners[].tls.certificateRefs[].namespace
         - group: external-secrets.io
           kind: ClusterSecretStore
           jqPathExpressions:

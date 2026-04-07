@@ -17,13 +17,18 @@ service:
 
 # Ingress / Gateway API settings
 ingress:
-  hostname: glg.fabianpiper.com
+  # Primary public hostname
+  hostname: www.fabianpiper.com
+  # Secondary hostname that also routes to this service (e.g. glg subdomain)
+  secondaryHostname: glg.fabianpiper.com
   # Namespace where the public-gateway lives
   gatewayNamespace: envoy-gateway-system
 
-# TLS certificate (cert-manager ClusterIssuer)
+# TLS certificate is now managed by the envoy-gateway infrastructure application.
+# Set create: false to prevent the www chart from issuing a duplicate certificate.
 tls:
-  secretName: www-tls
+  create: false
+  secretName: glg-tls     # kept for reference; not used when create: false
   issuerName: cloudflare-issuer
   issuerKind: ClusterIssuer
 

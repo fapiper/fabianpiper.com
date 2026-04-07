@@ -56,5 +56,6 @@ spec:
       tls:
         mode: Terminate
         certificateRefs:
-          - name: www-tls
-            namespace: www
+          - name: glg-tls
+            # No namespace = same namespace as Gateway (envoy-gateway-system).
+            # cert lives here so the Gateway is independent of the www application.

@@ -1,5 +1,5 @@
-# HTTPS route: glg.fabianpiper.com → www Service
-# PathPrefix / (least specific) catches everything not matched by /grafana.
+# HTTPS route: www.fabianpiper.com + glg.fabianpiper.com → www Service.
+# PathPrefix / (least specific) catches everything not matched by /grafana or /status.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -16,6 +16,9 @@ spec:
       sectionName: https
   hostnames:
     - {{ .Values.ingress.hostname | quote }}
+    {{- if .Values.ingress.secondaryHostname }}
+    - {{ .Values.ingress.secondaryHostname | quote }}
+    {{- end }}
   rules:
     - matches:
         - path: { type: PathPrefix, value: / }
@@ -23,7 +26,7 @@ spec:
         - name: {{ include "www.name" . }}
           port: {{ .Values.service.port }}
 ---
-# HTTP → HTTPS redirect
+# HTTP → HTTPS redirect for both hostnames
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -40,6 +43,9 @@ spec:
       sectionName: http
   hostnames:
     - {{ .Values.ingress.hostname | quote }}
+    {{- if .Values.ingress.secondaryHostname }}
+    - {{ .Values.ingress.secondaryHostname | quote }}
+    {{- end }}
   rules:
     - filters:
         - type: RequestRedirect

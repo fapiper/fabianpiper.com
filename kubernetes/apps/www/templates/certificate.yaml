@@ -1,3 +1,8 @@
+{{- if .Values.tls.create }}
+# Certificate is only created when tls.create=true.
+# By default (tls.create: false) the TLS cert is owned by the
+# envoy-gateway infrastructure application (kubernetes/infrastructure/envoy-gateway/certificate.yaml)
+# which keeps the Gateway's HTTPS listener independent of this application.
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
@@ -15,4 +20,7 @@ spec:
   commonName: {{ .Values.ingress.hostname | quote }}
   dnsNames:
     - {{ .Values.ingress.hostname | quote }}
-
+    {{- if .Values.ingress.secondaryHostname }}
+    - {{ .Values.ingress.secondaryHostname | quote }}
+    {{- end }}
+{{- end }}
