@@ -94,6 +94,25 @@ kube-prometheus-stack:
         cpu: "200m"
         memory: "256Mi"
 
+  # ── K3s compatibility — embedded components are not individually addressable ──
+  # These monitors target standalone kube-* processes that don't exist in K3s.
+  # Enabling them would cause scrape failures and, in v82.x, YAML render errors.
+  kubeScheduler:
+    enabled: false
+  kubeControllerManager:
+    enabled: false
+  kubeEtcd:
+    enabled: false
+  kubeProxy:
+    enabled: false
+
+  # ── kubelet ───────────────────────────────────────────────────────────────
+  # Disabled: v82.18.0 kubelet servicemonitor.yaml contains a YAML render bug
+  # (mapping values not allowed in this context, line 7) under K3s/K8s 1.34.
+  # node-exporter covers host-level metrics; re-enable after a chart upgrade.
+  kubelet:
+    enabled: false
+
   # ── node-exporter (DaemonSet — all 3 nodes) ───────────────────────────────
   nodeExporter:
     enabled: true
