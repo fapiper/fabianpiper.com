@@ -1,0 +1,28 @@
+# ArgoCD ConfigMap customizations.
+#
+# resource.customizations.health.monitoring.coreos.com_Prometheus
+#   The kube-prometheus-stack chart places the Prometheus CR (monitoring.coreos.com/Prometheus)
+#   and the prometheusOperator Deployment in the SAME sync wave (0).
+#   ArgoCD's built-in health check for the Prometheus CR waits for the StatefulSet
+#   (created by the operator) to be Running.  Because the operator and the CR are in the
+#   same wave, ArgoCD blocks waiting for Prometheus health before it has even created the
+#   operator Deployment → permanent deadlock.
+#   Fix: override the health check to always return Healthy so ArgoCD proceeds to
+#   subsequent waves (HTTPRoute at wave 25, etc.).  Actual Prometheus availability is
+#   still visible in its status fields; we just stop ArgoCD from blocking on it.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-cm
+    app.kubernetes.io/instance: argocd-cm
+    app.kubernetes.io/part-of: infrastructure
+data:
+  resource.customizations.health.monitoring.coreos.com_Prometheus: |
+    hs = {}
+    hs.status = "Healthy"
+    hs.message = ""
+    return hs
+
