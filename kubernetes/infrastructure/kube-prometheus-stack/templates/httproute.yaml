@@ -10,7 +10,7 @@ metadata:
   labels:
     {{- include "kube-prometheus-stack.labels" . | nindent 4 }}
   annotations:
-    argocd.argoproj.io/sync-wave: "25"
+    argocd.argoproj.io/sync-wave: "-3"
 spec:
   parentRefs:
     - name: public-gateway

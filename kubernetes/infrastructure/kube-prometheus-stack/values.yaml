@@ -86,6 +86,15 @@ kube-prometheus-stack:
 
   # ── Prometheus Operator ───────────────────────────────────────────────────
   prometheusOperator:
+    enabled: true
+    # Disable the admission webhook to prevent a bootstrap deadlock.
+    # The webhook (ValidatingWebhookConfiguration) is created by the pre-install
+    # Job; if its server (the operator) is not yet running, K8s rejects every
+    # CRD resource that goes through the webhook → operator never starts.
+    # Disabling it lets ArgoCD prune the existing webhook on next sync so the
+    # operator pod can come up cleanly. Re-enable once the cluster is stable.
+    admissionWebhooks:
+      enabled: false
     resources:
       requests:
         cpu: "100m"
