@@ -29,7 +29,7 @@ config:
   web:
     port: 8080
     address: "0.0.0.0"
-    base-path: "/status"
+    prefix: "/status"   # Gatus v5: renamed from base-path → prefix
 
   ui:
     title: "Status | fabianpiper.com"
