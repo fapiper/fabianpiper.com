@@ -16,9 +16,15 @@ metadata:
   name: argocd-cm
   namespace: argocd
   labels:
+    # Must match ArgoCD's own labels to avoid Server-Side-Apply field-manager conflicts.
     app.kubernetes.io/name: argocd-cm
-    app.kubernetes.io/instance: argocd-cm
-    app.kubernetes.io/part-of: infrastructure
+    app.kubernetes.io/part-of: argocd
+  annotations:
+    # Never prune this ConfigMap.  ArgoCD cannot start without argocd-cm; pruning it
+    # causes a bootstrap deadlock (controller crashes → root App cannot sync → argocd-cm
+    # cannot be recreated).  Even if the file is temporarily removed from git, the
+    # ConfigMap must remain in the cluster.
+    argocd.argoproj.io/sync-options: Prune=false
 data:
   resource.customizations.health.monitoring.coreos.com_Prometheus: |
     hs = {}
