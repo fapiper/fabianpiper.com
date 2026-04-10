@@ -26,3 +26,20 @@ data:
     hs.message = ""
     return hs
 
+  # resource.customizations.health.external-secrets.io_ExternalSecret
+  #   ExternalSecrets sync asynchronously via the ESO operator.  When kube-prometheus-stack
+  #   starts syncing, the ClusterSecretStore (oci-vault) may not yet be available because
+  #   the external-secrets operator installs in parallel (same ArgoCD sync-wave).
+  #   ArgoCD's built-in health check for ExternalSecret waits until the Secret is synced;
+  #   a failed sync returns Degraded and blocks all subsequent sync waves — including
+  #   wave 25 where the Grafana HTTPRoute lives.  Without the HTTPRoute the Gateway
+  #   never learns about /grafana and all traffic falls through to the www catch-all.
+  #   Fix: override to always return Healthy so ArgoCD proceeds past wave -5.
+  #   ESO retries automatically once the ClusterSecretStore is ready; Grafana recovers
+  #   when the grafana-admin Secret is eventually created.
+  resource.customizations.health.external-secrets.io_ExternalSecret: |
+    hs = {}
+    hs.status = "Healthy"
+    hs.message = ""
+    return hs
+

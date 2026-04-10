@@ -16,6 +16,10 @@ spec:
     metadata:
       labels:
         {{- include "gatus.labels" . | nindent 8 }}
+      annotations:
+        # Changing .Values.config triggers a rolling restart so the pod always
+        # runs with the latest ConfigMap content (Gatus reads config at startup only).
+        checksum/config: {{ toYaml .Values.config | sha256sum }}
     spec:
       securityContext:
         runAsNonRoot: true

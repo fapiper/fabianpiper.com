@@ -2,6 +2,14 @@
 # PathPrefix /grafana is more specific than the www PathPrefix /, so the Gateway
 # correctly directs Grafana traffic here.
 # TLS is terminated by the existing glg-tls certificate on the Gateway listener.
+#
+# Sync wave -6 (before wave -5 ExternalSecret and wave 0 chart resources):
+#   The grafana-admin ExternalSecret (wave -5) may block wave 0+ if ESO is not yet
+#   ready, and the Grafana Deployment (wave 0) may block wave 25+ if the grafana-admin
+#   Secret hasn't been created.  By placing the HTTPRoute in wave -6 it is applied
+#   before either blocking point.  Envoy Gateway accepts routes with missing backends
+#   and returns 503 until the Grafana pod is ready — far preferable to nginx 404 from
+#   the www catch-all (which happens when the route is never applied at all).
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -10,7 +18,7 @@ metadata:
   labels:
     {{- include "kube-prometheus-stack.labels" . | nindent 4 }}
   annotations:
-    argocd.argoproj.io/sync-wave: "25"
+    argocd.argoproj.io/sync-wave: "-6"
 spec:
   parentRefs:
     - name: public-gateway
