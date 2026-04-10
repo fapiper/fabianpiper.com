@@ -1,0 +1,35 @@
+# Standalone HTTPRoute for Grafana at glg.fabianpiper.com/grafana.
+#
+# Lives in its own Kustomize Application (grafana-route) so that it is applied
+# independently of the kube-prometheus-stack Helm chart.  This avoids the
+# situation where a sync-wave deadlock inside kube-prometheus-stack (e.g.
+# ExternalSecret Degraded → blocks wave 0 → HTTPRoute at wave 25 never applied)
+# leaves /grafana routing to the www catch-all (nginx 404).
+#
+# Grafana is configured with serve_from_sub_path: true, so it handles the full
+# /grafana prefix itself — no URL rewrite needed here.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: grafana-route
+  namespace: kube-prometheus-stack
+  labels:
+    app.kubernetes.io/name: grafana-route
+    app.kubernetes.io/instance: grafana-route
+    app.kubernetes.io/part-of: infrastructure
+spec:
+  parentRefs:
+    - name: public-gateway
+      namespace: envoy-gateway-system
+      sectionName: https
+  hostnames:
+    - "glg.fabianpiper.com"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /grafana
+      backendRefs:
+        - name: grafana
+          port: 80
+

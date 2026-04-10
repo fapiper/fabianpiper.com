@@ -54,7 +54,9 @@ config:
         - "[RESPONSE_TIME] < 2000"
 
     - name: "Grafana"
-      url: "https://glg.fabianpiper.com/grafana"
+      # /grafana/api/health returns 200 + JSON without auth (no redirect to /login).
+      # Monitoring /grafana directly would get a 302 → login, which Gatus counts as failure.
+      url: "https://glg.fabianpiper.com/grafana/api/health"
       interval: 5m
       conditions:
         - "[STATUS] == 200"

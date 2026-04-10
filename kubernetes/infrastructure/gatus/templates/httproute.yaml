@@ -2,12 +2,16 @@
 # TLS is already terminated by the existing www-tls certificate on the Gateway
 # https listener — no Certificate resource needed here.
 #
+# Gatus v5 behaviour: web.prefix (/status) only sets the SPA's HTML <base href>;
+# Fiber registers ALL routes at root (/, /health, /api/v1/…).
+# The gateway MUST strip the /status prefix before forwarding so that Gatus
+# receives root-relative paths.
+#
 # Two rules:
 #   1. Exact /status (no trailing slash) → 301 redirect to /status/
-#      Gatus uses Fiber whose static handler registers routes at /status/ (with trailing
-#      slash). Accessing /status without the slash returns Fiber's "Cannot GET /status"
-#      instead of the status page. The redirect fixes this for all browsers.
-#   2. PathPrefix /status/ → Gatus Service for UI, API (/status/api/…) and assets.
+#      Without this, browsers that omit the trailing slash receive a Fiber 404.
+#   2. PathPrefix /status/ + URLRewrite (ReplacePrefixMatch /) → strip /status/
+#      before forwarding to Gatus so the pod receives /, /api/v1/…, /health, etc.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -37,11 +41,21 @@ spec:
             path:
               type: ReplaceFullPath
               replaceFullPath: {{ .Values.ingress.subPath }}/
-    # Rule 2: proxy /status/* to the Gatus pod
+    # Rule 2: proxy /status/* to the Gatus pod.
+    # URLRewrite strips the /status/ prefix so Gatus receives root-relative paths:
+    #   /status/          → /
+    #   /status/api/v1/…  → /api/v1/…
+    #   /status/health    → /health   (external health path, not used by K8s probe)
     - matches:
         - path:
             type: PathPrefix
             value: {{ .Values.ingress.subPath }}/
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /
       backendRefs:
         - name: {{ include "gatus.name" . }}
           port: {{ .Values.service.port }}
