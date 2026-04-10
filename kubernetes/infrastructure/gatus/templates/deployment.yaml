@@ -41,13 +41,15 @@ spec:
               readOnly: true
           livenessProbe:
             httpGet:
-              path: /status/health
+              # Gatus v5 registers /health at root (no prefix), regardless of web.prefix.
+              # The prefix only applies to UI (/status/) and API (/status/api/v1/…) routes.
+              path: /health
               port: http
             initialDelaySeconds: 10
             periodSeconds: 30
           readinessProbe:
             httpGet:
-              path: /status/health
+              path: /health
               port: http
             initialDelaySeconds: 5
             periodSeconds: 10
