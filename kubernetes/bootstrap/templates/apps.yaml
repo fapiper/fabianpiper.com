@@ -3,6 +3,12 @@ kind: ApplicationSet
 metadata:
   name: apps
   namespace: argocd
+  annotations:
+    # Wave 5: created after the infrastructure ApplicationSet (wave 1) so the
+    # bootstrap ordering is: infra ApplicationSet → apps ApplicationSet → www (wave 10).
+    # Note: sync-waves order when ArgoCD *creates* these API objects within the
+    # root app's sync. Each Application's own sync then runs independently with retry.
+    argocd.argoproj.io/sync-wave: "5"
 spec:
   goTemplate: true
   goTemplateOptions: ["missingkey=error"]

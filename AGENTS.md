@@ -1,6 +1,6 @@
 # fabianpiper.com | Agent Operations Manual
 
-Last Updated: 2026-04-06
+Last Updated: 2026-04-11
 Generated for: AI Agents
 Repository: https://github.com/fapiper/fabianpiper.com
 Validation Status: Docs reviewed, Code cross-referenced, Ready for autonomous operation
@@ -103,15 +103,27 @@ Git polling interval: **30 seconds** (`requeueAfterSeconds: 30` in both Applicat
 
 ### Sync Wave Ordering Convention
 
-ArgoCD sync waves within each Application (lower = earlier):
+**Important distinction**: ArgoCD has two independent ordering mechanisms:
+
+- **Sync Waves** (`argocd.argoproj.io/sync-wave: "N"`) — numeric ordering of resources
+  **within the Sync phase**. Negative, zero, and positive waves are all part of the
+  same main Sync. ArgoCD applies wave N, waits for all resources to be healthy, then
+  proceeds to wave N+1.
+- **Sync Hooks** (`argocd.argoproj.io/hook: PreSync|Sync|PostSync`) — separate
+  lifecycle phases that run Jobs/Pods before or after the main resource sync. These are
+  used for database migrations, smoke tests, etc. We do **not** currently use hooks.
+
+Waves used in each Application (lower = applied first):
 
 | Wave | Typical Resources |
 |------|------------------|
+| `-5` | ExternalSecrets that create Secrets consumed by wave-0 sub-chart Deployments (e.g. Grafana admin password) |
 | `0` | Helm operators (cert-manager, external-secrets via HelmChart CRD) |
+| `1` | ExternalSecrets for secrets needed by later waves (cross-app dependencies tolerated by retry) |
 | `5` | RBAC (ServiceAccount, ClusterRole, ClusterRoleBinding), ConfigMaps |
 | `10` | PVCs + Deployments (must be **same wave** for WaitForFirstConsumer), Services |
 | `12–15` | Gateway, GatewayClass, provisioned ConfigMaps needed by later waves |
-| `20` | Deployments that depend on earlier waves (e.g., Grafana needs PVC + datasource CM) |
+| `20` | Deployments that depend on earlier waves |
 | `25` | HTTPRoutes, Certificates |
 
 > **K3s WaitForFirstConsumer gotcha**: `local-path` StorageClass uses `WaitForFirstConsumer` binding.
