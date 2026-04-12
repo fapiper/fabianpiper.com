@@ -1,22 +1,14 @@
-# Routes glg.fabianpiper.com/status → gatus Service.
-# TLS is already terminated by the existing glg-tls certificate on the Gateway
-# https listener — no Certificate resource needed here.
-#
-# Gatus v5 behaviour: web.prefix ("/status") causes Fiber to register ALL
-# application routes under the /status group:
-#   /status/          → UI HTML
-#   /status/api/v1/…  → REST API (used by the SPA for live polling)
-#   /health           → health-check endpoint (always at root, no prefix)
-#
-# Because Gatus owns the entire /status/* path space, the gateway must NOT
-# rewrite the path — doing so (ReplacePrefixMatch /) would forward "/" to Gatus
-# which has no handler at root, producing "Cannot GET /".
-#
-# Two rules:
-#   1. Exact /status (no trailing slash) → 301 redirect to /status/
-#      Without this, browsers that omit the trailing slash receive a Fiber 404.
-#   2. PathPrefix /status/ → forward as-is (NO URLRewrite).
-#      Gatus receives the full /status/* path and routes it internally.
+{{/*
+Routes status.fabianpiper.com → Gatus Service at root.
+
+Dedicated hostname approach: Gatus v5.12.1 ignores web.prefix for HTTP routing
+(the Fiber router never registers routes under /prefix/*). Serving Gatus at root
+on its own hostname avoids all sub-path complexity.
+
+DNS: external-dns creates the status.fabianpiper.com A record automatically
+from this HTTPRoute hostname.
+TLS: glg-tls certificate covers status.fabianpiper.com (added in certificate.yaml).
+*/}}
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -34,27 +26,11 @@ spec:
   hostnames:
     - {{ .Values.ingress.hostname | quote }}
   rules:
-    # Rule 1: redirect /status (exact) → /status/ (permanent redirect)
-    - matches:
-        - path:
-            type: Exact
-            value: {{ .Values.ingress.subPath }}
-      filters:
-        - type: RequestRedirect
-          requestRedirect:
-            statusCode: 301
-            path:
-              type: ReplaceFullPath
-              replaceFullPath: {{ .Values.ingress.subPath }}/
-    # Rule 2: proxy /status/* to the Gatus pod WITHOUT path rewriting.
-    # Gatus (web.prefix: "/status") handles the full path internally:
-    #   /status/          → UI HTML
-    #   /status/api/v1/…  → REST API
+    # All traffic to status.fabianpiper.com → Gatus (serves UI + API at root).
     - matches:
         - path:
             type: PathPrefix
-            value: {{ .Values.ingress.subPath }}/
+            value: /
       backendRefs:
         - name: {{ include "gatus.name" . }}
           port: {{ .Values.service.port }}
-

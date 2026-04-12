@@ -25,4 +25,5 @@ spec:
   dnsNames:
     - glg.fabianpiper.com
     - www.fabianpiper.com
+    - status.fabianpiper.com
 

@@ -287,9 +287,9 @@ fabianpiper.com/
 #### `kubernetes/infrastructure/gatus` — Status Page
 - **Deployed as**: Custom **Helm chart** (`Chart.yaml` + `values.yaml` + `templates/`)
 - **Namespace**: `gatus`
-- **URL**: `https://glg.fabianpiper.com/status` (no authentication)
+- **URL**: `https://status.fabianpiper.com` (no authentication)
 - **Config**: Endpoints defined in `values.yaml` under `config.endpoints`, rendered into a ConfigMap
-- **Monitored endpoints**: `www.fabianpiper.com`, `glg.fabianpiper.com`, `glg.fabianpiper.com/grafana`
+- **Monitored endpoints**: `www.fabianpiper.com`, `glg.fabianpiper.com`, `glg.fabianpiper.com/grafana`, `status.fabianpiper.com`
 - **Storage**: none (in-memory)
 - **Sync waves**: ConfigMap wave `5`, Deployment + Service wave `10`, HTTPRoute wave `25`
 
