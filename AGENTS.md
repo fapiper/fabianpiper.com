@@ -122,6 +122,7 @@ Waves used in each Application (lower = applied first):
 | `1` | ExternalSecrets for secrets needed by later waves (cross-app dependencies tolerated by retry) |
 | `5` | RBAC (ServiceAccount, ClusterRole, ClusterRoleBinding), ConfigMaps |
 | `10` | PVCs + Deployments (must be **same wave** for WaitForFirstConsumer), Services |
+| `11` | TLS Certificates that are referenced by a Gateway listener (must precede wave 12 so the Secret exists before the Gateway reconciles) |
 | `12–15` | Gateway, GatewayClass, provisioned ConfigMaps needed by later waves |
 | `20` | Deployments that depend on earlier waves |
 | `25` | HTTPRoutes, Certificates |

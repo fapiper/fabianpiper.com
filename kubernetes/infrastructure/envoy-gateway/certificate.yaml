@@ -16,7 +16,7 @@ metadata:
     app.kubernetes.io/instance: envoy-gateway
     app.kubernetes.io/part-of: infrastructure
   annotations:
-    argocd.argoproj.io/sync-wave: "13"
+    argocd.argoproj.io/sync-wave: "11"
 spec:
   secretName: glg-tls
   issuerRef:
