@@ -45,7 +45,7 @@ Validation Status: Docs reviewed, Code cross-referenced, Ready for autonomous op
 | State Backend | Local Terraform state per-component workspace | — |
 | Container Registry | GitHub Container Registry (ghcr.io) | — |
 | Ingress | Envoy Gateway (Gateway API) | — |
-| DNS | Cloudflare via external-dns | — |
+| DNS | Cloudflare via Terraform (modules/dns) | — |
 | Observability | Prometheus + Grafana | v3.3.0 / v11.6.0 |
 
 ### Architecture Mental Model
@@ -158,9 +158,9 @@ fabianpiper.com/
 │       ├── argocd-image-updater/   # Auto-updates image digest, git write-back   [Kustomize]
 │       ├── cert-manager/           # TLS via Let's Encrypt (K3s HelmChart CRD)   [Kustomize]
 │       ├── envoy-gateway/          # Gateway API ingress (hostNetwork on ingress) [Kustomize]
-│       ├── external-dns/           # Cloudflare DNS sync                          [Kustomize]
+│       ├── external-dns/           # Cloudflare DNS sync (disabled — resources: [])  [Kustomize]
 │       ├── external-secrets/       # OCI Vault → K8s Secrets (K3s HelmChart CRD) [Kustomize]
-│       ├── gatus/                  # Status page at /status                       [Helm chart]
+│       ├── gatus/                  # Status page (status.fabianpiper.com)         [Helm chart]
 │       ├── kube-prometheus-stack/  # Prometheus+Grafana+node-exporter+KSM         [Helm chart wrapper]
 │       └── loki/                   # Loki (monolithic) + Promtail                 [Helm chart wrapper]
 ├── components/terraform/         # Atmos thin wrappers (no logic, just delegation)
@@ -234,15 +234,15 @@ fabianpiper.com/
 - Listens on ports 80 (HTTP) and 443 (HTTPS)
 - All HTTPRoutes attach to `public-gateway`
 
-#### `kubernetes/infrastructure/external-dns` — DNS Automation
-- Syncs Cloudflare DNS records **dynamically** from HTTPRoutes and annotated Services
-- Cloudflare API token sourced from OCI Vault
-- Runs continuously in-cluster; reconciles on every change to HTTPRoute or Service resources
+#### `kubernetes/infrastructure/external-dns` — DNS Automation (disabled)
+- **Currently disabled**: `kustomization.yaml` has `resources: []` — no pod runs
+- All DNS records are managed exclusively by Terraform (`modules/dns`)
+- The directory is kept to preserve ArgoCD app registration; enabling it would conflict with Terraform-owned records
 
-> **DNS layering**: Two independent mechanisms manage Cloudflare DNS.
-> `modules/dns` (Terraform) creates the **static bootstrap A records** (`www.fabianpiper.com`, `glg.fabianpiper.com` → ingress IP) as a one-time provisioning step.
-> `external-dns` (K8s) manages **dynamic records** derived from Gateway API HTTPRoutes at runtime.
-> Both write to the same Cloudflare zone; Terraform records are stable and rarely change, while `external-dns` keeps route-level records in sync.
+> **DNS management**: All Cloudflare A records are managed by Terraform via `stacks/catalog/dns/defaults.yaml`.
+> Records: `www.fabianpiper.com`, `glg.fabianpiper.com`, `status.fabianpiper.com` → ingress IP.
+> To add/remove a hostname: edit `stacks/catalog/dns/defaults.yaml` → run `make apply-prod-dns`.
+> `proxied` defaults to `false` (direct TLS via cert-manager), `ttl` defaults to `300`.
 
 #### `kubernetes/infrastructure/external-secrets` — Secret Sync
 - Installed via K3s `HelmChart` CRD
@@ -745,9 +745,9 @@ curl -s http://localhost:9090/api/v1/targets | \
 
 ### Gatus Status Page
 
-- **URL**: `https://glg.fabianpiper.com/status`
+- **URL**: `https://status.fabianpiper.com`
 - **No authentication** — public read-only status page
-- **Endpoints monitored**: www.fabianpiper.com, glg.fabianpiper.com, glg.fabianpiper.com/grafana
+- **Endpoints monitored**: www.fabianpiper.com, glg.fabianpiper.com, glg.fabianpiper.com/grafana/api/health, status.fabianpiper.com
 - **Config**: edit `kubernetes/infrastructure/gatus/values.yaml` → `config.endpoints`
 
 ### Recommended Grafana Dashboard Imports

@@ -8,6 +8,6 @@ components:
         name: dns
         zone_name: fabianpiper.com
         records:
+          - name: www
           - name: glg
-            proxied: false
-            ttl: 60
+          - name: status

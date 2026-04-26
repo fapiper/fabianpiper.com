@@ -4,4 +4,3 @@ description: Gatus — endpoint health monitoring / public status page at /statu
 type: application
 version: 0.1.0
 appVersion: "v5.12.1"
-

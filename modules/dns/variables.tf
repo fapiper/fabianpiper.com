@@ -20,7 +20,7 @@ variable "records" {
   type = list(object({
     name    = string
     proxied = optional(bool, false)
-    ttl     = optional(number, 60)
+    ttl     = optional(number, 300)
   }))
   default = []
 }

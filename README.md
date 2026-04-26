@@ -51,6 +51,12 @@
       <img src="https://img.shields.io/badge/grafana-11.x-2D3748?logo=grafana&logoColor=F46800&labelColor=2D3748" alt="Grafana">
     </picture>
   </a>
+  <a href="https://github.com/TwiN/gatus">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/gatus-v5.x-1A202C?logo=statuspage&logoColor=white&labelColor=1A202C">
+      <img src="https://img.shields.io/badge/gatus-v5.x-2D3748?logo=statuspage&logoColor=white&labelColor=2D3748" alt="Gatus">
+    </picture>
+  </a>
   <a href="https://www.oracle.com/cloud/free/">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/oci-free_tier-1A202C?logo=oracle&logoColor=F80000&labelColor=1A202C">
@@ -201,9 +207,9 @@ The infrastructure consists of:
 - VCN with public (10.0.1.0/24) and private (10.0.2.0/24) subnets
 - Three ARM Ampere A1 instances running K3s
 - OCI Vault for runtime secret storage via Instance Principal
-- Cloudflare DNS with static A records provisioned by Terraform, dynamic records synced by `external-dns` from HTTPRoutes
+- Cloudflare DNS A records (`www`, `glg`, `status`) provisioned by Terraform (`modules/dns`)
 - ArgoCD managing GitOps deployments
-- kube-prometheus-stack (Prometheus + Grafana) + Loki for observability
+- kube-prometheus-stack (Prometheus + Grafana), Loki log aggregation, and Gatus status page (`https://status.fabianpiper.com`) for observability
 
 ### Directory Structure
 
