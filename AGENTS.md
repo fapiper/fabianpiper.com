@@ -1,6 +1,6 @@
 # fabianpiper.com | Agent Operations Manual
 
-Last Updated: 2026-04-11
+Last Updated: 2026-04-29
 Generated for: AI Agents
 Repository: https://github.com/fapiper/fabianpiper.com
 Validation Status: Docs reviewed, Code cross-referenced, Ready for autonomous operation
