@@ -67,40 +67,13 @@ kube-prometheus-stack:
         access: proxy
         isDefault: false
 
-    # ── Dashboard provisioning (downloaded from grafana.com at pod startup) ────
-    # downloadDashboards uses an initContainer (curlimages/curl, multi-arch) to
-    # fetch JSON from grafana.com and write it into the dashboards folder before
-    # Grafana starts.  Dashboards are sourced from the folder defined below.
+    # ── Dashboard provisioning via Grafana sidecar (no internet required at startup) ──
+    # The kube-prometheus-stack Grafana sub-chart runs a sidecar that watches for
+    # ConfigMaps labelled grafana_dashboard="1" in the release namespace and loads
+    # them dynamically — no init-container download, no grafana.com dependency.
+    # Dashboards are defined in templates/grafana-dashboards.yaml (one ConfigMap each).
     downloadDashboards:
-      enabled: true
-
-    dashboardProviders:
-      dashboardproviders.yaml:
-        apiVersion: 1
-        providers:
-          - name: node-exporter
-            orgId: 1
-            folder: "Node Exporter"
-            type: file
-            disableDeletion: false
-            editable: true
-            options:
-              path: /var/lib/grafana/dashboards/node-exporter
-
-    dashboards:
-      node-exporter:
-        node-exporter-full:
-          gnetId: 15282
-          revision: 2
-          datasource: Prometheus
-        node-exporter-11074:
-          gnetId: 14055
-          revision: 1
-          datasource: Prometheus
-        node-exporter-en:
-          gnetId: 14584
-          revision: 2
-          datasource: Prometheus
+      enabled: false
 
     persistence:
       enabled: true
