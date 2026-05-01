@@ -47,11 +47,6 @@ kube-prometheus-stack:
       server:
         root_url: "https://grafana.fabianpiper.com"
 
-    # Set an explicit UID for the auto-provisioned Prometheus datasource so that
-    # community dashboards using ${DS_PROMETHEUS} resolve it correctly.
-    sidecar:
-      datasources:
-        uid: prometheus
 
     # kube-prometheus-stack already provisions the default Prometheus datasource.
     # Explicit UIDs ensure community dashboards that reference ${DS_PROMETHEUS} /
