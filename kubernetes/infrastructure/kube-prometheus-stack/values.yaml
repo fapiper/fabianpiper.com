@@ -30,11 +30,19 @@ kube-prometheus-stack:
     enabled: true
     fullnameOverride: "grafana"   # service name = grafana (referenced by HTTPRoute)
 
-    # Skip init-chown-data: the PVC already has correct ownership from a previous
-    # successful run. The init container in v82.x runs as non-root and cannot
-    # chown pre-existing files → CrashLoopBackOff. Safe to disable.
+    # init-chown-data runs as UID 472 (non-root) in v82.x.  If any files on the
+    # PVC are root-owned (e.g. csv/pdf/png dirs created by Grafana v11 on first
+    # run), UID 472 cannot chown them → Permission denied → CrashLoopBackOff.
+    # Fix: force the init container to run as root (UID 0) so it can always
+    # correct ownership regardless of who created the existing files.
     initChownData:
-      enabled: false
+      enabled: true
+      securityContext:
+        runAsNonRoot: false
+        runAsUser: 0
+        capabilities:
+          add:
+            - CHOWN
 
     # Admin credentials loaded from ExternalSecret (wave -5 in templates/).
     admin:
