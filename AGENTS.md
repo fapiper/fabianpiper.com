@@ -231,7 +231,8 @@ fabianpiper.com/
 #### `kubernetes/infrastructure/envoy-gateway` — Ingress
 - GatewayClass `eg`, Gateway `public-gateway` in namespace `envoy-gateway-system`
 - Envoy pods: `hostNetwork: true`, NodeSelector `role: ingress`
-- Listens on ports 80 (HTTP) and 443 (HTTPS)
+- **Listens on ports 80 (HTTP) and 443 (HTTPS)**
+- **HTTP→HTTPS redirect**: `www-redirect` HTTPRoute in `kubernetes/apps/www/templates/httproute.yaml` covers all four public hostnames (`www`, `glg`, `grafana`, `status`). When adding a new subdomain, update `ingress.redirectHostnames` in `kubernetes/apps/www/values.yaml`.
 - All HTTPRoutes attach to `public-gateway`
 
 #### `kubernetes/infrastructure/external-dns` — DNS Automation (disabled)
@@ -240,8 +241,10 @@ fabianpiper.com/
 - The directory is kept to preserve ArgoCD app registration; enabling it would conflict with Terraform-owned records
 
 > **DNS management**: All Cloudflare A records are managed by Terraform via `stacks/catalog/dns/defaults.yaml`.
-> Records: `www.fabianpiper.com`, `glg.fabianpiper.com`, `status.fabianpiper.com` → ingress IP.
+> Records: `www.fabianpiper.com`, `glg.fabianpiper.com`, `grafana.fabianpiper.com`, `status.fabianpiper.com` → ingress IP.
 > To add/remove a hostname: edit `stacks/catalog/dns/defaults.yaml` → run `make apply-prod-dns`.
+> Also add the hostname to `ingress.redirectHostnames` in `kubernetes/apps/www/values.yaml` (HTTP→HTTPS redirect)
+> and to `spec.dnsNames` in `kubernetes/infrastructure/envoy-gateway/certificate.yaml` (TLS cert).
 > `proxied` defaults to `false` (direct TLS via cert-manager), `ttl` defaults to `300`.
 
 #### `kubernetes/infrastructure/external-secrets` — Secret Sync
@@ -269,7 +272,7 @@ fabianpiper.com/
 - **Prometheus storage**: 5 Gi PVC (K3s local-path)
 - **Grafana storage**: 2 Gi PVC (K3s local-path)
 - **Scraping**: ServiceMonitor-based (Kubernetes API, nodes, kubelet, cAdvisor, kube-state-metrics)
-- **Sync waves**: ExternalSecret wave `-5` (before upstream chart default wave `0`), HTTPRoute wave `25`
+- **Sync waves**: ExternalSecret wave `-5`, HTTPRoute wave `-4` (before upstream wave `0` — ensures routing survives operator deploy failures), upstream chart wave `0`
 - **fullnameOverride**: `kps` (for kube-prometheus-stack resources), `grafana` (for Grafana service)
 - **Dependency lock**: `Chart.lock` committed — run `helm dep update` after every version bump
 
