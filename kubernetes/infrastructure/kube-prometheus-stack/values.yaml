@@ -1,9 +1,8 @@
 # ─── Wrapper-chart tunables (consumed by templates/ only) ───────────────────
 
 ingress:
-  hostname: glg.fabianpiper.com
+  hostname: grafana.fabianpiper.com
   gatewayNamespace: envoy-gateway-system
-  subPath: /grafana
 
 # Admin credentials — ExternalSecret pulls the password from OCI Vault.
 # The resulting K8s Secret is referenced by grafana.admin.existingSecret below.
@@ -37,11 +36,10 @@ kube-prometheus-stack:
       userKey: "admin-user"
       passwordKey: "admin-password"
 
-    # Serve Grafana at /grafana sub-path behind the Gateway.
+    # Serve Grafana at the subdomain root (no sub-path needed).
     grafana.ini:
       server:
-        root_url: "https://glg.fabianpiper.com/grafana"
-        serve_from_sub_path: true
+        root_url: "https://grafana.fabianpiper.com"
 
     # kube-prometheus-stack already provisions the default Prometheus datasource.
     # Add Loki as an additional datasource pointing at the loki namespace.

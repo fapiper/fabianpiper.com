@@ -4,7 +4,7 @@
 #   • Gateway HTTPS listener never depends on the www application being healthy
 #   • cert-manager issues/renews the cert independently of app deployments
 #
-# Covers both public hostnames so all HTTPRoutes (www, grafana, status) can
+# Covers all public hostnames so all HTTPRoutes (www, grafana, status, glg)
 # share a single TLS context on the https listener.
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -26,4 +26,5 @@ spec:
     - glg.fabianpiper.com
     - www.fabianpiper.com
     - status.fabianpiper.com
+    - grafana.fabianpiper.com
 

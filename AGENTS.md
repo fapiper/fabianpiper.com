@@ -261,7 +261,7 @@ fabianpiper.com/
 - **Namespace**: `kube-prometheus-stack`
 - **Components enabled**: Prometheus (v3.x), Grafana (via sub-chart), node-exporter (DaemonSet), kube-state-metrics
 - **Components disabled**: Alertmanager, Pushgateway
-- **Grafana URL**: `https://glg.fabianpiper.com/grafana`
+- **Grafana URL**: `https://grafana.fabianpiper.com`
 - **Grafana admin credentials**: OCI Vault → ExternalSecret (wave `-5`) → `grafana-admin` K8s Secret
 - **Grafana datasources**: Prometheus (default, auto-provisioned by chart) + Loki (additionalDataSources)
 - **Grafana service**: `grafana.kube-prometheus-stack.svc.cluster.local:80` (fullnameOverride: grafana)
@@ -289,7 +289,7 @@ fabianpiper.com/
 - **Namespace**: `gatus`
 - **URL**: `https://status.fabianpiper.com` (no authentication)
 - **Config**: Endpoints defined in `values.yaml` under `config.endpoints`, rendered into a ConfigMap
-- **Monitored endpoints**: `www.fabianpiper.com`, `glg.fabianpiper.com`, `glg.fabianpiper.com/grafana`, `status.fabianpiper.com`
+- **Monitored endpoints**: `www.fabianpiper.com`, `glg.fabianpiper.com`, `grafana.fabianpiper.com/api/health`, `status.fabianpiper.com`
 - **Storage**: none (in-memory)
 - **Sync waves**: ConfigMap wave `5`, Deployment + Service wave `10`, HTTPRoute wave `25`
 
@@ -443,7 +443,7 @@ ssh -i ~/.ssh/id_rsa -L 8080:10.0.2.10:80 ubuntu@$INGRESS_IP -N &
 
 # Public endpoints
 curl -sI https://www.fabianpiper.com         | head -1  # HTTP/2 200
-curl -sI https://glg.fabianpiper.com/grafana | head -1  # HTTP/2 302
+curl -sI https://glg.fabianpiper.com         | head -1  # HTTP/2 200
 ```
 
 ### Local kubectl Access
@@ -693,7 +693,7 @@ mkdir -p components/terraform/<module-name>
 
 ### Grafana
 
-- **URL**: `https://glg.fabianpiper.com/grafana`
+- **URL**: `https://grafana.fabianpiper.com`
 - **Login**: username `admin`, password from OCI Vault (`grafana-admin-password`)
 - **Datasources**: Prometheus (default, auto-provisioned by kube-prometheus-stack) + Loki (additionalDataSources)
 - **Internal service**: `grafana.kube-prometheus-stack.svc.cluster.local:80`
@@ -703,7 +703,7 @@ mkdir -p components/terraform/<module-name>
 ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
   'ssh ubuntu@10.0.2.10 "sudo kubectl port-forward svc/grafana 3000:80 -n kube-prometheus-stack &>/dev/null &"'
 ssh -i ~/.ssh/id_rsa -L 3000:10.0.2.10:3000 ubuntu@$INGRESS_IP -N &
-# Open: http://localhost:3000/grafana
+# Open: http://localhost:3000
 ```
 
 ### Prometheus
@@ -747,7 +747,7 @@ curl -s http://localhost:9090/api/v1/targets | \
 
 - **URL**: `https://status.fabianpiper.com`
 - **No authentication** — public read-only status page
-- **Endpoints monitored**: www.fabianpiper.com, glg.fabianpiper.com, glg.fabianpiper.com/grafana/api/health, status.fabianpiper.com
+- **Endpoints monitored**: `www.fabianpiper.com`, `glg.fabianpiper.com`, `grafana.fabianpiper.com/api/health`, `status.fabianpiper.com`
 - **Config**: edit `kubernetes/infrastructure/gatus/values.yaml` → `config.endpoints`
 
 ### Recommended Grafana Dashboard Imports

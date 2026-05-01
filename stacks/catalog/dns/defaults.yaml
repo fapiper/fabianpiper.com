@@ -10,4 +10,5 @@ components:
         records:
           - name: www
           - name: glg
+          - name: grafana
           - name: status

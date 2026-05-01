@@ -56,8 +56,8 @@ config:
         - "[RESPONSE_TIME] < 2000"
 
     - name: "Grafana"
-      # /grafana/api/health returns 200 + JSON without auth (no redirect to /login).
-      url: "https://glg.fabianpiper.com/grafana/api/health"
+      # /api/health returns 200 + JSON without auth (no redirect to /login).
+      url: "https://grafana.fabianpiper.com/api/health"
       interval: 5m
       conditions:
         - "[STATUS] == 200"
