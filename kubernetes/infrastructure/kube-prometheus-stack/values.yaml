@@ -81,17 +81,14 @@ kube-prometheus-stack:
 
     dashboards:
       node-exporter:
-        # "1 Node Exporter for Prometheus Dashboard EN v20201010"
         node-exporter-full:
           gnetId: 15282
           revision: 2
           datasource: Prometheus
-        # "Node Exporter for Prometheus Dashboard based on 11074"
         node-exporter-11074:
           gnetId: 14055
           revision: 1
           datasource: Prometheus
-        # "Node Exporter Dashboard EN 20201010 / English"
         node-exporter-en:
           gnetId: 14584
           revision: 2
