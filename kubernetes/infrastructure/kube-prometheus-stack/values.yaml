@@ -47,11 +47,19 @@ kube-prometheus-stack:
       server:
         root_url: "https://grafana.fabianpiper.com"
 
+    # Set an explicit UID for the auto-provisioned Prometheus datasource so that
+    # community dashboards using ${DS_PROMETHEUS} resolve it correctly.
+    sidecar:
+      datasources:
+        uid: prometheus
+
     # kube-prometheus-stack already provisions the default Prometheus datasource.
-    # Add Loki as an additional datasource pointing at the loki namespace.
+    # Explicit UIDs ensure community dashboards that reference ${DS_PROMETHEUS} /
+    # ${DS_LOKI} template variables can resolve them without manual re-mapping.
     additionalDataSources:
       - name: Loki
         type: loki
+        uid: loki
         url: "http://loki.loki.svc.cluster.local:3100"
         access: proxy
         isDefault: false
