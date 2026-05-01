@@ -102,6 +102,13 @@ kube-prometheus-stack:
     # operator pod can come up cleanly. Re-enable once the cluster is stable.
     admissionWebhooks:
       enabled: false
+    # Disable operator TLS server. When admissionWebhooks.enabled=false, the chart
+    # does not create the kps-admission secret, but the operator binary still tries
+    # to load /cert/cert for its webhook TLS listener → CrashLoopBackOff.
+    # Setting tls.enabled=false removes the tls-secret volume from the Deployment
+    # and passes --web.cert-file="" so the operator starts without TLS.
+    tls:
+      enabled: false
     resources:
       requests:
         cpu: "100m"
