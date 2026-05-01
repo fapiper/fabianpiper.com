@@ -30,6 +30,12 @@ kube-prometheus-stack:
     enabled: true
     fullnameOverride: "grafana"   # service name = grafana (referenced by HTTPRoute)
 
+    # Skip init-chown-data: the PVC already has correct ownership from a previous
+    # successful run. The init container in v82.x runs as non-root and cannot
+    # chown pre-existing files → CrashLoopBackOff. Safe to disable.
+    initChownData:
+      enabled: false
+
     # Admin credentials loaded from ExternalSecret (wave -5 in templates/).
     admin:
       existingSecret: "grafana-admin"
