@@ -94,18 +94,13 @@ kube-prometheus-stack:
   # ── Prometheus Operator ───────────────────────────────────────────────────
   prometheusOperator:
     enabled: true
-    # admissionWebhooks.enabled=false: do not register the MutatingWebhookConfiguration
-    # so K8s never intercepts CRD creates through the operator → avoids bootstrap deadlock.
-    # certManager.enabled=true: delegate TLS cert creation to cert-manager (already running).
-    # cert-manager creates a SelfSigned Certificate → kps-admission Secret, which the
-    # operator Deployment mounts. Without this secret the operator pod stays ContainerCreating.
+    # Disable admission webhooks — no MutatingWebhookConfiguration registered.
+    # This avoids the bootstrap deadlock where K8s intercepts CRD creates
+    # through a webhook that isn't running yet.
     admissionWebhooks:
       enabled: false
-    # Disable operator TLS server. When admissionWebhooks.enabled=false the chart
-    # does not create the kps-admission Secret, but the operator binary still tries
-    # to load /cert/cert for its TLS listener → CrashLoopBackOff.
-    # tls.enabled=false removes the tls-secret volume mount and the --web.enable-tls
-    # arg so the operator starts without a TLS web server.
+    # Disable TLS on the operator web server — it runs plain HTTP on :8080.
+    # No kps-admission Secret is needed; keeps the setup as simple as possible.
     tls:
       enabled: false
     resources:
