@@ -94,19 +94,18 @@ kube-prometheus-stack:
   # ── Prometheus Operator ───────────────────────────────────────────────────
   prometheusOperator:
     enabled: true
-    # Disable the admission webhook to prevent a bootstrap deadlock.
-    # The webhook (ValidatingWebhookConfiguration) is created by the pre-install
-    # Job; if its server (the operator) is not yet running, K8s rejects every
-    # CRD resource that goes through the webhook → operator never starts.
-    # Disabling it lets ArgoCD prune the existing webhook on next sync so the
-    # operator pod can come up cleanly. Re-enable once the cluster is stable.
+    # admissionWebhooks.enabled=false: do not register the MutatingWebhookConfiguration
+    # so K8s never intercepts CRD creates through the operator → avoids bootstrap deadlock.
+    # certManager.enabled=true: delegate TLS cert creation to cert-manager (already running).
+    # cert-manager creates a SelfSigned Certificate → kps-admission Secret, which the
+    # operator Deployment mounts. Without this secret the operator pod stays ContainerCreating.
     admissionWebhooks:
       enabled: false
-    # Disable operator TLS server. When admissionWebhooks.enabled=false, the chart
-    # does not create the kps-admission secret, but the operator binary still tries
-    # to load /cert/cert for its webhook TLS listener → CrashLoopBackOff.
-    # Setting tls.enabled=false removes the tls-secret volume from the Deployment
-    # and passes --web.cert-file="" so the operator starts without TLS.
+    # Disable operator TLS server. When admissionWebhooks.enabled=false the chart
+    # does not create the kps-admission Secret, but the operator binary still tries
+    # to load /cert/cert for its TLS listener → CrashLoopBackOff.
+    # tls.enabled=false removes the tls-secret volume mount and the --web.enable-tls
+    # arg so the operator starts without a TLS web server.
     tls:
       enabled: false
     resources:
