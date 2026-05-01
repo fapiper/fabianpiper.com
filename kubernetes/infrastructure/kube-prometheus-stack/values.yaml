@@ -59,6 +59,44 @@ kube-prometheus-stack:
         access: proxy
         isDefault: false
 
+    # ── Dashboard provisioning (downloaded from grafana.com at pod startup) ────
+    # downloadDashboards uses an initContainer (curlimages/curl, multi-arch) to
+    # fetch JSON from grafana.com and write it into the dashboards folder before
+    # Grafana starts.  Dashboards are sourced from the folder defined below.
+    downloadDashboards:
+      enabled: true
+
+    dashboardProviders:
+      dashboardproviders.yaml:
+        apiVersion: 1
+        providers:
+          - name: node-exporter
+            orgId: 1
+            folder: "Node Exporter"
+            type: file
+            disableDeletion: false
+            editable: true
+            options:
+              path: /var/lib/grafana/dashboards/node-exporter
+
+    dashboards:
+      node-exporter:
+        # "1 Node Exporter for Prometheus Dashboard EN v20201010"
+        node-exporter-full:
+          gnetId: 15282
+          revision: 2
+          datasource: Prometheus
+        # "Node Exporter for Prometheus Dashboard based on 11074"
+        node-exporter-11074:
+          gnetId: 14055
+          revision: 1
+          datasource: Prometheus
+        # "Node Exporter Dashboard EN 20201010 / English"
+        node-exporter-en:
+          gnetId: 14584
+          revision: 2
+          datasource: Prometheus
+
     persistence:
       enabled: true
       size: 2Gi
@@ -133,6 +171,14 @@ kube-prometheus-stack:
   # ── node-exporter (DaemonSet — all 3 nodes) ───────────────────────────────
   nodeExporter:
     enabled: true
+    serviceMonitor:
+      # With fullnameOverride="kps" the default job label becomes
+      # "kps-prometheus-node-exporter".  Force it to "node-exporter" so that
+      # community dashboards (15282, 14055, 14584) can discover instances via
+      # their built-in $job template variable without manual reconfiguration.
+      relabelings:
+        - targetLabel: job
+          replacement: node-exporter
 
   prometheus-node-exporter:
     resources:
