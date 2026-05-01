@@ -1,6 +1,6 @@
 # fabianpiper.com | Agent Operations Manual
 
-Last Updated: 2026-04-29
+Last Updated: 2026-05-01
 Generated for: AI Agents
 Repository: https://github.com/fapiper/fabianpiper.com
 Validation Status: Docs reviewed, Code cross-referenced, Ready for autonomous operation
@@ -222,16 +222,21 @@ fabianpiper.com/
 - **Image Updater annotations**: Live on the dedicated `bootstrap/templates/www.yaml` Application (NOT on the Deployment)
 - **URLs**: `https://www.fabianpiper.com`, `https://glg.fabianpiper.com`
 - **Secrets**: `regcred` (GHCR pull secret), app env vars from OCI Vault via ExternalSecret
+- **TLS**: certificate `glg-tls` is owned by `envoy-gateway` infrastructure app (`kubernetes/infrastructure/envoy-gateway/certificate.yaml`); `www` chart has `tls.create: false`
+- **Chart templates**: `_helpers.tpl`, `deployment.yaml`, `service.yaml`, `httproute.yaml`, `external-secret.yaml`, `certificate.yaml` (inactive — `tls.create: false`), `referencegrant.yaml`
+- **Content collections** (Astro): `projects`, `publications` (active content in `src/content/`); `blog`, `authors` (defined in schema, no content files yet)
 
 #### `kubernetes/infrastructure/cert-manager` — TLS Certificates
 - Installed via K3s `HelmChart` CRD (not ArgoCD Helm source)
 - Issues Let's Encrypt certificates for all public-facing services
-- ClusterIssuer for ACME HTTP-01 challenge
+- `ClusterIssuer` (`cloudflare-issuer`) for ACME **DNS-01** challenge via Cloudflare API
+- Cloudflare API token provisioned into cert-manager namespace via ExternalSecret (`cloudflare-api-token`)
 
 #### `kubernetes/infrastructure/envoy-gateway` — Ingress
 - GatewayClass `eg`, Gateway `public-gateway` in namespace `envoy-gateway-system`
 - Envoy pods: `hostNetwork: true`, NodeSelector `role: ingress`
 - **Listens on ports 80 (HTTP) and 443 (HTTPS)**
+- **TLS certificate** (`glg-tls`) is managed here (not in the `www` chart) — `certificate.yaml` covers all four public hostnames. This avoids cross-namespace ReferenceGrants and decouples TLS from app deployments.
 - **HTTP→HTTPS redirect**: `www-redirect` HTTPRoute in `kubernetes/apps/www/templates/httproute.yaml` covers all four public hostnames (`www`, `glg`, `grafana`, `status`). When adding a new subdomain, update `ingress.redirectHostnames` in `kubernetes/apps/www/values.yaml`.
 - All HTTPRoutes attach to `public-gateway`
 
@@ -244,8 +249,8 @@ fabianpiper.com/
 > Records: `www.fabianpiper.com`, `glg.fabianpiper.com`, `grafana.fabianpiper.com`, `status.fabianpiper.com` → ingress IP.
 > To add/remove a hostname: edit `stacks/catalog/dns/defaults.yaml` → run `make apply-prod-dns`.
 > Also add the hostname to `ingress.redirectHostnames` in `kubernetes/apps/www/values.yaml` (HTTP→HTTPS redirect)
-> and to `spec.dnsNames` in `kubernetes/infrastructure/envoy-gateway/certificate.yaml` (TLS cert).
-> `proxied` defaults to `false` (direct TLS via cert-manager), `ttl` defaults to `300`.
+> and to `spec.dnsNames` in `kubernetes/infrastructure/envoy-gateway/certificate.yaml` (shared TLS cert).
+> `proxied` defaults to `false` (direct TLS via cert-manager DNS-01), `ttl` defaults to `300`.
 
 #### `kubernetes/infrastructure/external-secrets` — Secret Sync
 - Installed via K3s `HelmChart` CRD
@@ -305,6 +310,7 @@ fabianpiper.com/
 | `site-url` | www app | Public site URL |
 | `mixpanel-token` | www app | Analytics token (optional) |
 | `grafana-admin-password` | kube-prometheus-stack (Grafana) | Grafana admin password |
+| `cloudflare-api-token` | cert-manager (DNS-01 solver) | Cloudflare API token for Let's Encrypt DNS-01 challenge |
 
 ---
 
@@ -569,12 +575,11 @@ Examples: `feat(k8s): add prometheus`, `fix(grafana): correct datasource url`, `
 ```bash
 cd apps/www
 bun install
-bun run dev            # http://localhost:4321
+bun run dev            # http://localhost:1234
 
 # Validate before push
-bun run astro check    # Must report 0 errors
-bun run build          # Production build — must exit 0
-bun run preview        # Smoke-test prod build at http://localhost:4321
+bun run build          # Runs `astro check && astro build` — must exit 0 (check + build in one step)
+bun run preview        # Smoke-test prod build at http://localhost:1234
 
 # Deploy — just push to main
 git add apps/www/
@@ -790,8 +795,7 @@ git grep -iE '(password|secret|token|private_key)\s*[:=]\s*[^$\{T]' \
 
 # Application (when apps/www changed)
 cd apps/www
-bun run astro check    # 0 type errors
-bun run build          # exits 0
+bun run build          # runs `astro check && astro build` — exits 0
 ```
 
 ### Kubernetes Dry-run
