@@ -1,13 +1,13 @@
 # HTTPRoute for Grafana at grafana.fabianpiper.com (dedicated subdomain).
 #
-# Wave -4: intentionally applied BEFORE the upstream chart resources (wave 0).
-# Rationale: the kube-prometheus-stack Prometheus Operator Deployment can fail
-# to apply (e.g. label-selector mismatch on first install), which blocks all
-# subsequent waves. Grafana itself runs independently of the operator — its
-# Service exists as long as the Grafana Deployment is healthy. Placing the
-# HTTPRoute at wave -4 ensures routing is always configured regardless of
-# operator deploy state. Envoy Gateway resolves backends lazily (503 until
-# the backend Service is ready, then routes normally).
+# Wave 25: applied AFTER the upstream chart resources (wave 0) so that the
+# grafana Service exists before ArgoCD evaluates this HTTPRoute's health.
+# Placing this earlier (e.g. wave -4) causes a deadlock: ArgoCD health-checks
+# the HTTPRoute before wave 0 is applied, Envoy Gateway reports "Service not
+# found", ArgoCD considers the route Degraded, and wave 0 never gets applied —
+# meaning the grafana Service is never created and the deadlock is permanent.
+# Envoy Gateway resolves backends lazily, so a 503 is served briefly on first
+# deploy until both the Service and Pods are ready.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -16,7 +16,7 @@ metadata:
   labels:
     {{- include "kps-wrapper.labels" . | nindent 4 }}
   annotations:
-    argocd.argoproj.io/sync-wave: "-4"
+    argocd.argoproj.io/sync-wave: "25"
 spec:
   parentRefs:
     - name: public-gateway
