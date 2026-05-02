@@ -56,10 +56,21 @@ kube-prometheus-stack:
         root_url: "https://grafana.fabianpiper.com"
 
 
-    # kube-prometheus-stack already provisions the default Prometheus datasource.
-    # Explicit UIDs ensure community dashboards that reference ${DS_PROMETHEUS} /
-    # ${DS_LOKI} template variables can resolve them without manual re-mapping.
+    # Explicit datasource definitions with fixed UIDs ensure community dashboards
+    # that reference ${DS_PROMETHEUS} / ${DS_LOKI} template variables resolve
+    # correctly without manual re-mapping on every import.
+    # The Prometheus datasource overrides whatever the chart auto-provisions so
+    # the UID is always "prometheus" — matching the hardcoded value in Grafana.com
+    # dashboards 15282, 14055, 14584 and the kube-prometheus-stack built-in ones.
     additionalDataSources:
+      - name: Prometheus
+        type: prometheus
+        uid: prometheus
+        url: "http://kps-prometheus:9090"
+        access: proxy
+        isDefault: true
+        jsonData:
+          timeInterval: "30s"
       - name: Loki
         type: loki
         uid: loki
@@ -139,12 +150,14 @@ kube-prometheus-stack:
   kubeProxy:
     enabled: false
 
-  # ── kubelet ───────────────────────────────────────────────────────────────
-  # Disabled: v82.18.0 kubelet servicemonitor.yaml contains a YAML render bug
-  # (mapping values not allowed in this context, line 7) under K3s/K8s 1.34.
-  # node-exporter covers host-level metrics; re-enable after a chart upgrade.
+  # ── kubelet / cAdvisor ───────────────────────────────────────────────────
+  # Provides container_* and machine_* metrics required by dashboards that use
+  # cAdvisor (e.g. 15282 K3S cluster monitoring).
+  # K3s embeds cAdvisor inside the kubelet on port 10250 — no separate process.
   kubelet:
-    enabled: false
+    enabled: true
+    serviceMonitor:
+      cAdvisor: true
 
   # ── node-exporter (DaemonSet — all 3 nodes) ───────────────────────────────
   nodeExporter:
