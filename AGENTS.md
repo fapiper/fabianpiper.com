@@ -1,6 +1,6 @@
 # fabianpiper.com | Agent Operations Manual
 
-Last Updated: 2026-05-01
+Last Updated: 2026-05-02
 Generated for: AI Agents
 Repository: https://github.com/fapiper/fabianpiper.com
 Validation Status: Docs reviewed, Code cross-referenced, Ready for autonomous operation
@@ -271,13 +271,17 @@ fabianpiper.com/
 - **Components disabled**: Alertmanager, Pushgateway
 - **Grafana URL**: `https://grafana.fabianpiper.com`
 - **Grafana admin credentials**: OCI Vault → ExternalSecret (wave `-5`) → `grafana-admin` K8s Secret
-- **Grafana datasources**: Prometheus (default, auto-provisioned by chart) + Loki (additionalDataSources)
+- **Grafana datasources**: Both explicitly provisioned via `additionalDataSources` with **fixed UIDs**:
+  - `Prometheus` → uid=`prometheus`, url=`http://kps-prometheus:9090` (isDefault: true)
+  - `Loki` → uid=`loki`, url=`http://loki.loki.svc.cluster.local:3100`
+  - Fixed UIDs ensure community dashboards using `${DS_PROMETHEUS}` / `${DS_LOKI}` template variables resolve automatically on import without manual re-mapping.
 - **Grafana service**: `grafana.kube-prometheus-stack.svc.cluster.local:80` (fullnameOverride: grafana)
-- **Prometheus access**: ClusterIP only — `prometheus-operated.kube-prometheus-stack.svc.cluster.local:9090`
+- **Prometheus access**: ClusterIP only — `kps-prometheus.kube-prometheus-stack.svc.cluster.local:9090`
 - **Prometheus storage**: 5 Gi PVC (K3s local-path)
 - **Grafana storage**: 2 Gi PVC (K3s local-path)
-- **Scraping**: ServiceMonitor-based (Kubernetes API, nodes, kubelet, cAdvisor, kube-state-metrics)
-- **Sync waves**: ExternalSecret wave `-5`, HTTPRoute wave `-4` (before upstream wave `0` — ensures routing survives operator deploy failures), upstream chart wave `0`
+- **Scraping**: ServiceMonitor-based (kubelet/cAdvisor, node-exporter, kube-state-metrics, kube-apiserver)
+- **Sync waves**: ExternalSecret wave `-5`, upstream chart wave `0`, HTTPRoute wave `25`
+  - **⚠️ HTTPRoute MUST be wave 25 (after wave 0)**: placing it at wave -4 or any wave before 0 causes a permanent deadlock — ArgoCD health-checks the HTTPRoute before the `grafana` Service (wave 0) is created, Envoy Gateway reports "Service not found", the route stays Degraded, and wave 0 never gets applied.
 - **fullnameOverride**: `kps` (for kube-prometheus-stack resources), `grafana` (for Grafana service)
 - **Dependency lock**: `Chart.lock` committed — run `helm dep update` after every version bump
 
@@ -703,7 +707,7 @@ mkdir -p components/terraform/<module-name>
 
 - **URL**: `https://grafana.fabianpiper.com`
 - **Login**: username `admin`, password from OCI Vault (`grafana-admin-password`)
-- **Datasources**: Prometheus (default, auto-provisioned by kube-prometheus-stack) + Loki (additionalDataSources)
+- **Datasources**: Both explicitly provisioned with fixed UIDs (`uid: prometheus`, `uid: loki`) via `additionalDataSources` in `values.yaml`. Community dashboards using `${DS_PROMETHEUS}` or `${DS_LOKI}` variables resolve automatically on import.
 - **Internal service**: `grafana.kube-prometheus-stack.svc.cluster.local:80`
 
 **Local port-forward**:
@@ -740,10 +744,14 @@ curl -s http://localhost:9090/api/v1/targets | \
 |-----|--------|------|
 | `prometheus` | Prometheus itself | None (localhost) |
 | `kubernetes-apiservers` | K8s API server | HTTPS + bearer token |
-| `kubernetes-nodes` | kubelet on each node | HTTPS + bearer token |
-| `kubernetes-cadvisor` | cAdvisor on each node | HTTPS + bearer token |
+| `kubelet` | kubelet on each node | HTTPS + bearer token |
+| `kubernetes-cadvisor` | cAdvisor on each node (embedded in kubelet) | HTTPS + bearer token |
 | `kube-state-metrics` | kube-state-metrics pod | HTTP |
-| `node-exporter` | node-exporter DaemonSet (all nodes) | HTTP |
+| `node-exporter` | node-exporter DaemonSet (all nodes) — job label forced to `node-exporter` via relabeling | HTTP |
+
+> **node-exporter job label**: With `fullnameOverride: "kps"`, the default job label would be
+> `kps-prometheus-node-exporter`. A `serviceMonitor.relabelings` rule forces it to `node-exporter`
+> so community dashboards (15282, 14055, 14584) can discover instances without manual reconfiguration.
 
 ### Loki
 
