@@ -30,19 +30,23 @@ kube-prometheus-stack:
     enabled: true
     fullnameOverride: "grafana"   # service name = grafana (referenced by HTTPRoute)
 
-    # init-chown-data runs as UID 472 (non-root) in v82.x.  If any files on the
-    # PVC are root-owned (e.g. csv/pdf/png dirs created by Grafana v11 on first
-    # run), UID 472 cannot chown them → Permission denied → CrashLoopBackOff.
-    # Fix: force the init container to run as root (UID 0) so it can always
-    # correct ownership regardless of who created the existing files.
+    # PVC ownership is handled by Kubernetes' native fsGroup mechanism.
+    # kubelet applies fsGroup: 472 directly on the node before any container
+    # starts — this is more reliable than an init container because it works
+    # regardless of container-level capability restrictions (K3s/containerd
+    # blocks chown even for UID 0 on dirs already owned by the grafana user).
+    #
+    # initChownData is therefore disabled. It caused Init:Error on pod restarts
+    # when Grafana had previously created png/pdf/csv dirs (owned by UID 472):
+    #   chown: /var/lib/grafana/png: Permission denied
     initChownData:
-      enabled: true
-      securityContext:
-        runAsNonRoot: false
-        runAsUser: 0
-        capabilities:
-          add:
-            - CHOWN
+      enabled: false
+
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 472
+      runAsGroup: 472
+      fsGroup: 472
 
     # Admin credentials loaded from ExternalSecret (wave -5 in templates/).
     admin:
