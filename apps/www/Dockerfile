@@ -19,10 +19,9 @@ RUN --mount=type=secret,id=secrets \
     PUBLIC_SITE_URL="$SITE_URL" \
     bun run build
 
-# nginx-unprivileged: runs as UID 101 (nginx), listens on 8080, no root required
-FROM nginxinc/nginx-unprivileged:1.27-alpine
+FROM nginx:1.27-alpine
 
 COPY --from=builder --chown=nginx:nginx /app/dist /usr/share/nginx/html
 
-EXPOSE 8080
+EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]

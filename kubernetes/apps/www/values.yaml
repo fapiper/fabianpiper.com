@@ -7,7 +7,7 @@ image:
   pullPolicy: IfNotPresent
 
 service:
-  port: 8080
+  port: 80
 
 ingress:
   hostname: www.fabianpiper.com
