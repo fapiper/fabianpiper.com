@@ -53,7 +53,9 @@ kube-prometheus-stack:
     # Serve Grafana at the subdomain root (no sub-path needed).
     grafana.ini:
       server:
+        domain: "grafana.fabianpiper.com"
         root_url: "https://grafana.fabianpiper.com"
+        serve_from_sub_path: false
 
 
     # Explicit datasource definitions with fixed UIDs ensure community dashboards
@@ -95,8 +97,8 @@ kube-prometheus-stack:
         cpu: "100m"
         memory: "128Mi"
       limits:
-        cpu: "200m"
-        memory: "256Mi"
+        cpu: "300m"
+        memory: "512Mi"
 
   # ── Prometheus ───────────────────────────────────────────────────────────
   prometheus:

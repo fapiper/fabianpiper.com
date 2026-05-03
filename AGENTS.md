@@ -1,6 +1,6 @@
 # fabianpiper.com | Agent Operations Manual
 
-Last Updated: 2026-05-02
+Last Updated: 2026-05-03
 Generated for: AI Agents
 Repository: https://github.com/fapiper/fabianpiper.com
 Validation Status: Docs reviewed, Code cross-referenced, Ready for autonomous operation
@@ -94,10 +94,27 @@ cloud-init (server node)
   └─ kubectl apply kubernetes/bootstrap/root.yaml
        └─ ArgoCD Application "root"
             └─ watches kubernetes/bootstrap/templates/*.yaml
-                 ├─ ApplicationSet "infrastructure" (discovers kubernetes/infrastructure/*)
-                 ├─ ApplicationSet "apps"           (discovers kubernetes/apps/*, excludes www)
-                 └─ Application    "www"            (dedicated, with Image Updater annotations)
+                 ├─ Application    "argocd-config"   (wave 0 — patches argocd-cm health checks)
+                 ├─ ApplicationSet "infrastructure"  (wave 2 — discovers kubernetes/infrastructure/*)
+                 ├─ ApplicationSet "apps"            (wave 5/10 — discovers kubernetes/apps/*, excludes www)
+                 └─ Application    "www"             (wave 10 — dedicated, with Image Updater annotations)
 ```
+
+**Wave ordering rationale:**
+- `argocd-config` at wave 0 ensures custom health checks (ExternalSecret, HTTPRoute) are active
+  **before** any infrastructure Application starts its first sync. This prevents a race condition
+  where ArgoCD incorrectly treats a not-yet-reconciled ExternalSecret as Healthy, advances to the
+  next wave, and Deployments fail to start because the managed Secret doesn't exist yet.
+- `infrastructure` ApplicationSet at wave 1 (object) / wave 2 (generated Apps) starts all infra
+  apps. With the ExternalSecret health check in place, wave N completion correctly waits for
+  Secrets to be populated before Deployments in wave N+1 start.
+
+**Custom ArgoCD health checks** (in `kubernetes/bootstrap/argocd-config/argocd-cm-patch.yaml`):
+
+| Resource | Health logic |
+|----------|-------------|
+| `external-secrets.io/ExternalSecret` | Healthy only when `status.conditions[type=Ready].status == "True"` (Secret created). Progressing while store is initialising. Degraded on config errors (e.g. wrong secret name). |
+| `gateway.networking.k8s.io/HTTPRoute` | Healthy unless `Accepted=False` (Gateway rejected the route). `ResolvedRefs=False` (backend Service not found yet) is intentionally ignored — Envoy Gateway resolves backends lazily. |
 
 Git polling interval: **30 seconds** (`requeueAfterSeconds: 30` in both ApplicationSets).
 
@@ -148,7 +165,11 @@ fabianpiper.com/
 ├── kubernetes/
 │   ├── bootstrap/
 │   │   ├── root.yaml             # Single ArgoCD Application (applied via cloud-init)
+│   │   ├── argocd-config/        # Custom ArgoCD health checks (wave 0)
+│   │   │   ├── kustomization.yaml
+│   │   │   └── argocd-cm-patch.yaml  # Patches argocd-cm: ExternalSecret + HTTPRoute health
 │   │   └── templates/
+│   │       ├── argocd-config.yaml   # Application wave 0 → kubernetes/bootstrap/argocd-config
 │   │       ├── infrastructure.yaml  # ApplicationSet → kubernetes/infrastructure/*
 │   │       ├── apps.yaml            # ApplicationSet → kubernetes/apps/* (excludes www)
 │   │       └── www.yaml             # Dedicated Application for www (Image Updater annotations)
