@@ -64,6 +64,14 @@ kube-prometheus-stack:
     # The Prometheus datasource overrides whatever the chart auto-provisions so
     # the UID is always "prometheus" — matching the hardcoded value in Grafana.com
     # dashboards 15282, 14055, 14584 and the kube-prometheus-stack built-in ones.
+    #
+    # sidecar.datasources.defaultDatasourceEnabled: false — disables the chart's
+    # auto-provisioned Prometheus datasource (which also sets isDefault: true).
+    # Without this, Grafana crashes on startup:
+    #   "Only one datasource per organization can be marked as default"
+    sidecar:
+      datasources:
+        defaultDatasourceEnabled: false
     additionalDataSources:
       - name: Prometheus
         type: prometheus
