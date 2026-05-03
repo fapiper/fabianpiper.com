@@ -52,21 +52,26 @@ resource "oci_core_instance" "ingress" {
     subnet_id              = var.public_subnet_id
     assign_public_ip       = true
     private_ip             = var.ingress_private_ip
-    skip_source_dest_check = true  # Required for NAT functionality
+    skip_source_dest_check = true # Required for NAT functionality
     hostname_label         = var.ingress_hostname_label
   }
 
   metadata = {
     ssh_authorized_keys = local.ssh_public_key
     user_data = local.use_cloud_init ? base64encode(templatefile("${path.module}/user-data/ingress.yaml", {
-      server_ip = var.server_private_ip
-      k3s_token = var.k3s_token
+      server_ip   = var.server_private_ip
+      k3s_token   = var.k3s_token
+      k3s_version = local.k3s_version
     })) : null
   }
 
   source_details {
     source_type = "image"
     source_id   = data.oci_core_images.ubuntu.images[0].id
+  }
+
+  lifecycle {
+    ignore_changes = [source_details]
   }
 }
 
@@ -94,7 +99,7 @@ resource "oci_core_route_table" "private_rt" {
   }
 
   lifecycle {
-    replace_triggered_by = [oci_core_instance.ingress]
+    replace_triggered_by  = [oci_core_instance.ingress]
     create_before_destroy = true
   }
 }
@@ -163,6 +168,7 @@ resource "oci_core_instance" "server" {
     user_data = local.use_cloud_init ? base64encode(templatefile("${path.module}/user-data/server.yaml", {
       public_ip    = oci_core_instance.ingress[0].public_ip
       k3s_token    = var.k3s_token
+      k3s_version  = local.k3s_version
       git_pat      = var.git_pat
       git_username = var.git_username
       git_repo_url = var.git_repo_url
@@ -174,6 +180,10 @@ resource "oci_core_instance" "server" {
   source_details {
     source_type = "image"
     source_id   = data.oci_core_images.ubuntu.images[0].id
+  }
+
+  lifecycle {
+    ignore_changes = [source_details]
   }
 
   depends_on = [oci_core_subnet.private_subnet]
@@ -202,14 +212,19 @@ resource "oci_core_instance" "worker" {
   metadata = {
     ssh_authorized_keys = local.ssh_public_key
     user_data = local.use_cloud_init ? base64encode(templatefile("${path.module}/user-data/worker.yaml", {
-      server_ip = var.server_private_ip
-      k3s_token = var.k3s_token
+      server_ip   = var.server_private_ip
+      k3s_token   = var.k3s_token
+      k3s_version = local.k3s_version
     })) : null
   }
 
   source_details {
     source_type = "image"
     source_id   = data.oci_core_images.ubuntu.images[0].id
+  }
+
+  lifecycle {
+    ignore_changes = [source_details]
   }
 
   depends_on = [oci_core_instance.server]

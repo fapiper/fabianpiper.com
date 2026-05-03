@@ -145,9 +145,9 @@ variable "enable_worker" {
 }
 
 variable "k3s_version" {
-  description = "K3s version to install"
+  description = "K3s version to install. Must match across all nodes. See https://github.com/k3s-io/k3s/releases for latest."
   type        = string
-  default     = "v1.28.5+k3s1"
+  default     = "v1.32.4+k3s1"
 }
 
 variable "k3s_token" {
@@ -175,23 +175,27 @@ variable "git_pat" {
 variable "git_username" {
   description = "GitHub username"
   type        = string
+  sensitive   = true
   default     = ""
 }
 
 variable "git_email" {
   description = "Email address for Let's Encrypt certificates"
   type        = string
+  sensitive   = true
   default     = ""
 }
 
 variable "git_repo_url" {
   description = "Git repository URL for ArgoCD bootstrap"
   type        = string
+  sensitive   = true
 }
 
 variable "vault_id" {
   description = "OCI Vault OCID for external secrets"
   type        = string
+  sensitive   = true
   default     = ""
 }
 

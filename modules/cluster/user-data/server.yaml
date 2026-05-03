@@ -1,5 +1,6 @@
 #cloud-config
-package_update: false
+package_update: true
+package_upgrade: true
 
 runcmd:
   # Reset iptables to bypass restrictive OCI Ubuntu defaults
@@ -28,7 +29,7 @@ runcmd:
 
   # Install K3s server
   - |
-    curl -sfL https://get.k3s.io | sh -s - server \
+    curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=${k3s_version} sh -s - server \
       --token ${k3s_token} \
       --tls-san ${public_ip} \
       --disable traefik \
@@ -38,7 +39,7 @@ runcmd:
   # Wait for k3s binary
   - until [ -f /usr/local/bin/k3s ]; do sleep 2; done
 
-  # Configure GHCR registry credentials
+  # Configure GHCR registry credentials (root-only: credentials on disk)
   - mkdir -p /etc/rancher/k3s
   - |
     cat > /etc/rancher/k3s/registries.yaml <<'REGISTRIES'
@@ -48,7 +49,8 @@ runcmd:
           username: ${git_username}
           password: ${git_pat}
     REGISTRIES
-  - chmod 0644 /etc/rancher/k3s/registries.yaml
+  - chmod 0600 /etc/rancher/k3s/registries.yaml
+  - chown root:root /etc/rancher/k3s/registries.yaml
   - systemctl restart k3s
 
   - |
@@ -64,7 +66,9 @@ runcmd:
   - /usr/local/bin/k3s kubectl wait --for=condition=Ready nodes --all --timeout=300s
 
   # Bootstrap Envoy Gateway via Helm (before ArgoCD to break cold-start deadlock)
-  - curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+  - |
+    curl -fsSL https://raw.githubusercontent.com/helm/helm/v3.17.3/scripts/get-helm-3 | \
+      DESIRED_VERSION=v3.17.3 bash
   - /usr/local/bin/k3s kubectl create namespace envoy-gateway-system || true
   - |
     KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm install eg oci://docker.io/envoyproxy/gateway-helm \

@@ -1,5 +1,6 @@
 #cloud-config
-package_update: false
+package_update: true
+package_upgrade: true
 
 write_files:
   - path: /etc/sysctl.d/99-k3s.conf
@@ -85,4 +86,4 @@ runcmd:
     done
 
   # Install K3s agent with ingress role
-  - curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="agent --node-label role=ingress" K3S_URL=https://${server_ip}:6443 K3S_TOKEN=${k3s_token} sh -
+  - curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=${k3s_version} INSTALL_K3S_EXEC="agent --node-label role=ingress" K3S_URL=https://${server_ip}:6443 K3S_TOKEN=${k3s_token} sh -

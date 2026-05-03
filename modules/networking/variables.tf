@@ -39,3 +39,9 @@ variable "subnet_dns_label" {
   default     = "public"
 }
 
+variable "allowed_ssh_cidrs" {
+  type        = list(string)
+  description = "CIDRs allowed for SSH (port 22). Restrict to known admin IPs — e.g. [\"1.2.3.4/32\"]."
+  default     = ["0.0.0.0/0"]
+}
+

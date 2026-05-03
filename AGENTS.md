@@ -501,7 +501,10 @@ INGRESS_IP="<your-ingress-public-ip>"
 ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
   'ssh ubuntu@10.0.2.10 sudo cat /etc/rancher/k3s/k3s.yaml' > kubeconfig-prod.yaml
 
-sed -i "s/127.0.0.1/$INGRESS_IP/" kubeconfig-prod.yaml
+sed -i "s/127.0.0.1/10.0.2.10/" kubeconfig-prod.yaml
+
+# Access via SSH tunnel (port 6443 is NOT open in OCI security list — use tunnel)
+ssh -i ~/.ssh/id_rsa -L 6443:10.0.2.10:6443 ubuntu@$INGRESS_IP -N &
 
 export KUBECONFIG=./kubeconfig-prod.yaml
 kubectl get nodes
@@ -1298,11 +1301,12 @@ make apply-prod   # Apply
 ### Updating K3s (In-Place)
 
 ```bash
-# Update server first, then worker
+# k3s_version variable in modules/cluster/variables.tf controls the pinned version.
+# Update server first, then agents — all nodes must run the same version.
 ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
   'ssh ubuntu@10.0.2.10 "curl -sfL https://get.k3s.io | \
-   INSTALL_K3S_VERSION=v1.29.x+k3s1 sh -"'
-# Repeat for worker node
+   INSTALL_K3S_VERSION=v1.32.x+k3s1 sh -"'
+# Repeat for worker node (via jump host)
 ```
 
 ---

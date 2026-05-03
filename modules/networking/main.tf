@@ -7,6 +7,7 @@ locals {
 
   subnet_cidr_block = var.subnet_cidr_block
   subnet_dns_label  = var.subnet_dns_label
+  allowed_ssh_cidrs = var.allowed_ssh_cidrs
 }
 
 data "context_config" "main" {}
@@ -97,26 +98,27 @@ resource "oci_core_security_list" "k3s" {
     stateless   = false
   }
 
-  # SSH ingress
-  ingress_security_rules {
-    source      = "0.0.0.0/0"
-    protocol    = "6"  # TCP
-    description = "Allow SSH ingress"
-    stateless   = false
-
-    tcp_options {
-      min = 22
-      max = 22
+  # SSH ingress — one rule per CIDR; restrict allowed_ssh_cidrs to known admin IPs in production
+  dynamic "ingress_security_rules" {
+    for_each = local.allowed_ssh_cidrs
+    content {
+      source      = ingress_security_rules.value
+      protocol    = "6"
+      description = "Allow SSH ingress from ${ingress_security_rules.value}"
+      stateless   = false
+      tcp_options {
+        min = 22
+        max = 22
+      }
     }
   }
 
   # HTTP ingress
   ingress_security_rules {
     source      = "0.0.0.0/0"
-    protocol    = "6"  # TCP
+    protocol    = "6"
     description = "Allow HTTP ingress"
     stateless   = false
-
     tcp_options {
       min = 80
       max = 80
@@ -126,28 +128,18 @@ resource "oci_core_security_list" "k3s" {
   # HTTPS ingress
   ingress_security_rules {
     source      = "0.0.0.0/0"
-    protocol    = "6"  # TCP
+    protocol    = "6"
     description = "Allow HTTPS ingress"
     stateless   = false
-
     tcp_options {
       min = 443
       max = 443
     }
   }
 
-  # K3s API ingress
-  ingress_security_rules {
-    source      = "0.0.0.0/0"
-    protocol    = "6"  # TCP
-    description = "Allow K3s API ingress"
-    stateless   = false
-
-    tcp_options {
-      min = 6443
-      max = 6443
-    }
-  }
+  # Note: port 6443 (K3s API) is intentionally NOT open here.
+  # The K3s API server runs on the private node (10.0.2.10); kubectl access
+  # uses an SSH tunnel: ssh -L 6443:10.0.2.10:6443 ubuntu@<ingress-ip>
 
   # Allow all internal VCN traffic
   ingress_security_rules {
