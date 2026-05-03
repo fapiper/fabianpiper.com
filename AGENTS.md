@@ -296,7 +296,9 @@ fabianpiper.com/
   - `Prometheus` → uid=`prometheus`, url=`http://kps-prometheus:9090` (isDefault: true)
   - `Loki` → uid=`loki`, url=`http://loki.loki.svc.cluster.local:3100`
   - Fixed UIDs ensure community dashboards using `${DS_PROMETHEUS}` / `${DS_LOKI}` template variables resolve automatically on import without manual re-mapping.
+  - **`sidecar.datasources.defaultDatasourceEnabled: false`** — the chart's built-in auto-provisioned Prometheus datasource is disabled. Without this, Grafana crashes on startup with _"Only one datasource per organization can be marked as default"_ because both the sidecar datasource and the `additionalDataSources` Prometheus entry have `isDefault: true`.
 - **Grafana service**: `grafana.kube-prometheus-stack.svc.cluster.local:80` (fullnameOverride: grafana)
+- **Grafana PVC ownership**: managed via **`fsGroup: 472`** in the pod `securityContext` (set by kubelet at node level before any container starts). `initChownData` is **disabled** (`initChownData.enabled: false`) — K3s/containerd blocks the CHOWN capability even for UID 0 containers, causing `Init:Error` (`chown: /var/lib/grafana/png: Permission denied`) on pod restarts when Grafana has previously created subdirectories.
 - **Prometheus access**: ClusterIP only — `kps-prometheus.kube-prometheus-stack.svc.cluster.local:9090`
 - **Prometheus storage**: 5 Gi PVC (K3s local-path)
 - **Grafana storage**: 2 Gi PVC (K3s local-path)
@@ -741,13 +743,13 @@ ssh -i ~/.ssh/id_rsa -L 3000:10.0.2.10:3000 ubuntu@$INGRESS_IP -N &
 
 ### Prometheus
 
-- **Internal URL**: `http://prometheus-operated.kube-prometheus-stack.svc.cluster.local:9090`
+- **Internal URL**: `http://kps-prometheus.kube-prometheus-stack.svc.cluster.local:9090` (ClusterIP service, named by `fullnameOverride: kps`)
 - **No public HTTPRoute** — intentionally internal-only, accessible via Grafana datasource
 
 **Local port-forward**:
 ```bash
 ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
-  'ssh ubuntu@10.0.2.10 "sudo kubectl port-forward svc/prometheus-operated 9090:9090 -n kube-prometheus-stack &>/dev/null &"'
+  'ssh ubuntu@10.0.2.10 "sudo kubectl port-forward svc/kps-prometheus 9090:9090 -n kube-prometheus-stack &>/dev/null &"'
 ssh -i ~/.ssh/id_rsa -L 9090:10.0.2.10:9090 ubuntu@$INGRESS_IP -N &
 # Open: http://localhost:9090
 ```
@@ -1025,7 +1027,7 @@ ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
 # 2. Prometheus reachable from Grafana pod?
 ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
   'ssh ubuntu@10.0.2.10 sudo kubectl exec deploy/grafana -n kube-prometheus-stack -- \
-   wget -qO- http://prometheus-operated:9090/-/healthy'
+   wget -qO- http://kps-prometheus:9090/-/healthy'
 # Expected: Prometheus is Healthy.
 
 # 3. Loki reachable from Grafana pod?
@@ -1037,6 +1039,31 @@ ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
 # 4. Restart Grafana to reload datasource provisioning
 ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
   'ssh ubuntu@10.0.2.10 sudo kubectl rollout restart deploy/grafana -n kube-prometheus-stack'
+```
+
+---
+
+**Issue**: Grafana `CrashLoopBackOff` — "Only one datasource per organization can be marked as default"
+**Cause**: `sidecar.datasources.defaultDatasourceEnabled` defaults to `true` in the chart, auto-provisioning a Prometheus datasource with `isDefault: true`. If `additionalDataSources` also contains a Prometheus entry with `isDefault: true`, Grafana crashes on startup.
+```bash
+# Confirm the crash message
+sudo kubectl logs -n kube-prometheus-stack -l app.kubernetes.io/name=grafana -c grafana --tail=30 | grep -i default
+# Fix is already applied: sidecar.datasources.defaultDatasourceEnabled: false in values.yaml
+# If this appears on a fresh cluster, ensure the chart version matches Chart.lock (helm dep update)
+```
+
+---
+
+**Issue**: Grafana `Init:Error` — `chown: /var/lib/grafana/png: Permission denied`
+**Cause**: The `initChownData` init container runs as UID 0 with `CHOWN` capability, but K3s/containerd blocks this capability on directories previously created by the Grafana process (UID 472). Occurs on pod restarts when the PVC already contains Grafana-owned subdirs.
+```bash
+# Confirm the error
+sudo kubectl logs -n kube-prometheus-stack -l app.kubernetes.io/name=grafana -c init-chown-data --tail=10
+# Fix is already applied: initChownData.enabled: false + securityContext.fsGroup: 472 in values.yaml
+# The kubelet applies fsGroup ownership at the node level before any container starts — no capability needed.
+# If the PVC is stuck with wrong-owner dirs from an older deploy, delete and recreate:
+sudo kubectl delete pvc -n kube-prometheus-stack -l app.kubernetes.io/name=grafana
+# ArgoCD will recreate the PVC on next sync (same wave as Deployment → no WaitForFirstConsumer deadlock)
 ```
 
 ---
