@@ -13,6 +13,4 @@ spec:
   ports:
     - protocol: TCP
       port: {{ .Values.service.port }}
-      targetPort: {{ .Values.service.port }}
-  type: ClusterIP
-
+      targetPort: http

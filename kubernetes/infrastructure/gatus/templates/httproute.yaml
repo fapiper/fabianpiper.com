@@ -1,14 +1,3 @@
-{{/*
-Routes status.fabianpiper.com → Gatus Service at root.
-
-Dedicated hostname approach: Gatus v5.12.1 ignores web.prefix for HTTP routing
-(the Fiber router never registers routes under /prefix/*). Serving Gatus at root
-on its own hostname avoids all sub-path complexity.
-
-DNS: external-dns creates the status.fabianpiper.com A record automatically
-from this HTTPRoute hostname.
-TLS: glg-tls certificate covers status.fabianpiper.com (added in certificate.yaml).
-*/}}
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -26,7 +15,6 @@ spec:
   hostnames:
     - {{ .Values.ingress.hostname | quote }}
   rules:
-    # All traffic to status.fabianpiper.com → Gatus (serves UI + API at root).
     - matches:
         - path:
             type: PathPrefix

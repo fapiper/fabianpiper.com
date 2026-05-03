@@ -1,4 +1,0 @@
-{{- /* ReferenceGrant is no longer needed: the TLS certificate has been moved to
-   envoy-gateway-system (same namespace as the Gateway), so no cross-namespace
-   Secret reference is required. This file is intentionally empty. */ -}}
-

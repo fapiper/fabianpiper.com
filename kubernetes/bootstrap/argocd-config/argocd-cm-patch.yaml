@@ -1,28 +1,9 @@
-# Patches the ArgoCD ConfigMap to add custom health checks for CRDs that ArgoCD
-# cannot evaluate correctly out of the box.
-#
-# Applied at bootstrap wave 0 (before any infrastructure Application starts) so the
-# health logic is active on the very first sync of every infrastructure app.
-#
-# Applied via Server-Side Apply (SSA) — only the keys listed here are owned by this
-# resource; all other argocd-cm keys remain managed by ArgoCD's own installation.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: argocd-cm
   namespace: argocd
 data:
-  # ── ExternalSecret health ────────────────────────────────────────────────────
-  # Without this, ArgoCD marks an ExternalSecret as Healthy the moment the resource
-  # object exists — even though the managed Secret has not been created yet.
-  # This causes a wave-ordering race: wave N+1 Deployments start mounting secrets
-  # that do not exist (wave N ExternalSecret is "Healthy" but Secret is empty), leading
-  # to CrashLoopBackOff and wave N being permanently stuck.
-  #
-  # With this check:
-  #   • Healthy   → status.conditions[type=Ready].status == "True"  (Secret created)
-  #   • Degraded  → Ready=False with an "Error" reason  (bad config — fail fast)
-  #   • Progressing → Ready=False, transient reason  (vault/store not reachable yet)
   resource.customizations.health.external-secrets.io_ExternalSecret: |
     hs = {}
     if obj.status == nil or obj.status.conditions == nil then
@@ -37,14 +18,11 @@ data:
           hs.message = "Secret synced from external store"
           return hs
         end
-        -- reason contains "Error" → bad config (wrong secret name, RBAC issue)
-        -- signal Degraded so the app shows as failed and operators are alerted
         if condition.reason ~= nil and string.find(condition.reason, "Error") then
           hs.status = "Degraded"
           hs.message = condition.message or condition.reason
           return hs
         end
-        -- transient: store not ready, OCI Vault not yet accessible, etc. → wait
         hs.status = "Progressing"
         hs.message = condition.message or "Waiting for external secret store"
         return hs
@@ -54,21 +32,7 @@ data:
     hs.message = "ExternalSecret status unknown — waiting"
     return hs
 
-  # ── HTTPRoute health ─────────────────────────────────────────────────────────
-  # Without this, ArgoCD marks an HTTPRoute as Degraded when ResolvedRefs=False
-  # (backend Service not found). This creates a deadlock: the HTTPRoute (wave 25)
-  # references a Service created at wave 0, but if for any reason ResolvedRefs stays
-  # False, ArgoCD marks the app Degraded and the next sync can stall.
-  #
-  # Envoy Gateway resolves backends lazily — the route is functional once the Service
-  # and Pods appear, even if they were not present when the HTTPRoute was first applied.
-  # We therefore only fail on Accepted=False (Gateway explicitly rejected the route),
-  # and ignore ResolvedRefs=False (backend temporarily unavailable).
-  #
-  # With this check:
-  #   • Healthy    → Accepted=True on at least one parent (or no status yet)
-  #   • Degraded   → Accepted=False on any parent (misconfigured parentRef)
-  #   • Progressing → no status.parents yet (Gateway not evaluated yet)
+  # Only fail on Accepted=False; ignore ResolvedRefs=False (Envoy resolves backends lazily).
   resource.customizations.health.gateway.networking.k8s.io_HTTPRoute: |
     hs = {}
     if obj.status == nil or obj.status.parents == nil then
@@ -90,4 +54,3 @@ data:
     hs.status = "Healthy"
     hs.message = "HTTPRoute accepted by Gateway"
     return hs
-

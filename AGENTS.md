@@ -5,6 +5,13 @@ Generated for: AI Agents
 Repository: https://github.com/fapiper/fabianpiper.com
 Validation Status: Docs reviewed, Code cross-referenced, Ready for autonomous operation
 
+> **Changelog (2026-05-03)**: Kubernetes refactoring — deleted dead templates (`certificate.yaml`,
+> `referencegrant.yaml`, orphaned external-dns manifests, loki stub helpers); removed redundant
+> Namespace declaration from argocd-image-updater; eliminated `creationPolicy: Owner` (ESO default)
+> and dangling `oci-vault-config` ConfigMap; consolidated Envoy Gateway sync waves (5/5/10 instead
+> of 5/10/11/12); simplified www chart waves (5/10/25); stripped all prose comments from manifests
+> per comment policy (§6); fixed ApplicationSet template-wave misconception in §2.
+
 ---
 
 ## Table of Contents
@@ -95,8 +102,8 @@ cloud-init (server node)
        └─ ArgoCD Application "root"
             └─ watches kubernetes/bootstrap/templates/*.yaml
                  ├─ Application    "argocd-config"   (wave 0 — patches argocd-cm health checks)
-                 ├─ ApplicationSet "infrastructure"  (wave 2 — discovers kubernetes/infrastructure/*)
-                 ├─ ApplicationSet "apps"            (wave 5/10 — discovers kubernetes/apps/*, excludes www)
+                 ├─ ApplicationSet "infrastructure"  (wave 1 — discovers kubernetes/infrastructure/*)
+                 ├─ ApplicationSet "apps"            (wave 5 — discovers kubernetes/apps/*, excludes www)
                  └─ Application    "www"             (wave 10 — dedicated, with Image Updater annotations)
 ```
 
@@ -105,9 +112,15 @@ cloud-init (server node)
   **before** any infrastructure Application starts its first sync. This prevents a race condition
   where ArgoCD incorrectly treats a not-yet-reconciled ExternalSecret as Healthy, advances to the
   next wave, and Deployments fail to start because the managed Secret doesn't exist yet.
-- `infrastructure` ApplicationSet at wave 1 (object) / wave 2 (generated Apps) starts all infra
-  apps. With the ExternalSecret health check in place, wave N completion correctly waits for
-  Secrets to be populated before Deployments in wave N+1 start.
+- `infrastructure` ApplicationSet at wave 1 starts all infra apps. With the ExternalSecret health
+  check in place, wave N completion correctly waits for Secrets to be populated before Deployments
+  in wave N+1 start.
+
+> **ApplicationSet template waves**: Do **not** add `argocd.argoproj.io/sync-wave` to an
+> ApplicationSet's `template.metadata.annotations`. The annotation is copied into each generated
+> Application object, but generated Applications are **not** children of the root App resource
+> tree — they are created by the ApplicationSet controller. The root App's wave engine never
+> evaluates them, so the annotation has no effect and only creates confusion.
 
 **Custom ArgoCD health checks** (in `kubernetes/bootstrap/argocd-config/argocd-cm-patch.yaml`):
 
@@ -136,13 +149,11 @@ Waves used in each Application (lower = applied first):
 |------|------------------|
 | `-5` | ExternalSecrets that create Secrets consumed by wave-0 sub-chart Deployments (e.g. Grafana admin password) |
 | `0` | Helm operators (cert-manager, external-secrets via HelmChart CRD) |
-| `1` | ExternalSecrets for secrets needed by later waves (cross-app dependencies tolerated by retry) |
-| `5` | RBAC (ServiceAccount, ClusterRole, ClusterRoleBinding), ConfigMaps |
-| `10` | PVCs + Deployments (must be **same wave** for WaitForFirstConsumer), Services |
-| `11` | TLS Certificates that are referenced by a Gateway listener (must precede wave 12 so the Secret exists before the Gateway reconciles) |
-| `12–15` | Gateway, GatewayClass, provisioned ConfigMaps needed by later waves |
-| `20` | Deployments that depend on earlier waves |
-| `25` | HTTPRoutes, Certificates |
+| `1` | ExternalSecrets for secrets needed by later waves |
+| `5` | RBAC (ServiceAccount, ClusterRole, ClusterRoleBinding); ExternalSecrets consumed by wave-10 Deployments; EnvoyProxy + GatewayClass |
+| `10` | PVCs + Deployments + Services (must share the **same wave** for WaitForFirstConsumer); Gateway + TLS Certificate |
+| `15` | ClusterSecretStore, ClusterIssuer (depend on operators at waves 0–1) |
+| `25` | HTTPRoutes (after Services exist; Envoy Gateway resolves backends lazily) |
 
 > **K3s WaitForFirstConsumer gotcha**: `local-path` StorageClass uses `WaitForFirstConsumer` binding.
 > If a PVC is in wave N and its Deployment is in wave N+1, ArgoCD waits for the PVC to become `Bound`
@@ -243,8 +254,8 @@ fabianpiper.com/
 - **Image Updater annotations**: Live on the dedicated `bootstrap/templates/www.yaml` Application (NOT on the Deployment)
 - **URLs**: `https://www.fabianpiper.com`, `https://glg.fabianpiper.com`
 - **Secrets**: `regcred` (GHCR pull secret), app env vars from OCI Vault via ExternalSecret
-- **TLS**: certificate `glg-tls` is owned by `envoy-gateway` infrastructure app (`kubernetes/infrastructure/envoy-gateway/certificate.yaml`); `www` chart has `tls.create: false`
-- **Chart templates**: `_helpers.tpl`, `deployment.yaml`, `service.yaml`, `httproute.yaml`, `external-secret.yaml`, `certificate.yaml` (inactive — `tls.create: false`), `referencegrant.yaml`
+- **TLS**: certificate `glg-tls` is owned by `envoy-gateway` infrastructure app (`kubernetes/infrastructure/envoy-gateway/certificate.yaml`); TLS is not managed in this chart.
+- **Chart templates**: `_helpers.tpl`, `deployment.yaml`, `service.yaml`, `httproute.yaml`, `external-secret.yaml`
 - **Content collections** (Astro): `projects`, `publications` (active content in `src/content/`); `blog`, `authors` (defined in schema, no content files yet)
 
 #### `kubernetes/infrastructure/cert-manager` — TLS Certificates
@@ -578,7 +589,26 @@ All custom charts in this repo follow these conventions:
 - **Filenames**: `kebab-case.sh`
 - **Lint**: `shellcheck <script>` before commit
 
-### Git Commits
+### Comment Policy
+
+Applies to all YAML manifests, Helm templates, and Terraform files:
+
+- **Explain *why*, never *what***: a comment that restates what the key name already says must be deleted.
+  ```yaml
+  # Bad  — restates the key
+  type: ClusterIP   # Service type is ClusterIP
+
+  # Good — explains a non-obvious constraint
+  initChownData:
+    enabled: false  # K3s/containerd blocks chown for UID 0 on dirs already owned by UID 472
+  ```
+- **One line is almost always enough**. Multi-paragraph explanations belong in AGENTS.md (§2, §4) or README, not in manifests.
+- **Section headers** (`# ─── Grafana ───`) are noise — YAML structure is already readable. Delete them.
+- **Commented-out config** (e.g. `# storageClassName: ""`) must be deleted; use git history if you need to recover a previous value.
+- **Dead templates** (`{{- if false }}…{{- end }}`, empty `{{- /* … */ -}}` files) must be deleted, not commented out.
+- **When a comment IS warranted**: one-line rationale for a non-obvious trade-off or known gotcha that is not captured elsewhere (e.g. a deadlock, a K3s-specific limitation, a wave ordering constraint).
+
+
 
 Conventional Commits: `<type>(<scope>): <description>`
 
@@ -1311,7 +1341,8 @@ Before marking any task complete, verify **all applicable items**:
 
 **Process**:
 - [ ] Commit uses conventional commit format: `<type>(<scope>): <description>`
-- [ ] AGENTS.md updated if project structure, component inventory, or commands changed
+- [ ] AGENTS.md updated if project structure, component inventory, commands, or sync waves changed
+- [ ] Comment policy respected: no comments that restate key names; no multi-line prose; no commented-out config; no dead templates
 - [ ] CI/CD pipeline passes if `apps/` or `.github/workflows/` changed
 
 ---

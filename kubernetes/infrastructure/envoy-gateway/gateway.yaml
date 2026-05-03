@@ -26,7 +26,7 @@ kind: GatewayClass
 metadata:
   name: eg
   annotations:
-    argocd.argoproj.io/sync-wave: "10"
+    argocd.argoproj.io/sync-wave: "5"
 spec:
   controllerName: gateway.envoyproxy.io/gatewayclass-controller
   parametersRef:
@@ -41,7 +41,7 @@ metadata:
   name: public-gateway
   namespace: envoy-gateway-system
   annotations:
-    argocd.argoproj.io/sync-wave: "12"
+    argocd.argoproj.io/sync-wave: "10"
 spec:
   gatewayClassName: eg
   listeners:
@@ -57,5 +57,3 @@ spec:
         mode: Terminate
         certificateRefs:
           - name: glg-tls
-            # No namespace = same namespace as Gateway (envoy-gateway-system).
-            # cert lives here so the Gateway is independent of the www application.

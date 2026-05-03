@@ -1,5 +1,3 @@
-# HTTPS route: www.fabianpiper.com + glg.fabianpiper.com → www Service.
-# PathPrefix / (least specific) catches everything not matched by other routes.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -26,7 +24,6 @@ spec:
         - name: {{ include "www.name" . }}
           port: {{ .Values.service.port }}
 ---
-# HTTP → HTTPS redirect for all public hostnames (www, glg, grafana, status).
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:

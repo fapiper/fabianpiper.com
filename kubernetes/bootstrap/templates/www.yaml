@@ -1,14 +1,3 @@
-# Dedicated Application for the www Helm chart.
-# Managed separately from the apps ApplicationSet so that ArgoCD Image Updater
-# annotations (which are Application-level, not Deployment-level) can be applied
-# only to this app.
-#
-# Image Updater behaviour:
-#   • Monitors the `latest` tag on ghcr.io/fapiper/fabianpiper.com/www
-#   • Uses the "digest" update strategy: writes the resolved sha256 digest to
-#     image.digest via the write-back file .argocd-source-www.yaml
-#   • The Helm template uses repository@digest when digest is non-empty,
-#     ensuring an immutable, rollout-triggering image reference every time.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -16,12 +5,9 @@ metadata:
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "10"
-    # ── ArgoCD Image Updater ──────────────────────────────────────────────────
-    # Track the :latest tag and resolve its digest on every check (2-min interval).
     argocd-image-updater.argoproj.io/image-list: www=ghcr.io/fapiper/fabianpiper.com/www
     argocd-image-updater.argoproj.io/www.update-strategy: digest
     argocd-image-updater.argoproj.io/www.allow-tags: regexp:^latest$
-    # Write the resolved digest into the Helm value image.digest via git.
     argocd-image-updater.argoproj.io/write-back-method: git:secret:argocd/argocd-image-updater-github-creds
     argocd-image-updater.argoproj.io/www.helm.image-name: image.repository
     argocd-image-updater.argoproj.io/www.helm.image-tag: image.digest
@@ -33,7 +19,6 @@ spec:
     repoURL: https://github.com/fapiper/fabianpiper.com.git
     targetRevision: HEAD
     path: kubernetes/apps/www
-    # ArgoCD auto-detects Chart.yaml → Helm mode; no explicit helm: block needed.
   destination:
     server: https://kubernetes.default.svc
     namespace: www
@@ -61,4 +46,3 @@ spec:
         duration: 10s
         factor: 2
         maxDuration: 5m
-

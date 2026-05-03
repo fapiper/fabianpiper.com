@@ -1,24 +1,3 @@
-# Applies custom ArgoCD health checks to argocd-cm BEFORE any infrastructure
-# Application starts syncing (wave 0, before infrastructure wave 1–2).
-#
-# Why wave 0?
-#   The infrastructure ApplicationSet (wave 1) generates all infra Applications
-#   which start syncing immediately. Without custom health checks already in place,
-#   ArgoCD would evaluate ExternalSecret and HTTPRoute health using its built-in
-#   (incorrect) defaults on the very first sync. This causes:
-#     • ExternalSecret: Healthy immediately after creation (Secret not yet populated)
-#       → wave -5 "completes", wave 0 Deployments start mounting non-existent Secrets
-#       → CrashLoopBackOff → wave 0 stuck → wave 25 HTTPRoute never deployed → 404
-#     • HTTPRoute: Degraded on ResolvedRefs=False (backend not found yet)
-#       → false Degraded state pollutes app health dashboard
-#
-#   By landing at wave 0, this Application patches argocd-cm before any Application
-#   at wave 2 has a chance to evaluate CRD health. The ConfigMap apply takes <1 s
-#   and ArgoCD reloads customizations within ~5 s — well before any ExternalSecret or
-#   HTTPRoute could possibly reconcile on a fresh cluster.
-#
-# Applied via Server-Side Apply: only the two health-check keys are owned here;
-# all other argocd-cm keys remain managed by ArgoCD's installation.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -49,4 +28,3 @@ spec:
         duration: 5s
         factor: 2
         maxDuration: 1m
-

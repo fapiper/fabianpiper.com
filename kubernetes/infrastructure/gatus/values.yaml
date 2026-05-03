@@ -8,14 +8,10 @@ replicaCount: 1
 service:
   port: 8080
 
-# Ingress / Gateway API settings
 ingress:
-  hostname: status.fabianpiper.com   # Dedicated hostname — avoids sub-path prefix issues
+  hostname: status.fabianpiper.com
   gatewayNamespace: envoy-gateway-system
-  # No subPath: Gatus v5.12.1 ignores web.prefix and serves everything at root.
-  # A dedicated hostname lets Gatus work without any path rewriting.
 
-# Container resource requests and limits
 resources:
   requests:
     cpu: "25m"
@@ -24,14 +20,10 @@ resources:
     cpu: "100m"
     memory: "64Mi"
 
-# Gatus configuration — rendered into a ConfigMap and mounted at /config/config.yaml.
 config:
   web:
     port: 8080
     address: "0.0.0.0"
-    # No prefix: Gatus v5.12.1 does not register Fiber routes under web.prefix;
-    # the field is silently ignored for HTTP routing. Serving at root on a
-    # dedicated hostname (status.fabianpiper.com) is the correct approach.
 
   ui:
     title: "Status | fabianpiper.com"
@@ -56,7 +48,6 @@ config:
         - "[RESPONSE_TIME] < 2000"
 
     - name: "Grafana"
-      # /api/health returns 200 + JSON without auth (no redirect to /login).
       url: "https://grafana.fabianpiper.com/api/health"
       interval: 5m
       conditions:

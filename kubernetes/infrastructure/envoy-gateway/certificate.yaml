@@ -1,11 +1,3 @@
-# TLS certificate owned by the envoy-gateway infrastructure application.
-# Placing the cert in envoy-gateway-system (same namespace as the Gateway) means:
-#   • No cross-namespace ReferenceGrant needed
-#   • Gateway HTTPS listener never depends on the www application being healthy
-#   • cert-manager issues/renews the cert independently of app deployments
-#
-# Covers all public hostnames so all HTTPRoutes (www, grafana, status, glg)
-# share a single TLS context on the https listener.
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
@@ -16,7 +8,7 @@ metadata:
     app.kubernetes.io/instance: envoy-gateway
     app.kubernetes.io/part-of: infrastructure
   annotations:
-    argocd.argoproj.io/sync-wave: "11"
+    argocd.argoproj.io/sync-wave: "10"
 spec:
   secretName: glg-tls
   issuerRef:
@@ -27,4 +19,3 @@ spec:
     - www.fabianpiper.com
     - status.fabianpiper.com
     - grafana.fabianpiper.com
-

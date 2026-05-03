@@ -7,7 +7,6 @@ loki-stack:
     persistence:
       enabled: true
       size: 5Gi
-      # storageClassName: ""  → default (local-path on K3s)
 
     resources:
       requests:

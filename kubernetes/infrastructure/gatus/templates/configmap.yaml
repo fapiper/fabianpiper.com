@@ -6,7 +6,7 @@ metadata:
   labels:
     {{- include "gatus.labels" . | nindent 4 }}
   annotations:
-    argocd.argoproj.io/sync-wave: "5"
+    argocd.argoproj.io/sync-wave: "10"
 data:
   config.yaml: |
     {{- .Values.config | toYaml | nindent 4 }}

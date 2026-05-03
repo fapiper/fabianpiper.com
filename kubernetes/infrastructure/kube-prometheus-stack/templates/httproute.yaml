@@ -1,13 +1,3 @@
-# HTTPRoute for Grafana at grafana.fabianpiper.com (dedicated subdomain).
-#
-# Wave 25: applied AFTER the upstream chart resources (wave 0) so that the
-# grafana Service exists before ArgoCD evaluates this HTTPRoute's health.
-# Placing this earlier (e.g. wave -4) causes a deadlock: ArgoCD health-checks
-# the HTTPRoute before wave 0 is applied, Envoy Gateway reports "Service not
-# found", ArgoCD considers the route Degraded, and wave 0 never gets applied —
-# meaning the grafana Service is never created and the deadlock is permanent.
-# Envoy Gateway resolves backends lazily, so a 503 is served briefly on first
-# deploy until both the Service and Pods are ready.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -28,4 +18,3 @@ spec:
     - backendRefs:
         - name: {{ .Values.grafanaServiceName }}
           port: 80
-

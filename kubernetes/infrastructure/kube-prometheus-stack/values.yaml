@@ -1,44 +1,25 @@
-# ─── Wrapper-chart tunables (consumed by templates/ only) ───────────────────
-
 ingress:
   hostname: grafana.fabianpiper.com
   gatewayNamespace: envoy-gateway-system
 
-# Admin credentials — ExternalSecret pulls the password from OCI Vault.
-# The resulting K8s Secret is referenced by grafana.admin.existingSecret below.
 grafanaAdmin:
   secretName: grafana-admin
   userKey: admin-user
   passwordKey: admin-password
 
-# Must match kube-prometheus-stack.grafana.fullnameOverride so the HTTPRoute
-# backend points at the correct service.
 grafanaServiceName: grafana
 
-# ─── kube-prometheus-stack sub-chart values ─────────────────────────────────
 kube-prometheus-stack:
-
-  # Shorten all resource names to avoid hitting the 63-char label limit.
   fullnameOverride: "kps"
 
-  # ── Alertmanager — disabled (no alert routing needed, saves ~200 Mi RAM) ──
   alertmanager:
     enabled: false
 
-  # ── Grafana ──────────────────────────────────────────────────────────────
   grafana:
     enabled: true
-    fullnameOverride: "grafana"   # service name = grafana (referenced by HTTPRoute)
+    fullnameOverride: "grafana"
 
-    # PVC ownership is handled by Kubernetes' native fsGroup mechanism.
-    # kubelet applies fsGroup: 472 directly on the node before any container
-    # starts — this is more reliable than an init container because it works
-    # regardless of container-level capability restrictions (K3s/containerd
-    # blocks chown even for UID 0 on dirs already owned by the grafana user).
-    #
-    # initChownData is therefore disabled. It caused Init:Error on pod restarts
-    # when Grafana had previously created png/pdf/csv dirs (owned by UID 472):
-    #   chown: /var/lib/grafana/png: Permission denied
+    # K3s/containerd blocks chown even for UID 0 on dirs owned by UID 472; fsGroup handles it at kubelet level.
     initChownData:
       enabled: false
 
@@ -48,34 +29,23 @@ kube-prometheus-stack:
       runAsGroup: 472
       fsGroup: 472
 
-    # Admin credentials loaded from ExternalSecret (wave -5 in templates/).
     admin:
       existingSecret: "grafana-admin"
       userKey: "admin-user"
       passwordKey: "admin-password"
 
-    # Serve Grafana at the subdomain root (no sub-path needed).
     grafana.ini:
       server:
         domain: "grafana.fabianpiper.com"
         root_url: "https://grafana.fabianpiper.com"
         serve_from_sub_path: false
 
-
-    # Explicit datasource definitions with fixed UIDs ensure community dashboards
-    # that reference ${DS_PROMETHEUS} / ${DS_LOKI} template variables resolve
-    # correctly without manual re-mapping on every import.
-    # The Prometheus datasource overrides whatever the chart auto-provisions so
-    # the UID is always "prometheus" — matching the hardcoded value in Grafana.com
-    # dashboards 15282, 14055, 14584 and the kube-prometheus-stack built-in ones.
-    #
-    # sidecar.datasources.defaultDatasourceEnabled: false — disables the chart's
-    # auto-provisioned Prometheus datasource (which also sets isDefault: true).
-    # Without this, Grafana crashes on startup:
-    #   "Only one datasource per organization can be marked as default"
+    # Disable the chart's auto-provisioned default Prometheus datasource; it also sets
+    # isDefault: true which conflicts with additionalDataSources and crashes Grafana.
     sidecar:
       datasources:
         defaultDatasourceEnabled: false
+
     additionalDataSources:
       - name: Prometheus
         type: prometheus
@@ -92,11 +62,6 @@ kube-prometheus-stack:
         access: proxy
         isDefault: false
 
-    # ── Dashboard provisioning via Grafana sidecar (no internet required at startup) ──
-    # The kube-prometheus-stack Grafana sub-chart runs a sidecar that watches for
-    # ConfigMaps labelled grafana_dashboard="1" in the release namespace and loads
-    # them dynamically — no init-container download, no grafana.com dependency.
-    # Dashboards are defined in templates/grafana-dashboards.yaml (one ConfigMap each).
     downloadDashboards:
       enabled: false
 
@@ -112,7 +77,6 @@ kube-prometheus-stack:
         cpu: "300m"
         memory: "512Mi"
 
-  # ── Prometheus ───────────────────────────────────────────────────────────
   prometheus:
     prometheusSpec:
       retention: 15d
@@ -132,16 +96,11 @@ kube-prometheus-stack:
           cpu: "500m"
           memory: "1Gi"
 
-  # ── Prometheus Operator ───────────────────────────────────────────────────
   prometheusOperator:
     enabled: true
-    # Disable admission webhooks — no MutatingWebhookConfiguration registered.
-    # This avoids the bootstrap deadlock where K8s intercepts CRD creates
-    # through a webhook that isn't running yet.
+    # Disable webhooks to avoid bootstrap deadlock (webhook not running yet when CRDs are applied).
     admissionWebhooks:
       enabled: false
-    # Disable TLS on the operator web server — it runs plain HTTP on :8080.
-    # No kps-admission Secret is needed; keeps the setup as simple as possible.
     tls:
       enabled: false
     resources:
@@ -152,9 +111,7 @@ kube-prometheus-stack:
         cpu: "200m"
         memory: "256Mi"
 
-  # ── K3s compatibility — embedded components are not individually addressable ──
-  # These monitors target standalone kube-* processes that don't exist in K3s.
-  # Enabling them would cause scrape failures and, in v82.x, YAML render errors.
+  # K3s embeds these components; standalone ServiceMonitors would cause scrape failures.
   kubeScheduler:
     enabled: false
   kubeControllerManager:
@@ -164,23 +121,15 @@ kube-prometheus-stack:
   kubeProxy:
     enabled: false
 
-  # ── kubelet / cAdvisor ───────────────────────────────────────────────────
-  # Provides container_* and machine_* metrics required by dashboards that use
-  # cAdvisor (e.g. 15282 K3S cluster monitoring).
-  # K3s embeds cAdvisor inside the kubelet on port 10250 — no separate process.
   kubelet:
     enabled: true
     serviceMonitor:
       cAdvisor: true
 
-  # ── node-exporter (DaemonSet — all 3 nodes) ───────────────────────────────
   nodeExporter:
     enabled: true
     serviceMonitor:
-      # With fullnameOverride="kps" the default job label becomes
-      # "kps-prometheus-node-exporter".  Force it to "node-exporter" so that
-      # community dashboards (15282, 14055, 14584) can discover instances via
-      # their built-in $job template variable without manual reconfiguration.
+      # Force job label to "node-exporter" so community dashboards resolve instances correctly.
       relabelings:
         - targetLabel: job
           replacement: node-exporter
@@ -194,7 +143,6 @@ kube-prometheus-stack:
         cpu: "100m"
         memory: "128Mi"
 
-  # ── kube-state-metrics ────────────────────────────────────────────────────
   kubeStateMetrics:
     enabled: true
 
