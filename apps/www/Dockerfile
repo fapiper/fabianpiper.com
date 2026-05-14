@@ -19,9 +19,9 @@ RUN --mount=type=secret,id=secrets \
     PUBLIC_SITE_URL="$SITE_URL" \
     bun run build
 
-FROM nginx:1.27-alpine
+FROM nginxinc/nginx-unprivileged:1.27-alpine
 
 COPY --from=builder --chown=nginx:nginx /app/dist /usr/share/nginx/html
 
-EXPOSE 80
+EXPOSE 8080
 CMD ["nginx", "-g", "daemon off;"]
