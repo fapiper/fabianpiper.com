@@ -1,5 +1,5 @@
 output "ingress_public_ip" {
-  description = "Public IP of the ingress instance"
+  description = "Reserved public IP of the ingress instance"
   value       = module.cluster.ingress_public_ip
 }
 
@@ -23,17 +23,32 @@ output "ssh_private_key_path" {
   value       = module.cluster.ssh_private_key_path
 }
 
-output "ssh_ingress_command" {
-  description = "SSH command to connect to the ingress instance"
-  value       = module.cluster.ssh_ingress_command
+output "ssh_jump_command" {
+  description = "SSH to the jump host (ingress node)"
+  value       = module.cluster.ssh_jump_command
 }
 
-output "ssh_server_command" {
-  description = "SSH command to connect to the server instance (via ingress jump host)"
-  value       = module.cluster.ssh_server_command
+output "ssh_jump_command_unsafe" {
+  description = "SSH to the jump host — skips host-key check (use after rebuilds)"
+  value       = module.cluster.ssh_jump_command_unsafe
+}
+
+output "ssh_controlplane_command" {
+  description = "SSH to the K3s control-plane node via jump host"
+  value       = module.cluster.ssh_controlplane_command
+}
+
+output "ssh_controlplane_command_unsafe" {
+  description = "SSH to the K3s control-plane node via jump host — skips host-key checks on both hops (use after rebuilds)"
+  value       = module.cluster.ssh_controlplane_command_unsafe
 }
 
 output "kubeconfig_command" {
-  description = "Command to retrieve kubeconfig"
+  description = "Fetch k3s kubeconfig from control-plane"
   value       = module.cluster.kubeconfig_command
+}
+
+output "kubeconfig_command_unsafe" {
+  description = "Fetch k3s kubeconfig — skips host-key checks on both hops (use after rebuilds)"
+  value       = module.cluster.kubeconfig_command_unsafe
 }
