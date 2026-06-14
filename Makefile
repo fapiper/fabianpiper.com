@@ -10,7 +10,7 @@ VERSION     := $(BRANCH)-$(COMMIT_HASH)
 SCRIPTS := ./scripts
 
 .DEFAULT_GOAL := help
-.PHONY: help setup dev build deploy-% plan-% apply-% validate-% destroy-% sops-%
+.PHONY: help setup dev build deploy-% plan-% apply-% output-% validate-% destroy-% sops-%
 
 #----------------------------------------------------------------
 # Context Helpers
@@ -41,6 +41,10 @@ deploy-%:
 ## plan-[env]-[comp]: terraform plan (omit comp to plan all)
 plan-%:
 	@$(run_atmos) plan $(env_app)
+
+## output-[env]-[comp]: show terraform outputs (IPs, SSH commands — requires comp, e.g. output-prod-cluster)
+output-%:
+	@$(run_atmos) output $(env_app)
 
 ## apply-[env]-[comp]: terraform apply (omit comp to apply all)
 apply-%:

@@ -389,6 +389,7 @@ make apply-prod-networking   # Apply networking
 make apply-prod-iam          # Apply IAM
 make apply-prod-vault        # Apply vault
 make apply-prod-cluster      # Apply cluster
+make output-prod-cluster     # Print all cluster outputs (IPs + ready-made SSH commands)
 make apply-prod-dns          # Apply DNS
 make destroy-prod-cluster    # Destroy cluster (careful!)
 make validate-prod           # terraform validate all modules
@@ -462,7 +463,7 @@ make deploy-prod
 INGRESS_IP="<your-ingress-public-ip>"
 
 # Get ingress IP from Terraform outputs
-make plan-prod-cluster 2>&1 | grep ingress_public_ip
+make output-prod-cluster 2>&1 | grep ingress_public_ip
 
 # SSH connectivity
 ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP 'echo ok'
@@ -497,7 +498,7 @@ curl -sI https://glg.fabianpiper.com         | head -1  # HTTP/2 200
 
 ```bash
 # Get the ingress IP and ready-made SSH commands from Terraform outputs after cluster apply
-make plan-prod-cluster   # look for ingress_public_ip, ssh_ingress_command, kubeconfig_command
+make output-prod-cluster   # prints ingress_public_ip, ssh_ingress_command, kubeconfig_command
 
 INGRESS_IP="<ingress_public_ip from output>"
 
