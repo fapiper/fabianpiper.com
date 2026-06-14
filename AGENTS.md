@@ -497,18 +497,21 @@ curl -sI https://glg.fabianpiper.com         | head -1  # HTTP/2 200
 ### Local kubectl Access
 
 ```bash
-# Get the ingress IP and ready-made SSH commands from Terraform outputs after cluster apply
-make output-prod-cluster   # prints ingress_public_ip, ssh_ingress_command, kubeconfig_command
+# All ready-made commands are printed by Terraform after cluster apply
+make output-prod-cluster
+# Key outputs: ingress_public_ip, ssh_jump_command_unsafe, ssh_controlplane_command_unsafe,
+#              kubeconfig_command_unsafe (use the _unsafe variants after every rebuild)
 
+# SSH — copy the output values directly, or use the IP:
 INGRESS_IP="<ingress_public_ip from output>"
 
-# SSH
-ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@$INGRESS_IP               # jump host
-ssh -i ~/.ssh/id_rsa -J ubuntu@$INGRESS_IP ubuntu@10.0.2.10                       # server via jump host
+ssh -i ~/.ssh/id_rsa -J ubuntu@$INGRESS_IP ubuntu@10.0.2.10          # first time / known host
+# after a rebuild use ssh_controlplane_command_unsafe (skips changed host-key prompt)
 
-# Fetch kubeconfig (kubeconfig_command output gives this verbatim)
-ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
-  'ssh ubuntu@10.0.2.10 sudo cat /etc/rancher/k3s/k3s.yaml' > kubeconfig-prod.yaml
+# Fetch kubeconfig (kubeconfig_command_unsafe output gives this verbatim)
+ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ubuntu@$INGRESS_IP \
+  'ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ubuntu@10.0.2.10 sudo cat /etc/rancher/k3s/k3s.yaml' \
+  > kubeconfig-prod.yaml
 sed -i 's/127.0.0.1/10.0.2.10/g' kubeconfig-prod.yaml
 chmod 600 kubeconfig-prod.yaml
 

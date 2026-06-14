@@ -43,7 +43,9 @@ output "private_subnet_id" {
 locals {
   ssh_private_key_path = trimsuffix(var.ssh_public_key_path, ".pub")
   ingress_ip           = var.enabled ? oci_core_public_ip.ingress_reserved[0].ip_address : null
-  ssh_base             = var.enabled ? "ssh -i ${local.ssh_private_key_path} ubuntu@${local.ingress_ip}" : null
+  unsafe_opts          = "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+  ssh_jump             = var.enabled ? "ssh -i ${local.ssh_private_key_path} ubuntu@${local.ingress_ip}" : null
+  ssh_jump_unsafe      = var.enabled ? "ssh -i ${local.ssh_private_key_path} ${local.unsafe_opts} ubuntu@${local.ingress_ip}" : null
 }
 
 output "ssh_private_key_path" {
@@ -51,17 +53,32 @@ output "ssh_private_key_path" {
   value       = local.ssh_private_key_path
 }
 
-output "ssh_ingress_command" {
-  description = "SSH command to connect to the ingress instance"
-  value       = var.enabled ? local.ssh_base : null
+output "ssh_jump_command" {
+  description = "SSH to the jump host (ingress node)"
+  value       = var.enabled ? local.ssh_jump : null
 }
 
-output "ssh_server_command" {
-  description = "SSH command to connect to the server instance (via ingress jump host)"
+output "ssh_jump_command_unsafe" {
+  description = "SSH to the jump host — skips host-key check (use after rebuilds)"
+  value       = var.enabled ? local.ssh_jump_unsafe : null
+}
+
+output "ssh_controlplane_command" {
+  description = "SSH to the K3s control-plane node via jump host"
   value       = var.enabled ? "ssh -i ${local.ssh_private_key_path} -J ubuntu@${local.ingress_ip} ubuntu@${var.server_private_ip}" : null
 }
 
+output "ssh_controlplane_command_unsafe" {
+  description = "SSH to the K3s control-plane node via jump host — skips host-key checks on both hops (use after rebuilds)"
+  value       = var.enabled ? "ssh -i ${local.ssh_private_key_path} ${local.unsafe_opts} -J ubuntu@${local.ingress_ip} ubuntu@${var.server_private_ip}" : null
+}
+
 output "kubeconfig_command" {
-  description = "Command to retrieve kubeconfig (uses derived private key from ssh_public_key_path)"
-  value       = var.enabled ? "${local.ssh_base} 'ssh ubuntu@${var.server_private_ip} sudo cat /etc/rancher/k3s/k3s.yaml'" : null
+  description = "Fetch k3s kubeconfig from control-plane — pipe to kubeconfig-prod.yaml, then sed 127.0.0.1 → 10.0.2.10"
+  value       = var.enabled ? "${local.ssh_jump} 'ssh ubuntu@${var.server_private_ip} sudo cat /etc/rancher/k3s/k3s.yaml'" : null
+}
+
+output "kubeconfig_command_unsafe" {
+  description = "Fetch k3s kubeconfig — skips host-key checks on both hops (use after rebuilds)"
+  value       = var.enabled ? "${local.ssh_jump_unsafe} 'ssh ${local.unsafe_opts} ubuntu@${var.server_private_ip} sudo cat /etc/rancher/k3s/k3s.yaml'" : null
 }
