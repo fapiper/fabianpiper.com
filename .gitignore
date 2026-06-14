@@ -18,6 +18,8 @@ terraform.rc
 .oci/
 oci_api_key.pem
 kubeconfig
+kubeconfig-*.yaml
+ssh-config-*
 k3s.yaml
 .kube/
 

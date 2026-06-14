@@ -78,6 +78,7 @@ sops-encrypt-%:
 sops-decrypt-%:
 	@$(SCRIPTS)/sops.sh decrypt $*
 
+
 ## help: show this menu
 help:
 	@printf -- "========================================================================\n"

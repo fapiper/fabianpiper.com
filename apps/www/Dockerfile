@@ -4,6 +4,7 @@
 # The dist/ output is static files (HTML/CSS/JS) and therefore platform-agnostic.
 FROM --platform=$BUILDPLATFORM oven/bun:1 AS builder
 WORKDIR /app
+SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 
 COPY package.json bun.lock ./
 RUN bun install
@@ -11,12 +12,11 @@ RUN bun install
 COPY . .
 
 RUN --mount=type=secret,id=secrets \
-    set -euo pipefail && \
     set -a && \
     . /run/secrets/secrets && \
     set +a && \
-    PUBLIC_MIXPANEL_TOKEN="$MIXPANEL_TOKEN" \
-    PUBLIC_SITE_URL="$SITE_URL" \
+    PUBLIC_MIXPANEL_TOKEN="${MIXPANEL_TOKEN:-}" \
+    PUBLIC_SITE_URL="${SITE_URL:-}" \
     bun run build
 
 FROM nginxinc/nginx-unprivileged:1.27-alpine

@@ -50,7 +50,7 @@ resource "oci_core_instance" "ingress" {
 
   create_vnic_details {
     subnet_id              = var.public_subnet_id
-    assign_public_ip       = true
+    assign_public_ip       = false # Reserved IP managed separately below
     private_ip             = var.ingress_private_ip
     skip_source_dest_check = true # Required for NAT functionality
     hostname_label         = var.ingress_hostname_label
@@ -82,6 +82,15 @@ data "oci_core_private_ips" "ingress_ips" {
   ip_address = var.ingress_private_ip
 
   depends_on = [oci_core_instance.ingress]
+}
+
+resource "oci_core_public_ip" "ingress_reserved" {
+  count          = var.enabled ? 1 : 0
+  compartment_id = local.compartment_ocid
+  lifetime       = "RESERVED"
+  display_name   = "ingress-reserved-ip"
+  private_ip_id  = data.oci_core_private_ips.ingress_ips[0].private_ips[0].id
+  freeform_tags  = var.common_tags
 }
 
 resource "oci_core_route_table" "private_rt" {

@@ -82,7 +82,7 @@ OCI Vault → secrets at runtime (Instance Principal, no API keys on nodes)
 
 | Node | Role | Private IP | OCPUs | RAM | Public |
 |------|------|-----------|-------|-----|--------|
-| ingress | NAT gateway + Envoy Gateway | 10.0.1.10 | 1 | 6 GB | Yes (reserved IP) |
+| ingress | NAT gateway + Envoy Gateway | 10.0.1.10 | 1 | 6 GB | Yes (OCI reserved IP — survives instance replace-in-place; changes only on full cluster destroy+recreate) |
 | server | K3s server (control plane + infra pods) | 10.0.2.10 | 2 | 12 GB | No |
 | worker | K3s agent (app pods) | DHCP (10.0.2.x) | 1 | 6 GB | No |
 
@@ -496,19 +496,28 @@ curl -sI https://glg.fabianpiper.com         | head -1  # HTTP/2 200
 ### Local kubectl Access
 
 ```bash
-INGRESS_IP="<your-ingress-public-ip>"
+# Get the ingress IP and ready-made SSH commands from Terraform outputs after cluster apply
+make plan-prod-cluster   # look for ingress_public_ip, ssh_ingress_command, kubeconfig_command
 
+INGRESS_IP="<ingress_public_ip from output>"
+
+# SSH
+ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@$INGRESS_IP               # jump host
+ssh -i ~/.ssh/id_rsa -J ubuntu@$INGRESS_IP ubuntu@10.0.2.10                       # server via jump host
+
+# Fetch kubeconfig (kubeconfig_command output gives this verbatim)
 ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
   'ssh ubuntu@10.0.2.10 sudo cat /etc/rancher/k3s/k3s.yaml' > kubeconfig-prod.yaml
+sed -i 's/127.0.0.1/10.0.2.10/g' kubeconfig-prod.yaml
+chmod 600 kubeconfig-prod.yaml
 
-sed -i "s/127.0.0.1/10.0.2.10/" kubeconfig-prod.yaml
-
-# Access via SSH tunnel (port 6443 is NOT open in OCI security list — use tunnel)
-ssh -i ~/.ssh/id_rsa -L 6443:10.0.2.10:6443 ubuntu@$INGRESS_IP -N &
-
+# kubectl via SSH tunnel (port 6443 is NOT open in OCI security list — use tunnel)
+ssh -i ~/.ssh/id_rsa -L 6443:10.0.2.10:6443 ubuntu@$INGRESS_IP -fN
 export KUBECONFIG=./kubeconfig-prod.yaml
 kubectl get nodes
 kubectl get pods -A
+
+# After a full cluster destroy + recreate, repeat from the top (new IP only on full rebuild).
 ```
 
 ---

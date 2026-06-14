@@ -6,8 +6,8 @@ output "ingress_instance_id" {
 }
 
 output "ingress_public_ip" {
-  description = "Public IP of the ingress instance"
-  value       = var.enabled ? oci_core_instance.ingress[0].public_ip : null
+  description = "Reserved public IP of the ingress instance"
+  value       = var.enabled ? oci_core_public_ip.ingress_reserved[0].ip_address : null
 }
 
 output "ingress_private_ip" {
@@ -42,7 +42,7 @@ output "private_subnet_id" {
 
 locals {
   ssh_private_key_path = trimsuffix(var.ssh_public_key_path, ".pub")
-  ingress_ip           = var.enabled ? oci_core_instance.ingress[0].public_ip : null
+  ingress_ip           = var.enabled ? oci_core_public_ip.ingress_reserved[0].ip_address : null
   ssh_base             = var.enabled ? "ssh -i ${local.ssh_private_key_path} ubuntu@${local.ingress_ip}" : null
 }
 
