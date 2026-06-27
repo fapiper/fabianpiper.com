@@ -34,7 +34,7 @@ runcmd:
       --tls-san ${public_ip} \
       --disable traefik \
       --disable servicelb \
-      --node-label role=server
+      --node-label role=ingress
 
   # Wait for k3s binary
   - until [ -f /usr/local/bin/k3s ]; do sleep 2; done

@@ -6,3 +6,4 @@ components:
       vars:
         enabled: true
         name: "cluster"
+        enable_worker: false

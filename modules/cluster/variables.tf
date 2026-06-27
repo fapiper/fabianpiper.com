@@ -72,8 +72,14 @@ variable "ingress_private_ip" {
   default     = "10.0.1.10"
 }
 
+variable "ingress_instance_shape" {
+  description = "OCI instance shape for the ingress node. VM.Standard.E2.1.Micro is AMD fixed-shape (Always Free); VM.Standard.A1.Flex requires ingress_shape_config."
+  type        = string
+  default     = "VM.Standard.E2.1.Micro"
+}
+
 variable "ingress_shape_config" {
-  description = "Shape configuration for ingress instance"
+  description = "Shape configuration for ingress instance — only used when ingress_instance_shape is a Flex shape."
   type = object({
     ocpus         = number
     memory_in_gbs = number
@@ -141,7 +147,7 @@ variable "worker_shape_config" {
 variable "enable_worker" {
   description = "Enable worker instance"
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "k3s_version" {

@@ -64,10 +64,9 @@ ArgoCD Image Updater (resolves digest of :latest, writes sha256 to git)
                     ↓
 ArgoCD (polls git every 30s, syncs K8s manifests)
                     ↓
-K3s cluster (3 ARM nodes on OCI)
-  ├─ Ingress node  → Envoy Gateway (hostNetwork, NodePort 80/443)
-  ├─ Server node   → K3s control plane + all infra pods
-  └─ Worker node   → App pods (www)
+K3s cluster (1 ARM server + 1 AMD NAT node on OCI)
+  ├─ Ingress node  → NAT gateway + SSH jump host (AMD E2.1.Micro, no k3s)
+  └─ Server node   → K3s single-node: control plane + all pods incl. Envoy Gateway
 
 Terraform → OCI (VCN, compute, vault, IAM)
 SOPS+age  → secrets at rest in git
@@ -82,17 +81,19 @@ OCI Vault → secrets at runtime (Instance Principal, no API keys on nodes)
 
 | Node | Role | Private IP | OCPUs | RAM | Public |
 |------|------|-----------|-------|-----|--------|
-| ingress | NAT gateway + Envoy Gateway | 10.0.1.10 | 1 | 6 GB | Yes (OCI reserved IP — survives instance replace-in-place; changes only on full cluster destroy+recreate) |
-| server | K3s server (control plane + infra pods) | 10.0.2.10 | 2 | 12 GB | No |
-| worker | K3s agent (app pods) | DHCP (10.0.2.x) | 1 | 6 GB | No |
+| ingress | NAT gateway + SSH jump host (no k3s) | 10.0.1.10 | 1 | 1 GB | Yes (OCI reserved IP — survives instance replace-in-place; changes only on full cluster destroy+recreate) |
+| server | K3s single-node (control plane + all pods incl. Envoy Gateway) | 10.0.2.10 | 2 | 12 GB | No |
+
+> **Ingress node shape**: `VM.Standard.E2.1.Micro` (AMD, Always Free). Does not run k3s — only iptables NAT and SSH jump host.
+> Envoy Gateway runs on the server node (nodeSelector `role: ingress` matches the server node's label).
 
 ### Networking
 
 - **VCN CIDR**: `10.0.0.0/16` — **do not change** (subnet math depends on it)
 - **Public subnet**: `10.0.1.0/24` (ingress node only)
-- **Private subnet**: `10.0.2.0/24` (server + worker)
+- **Private subnet**: `10.0.2.0/24` (server only)
 - **Pod networking**: Flannel VXLAN over UDP `8472` (must be open in OCI security lists)
-- **Ingress flow**: Internet → OCI public IP → ingress:80/443 → iptables DNAT → Envoy Gateway pod (hostNetwork) → K8s Service → Pod
+- **Ingress flow**: Internet → OCI public IP → ingress:80/443 → iptables DNAT → Envoy Gateway pod (hostNetwork on server) → K8s Service → Pod
 
 ### ArgoCD Bootstrap Chain
 
@@ -920,24 +921,37 @@ curl -sI https://www.fabianpiper.com | head -1
 
 ### OCI Free Tier — CRITICAL: Never Exceed
 
-| Resource | Limit | Current Usage | Headroom |
-|----------|-------|---------------|----------|
-| Compute — OCPUs (ARM) | 4 | 4 | **0 — cannot add nodes** |
-| Compute — RAM | 24 GB | 24 GB | **0** |
-| Block Storage | 200 GB | ~132 GB (~120 GB boot vols + 12 Gi PVCs) | ~68 GB |
-| VCNs | 2 | 1 | 1 |
-| Reserved Public IPs | 2 | 1 | 1 |
-| Flexible Load Balancers | 1 | 0 (using NAT instance) | 1 |
+> **⚠️ Always Free A1 compute limits changed as of June 2026.**
+> Source: [OCI Always Free Resources docs](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm)
+>
+> The Ampere A1 Always Free allocation was **reduced from 4 OCPU / 24 GB to 2 OCPU / 12 GB**.
+> Do not assume 4 OCPU / 24 GB is free — older documentation and most community references still show the old limits.
+>
+> The current Terraform config uses `VM.Standard.E2.1.Micro` (AMD) for the ingress node and
+> `VM.Standard.A1.Flex` (2 OCPU / 12 GB) for the server node — within the Always Free limit.
+>
+> **OCI idle reclamation policy** — Always Free instances are automatically terminated if all of the
+> following are true for any 7-day period: CPU p95 < 20%, network utilisation < 20%, memory < 20% (A1 only).
+> A running k3s cluster with active workloads typically stays above these thresholds, but intentionally
+> stopped or very low-traffic clusters are at risk.
+
+| Resource | Limit | Current Config | Status |
+|----------|-------|----------------|--------|
+| Compute — OCPUs (ARM) | **2** | 2 (server only) | **0** |
+| Compute — RAM | **12 GB** | 12 GB (server only) | **0** |
+| Block Storage | 200 GB | ~132 GB (~120 GB boot vols + 12 Gi PVCs) | ~68 GB headroom |
+| VCNs | 2 | 1 | 1 headroom |
+| Reserved Public IPs | 2 | 1 | 1 headroom |
+| Flexible Load Balancers | 1 | 0 (using NAT instance) | 1 headroom |
 | OCI Vault secrets | Unlimited | 1 vault, 5 secrets | Unlimited |
-| Object Storage | 20 GB | 0 GB | 20 GB |
+| Object Storage | 20 GB | 0 GB | 20 GB headroom |
 
-**ARM Instance Sizing** (100% utilized — cannot add nodes):
+**Instance Sizing** (within Always Free limits):
 
-| Node | OCPUs | RAM | Schedulable RAM |
-|------|-------|-----|----------------|
-| ingress | 1 | 6 GB | ~5.5 GB |
-| server | 2 | 12 GB | ~10 GB |
-| worker | 1 | 6 GB | ~5.5 GB |
+| Node | Shape | OCPUs | RAM | Schedulable RAM |
+|------|-------|-------|-----|----------------|
+| ingress | VM.Standard.E2.1.Micro (AMD) | 1 | 1 GB | N/A — no k3s |
+| server | VM.Standard.A1.Flex (ARM) | 2 | 12 GB | ~10 GB |
 
 **Before adding a new service**:
 1. Check current node pressure: `kubectl top nodes`
@@ -1333,7 +1347,7 @@ Before marking any task complete, verify **all applicable items**:
 - [ ] `terraform validate` in each affected module directory — exits 0
 - [ ] `make plan-prod-<component>` reviewed — no unexpected changes
 - [ ] Block storage impact calculated if new PVCs added (current ~132 GB, limit 200 GB)
-- [ ] Compute unchanged — no new OCI instances (currently at 100% free tier)
+- [ ] Compute sizing stays within Always Free limits: server A1 ≤ 2 OCPU / 12 GB; ingress uses E2.1.Micro (see §10)
 
 **If Kubernetes manifests changed**:
 - [ ] For **Kustomize** dirs: `kubectl kustomize kubernetes/<path>/` — no YAML errors

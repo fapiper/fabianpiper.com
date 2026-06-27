@@ -33,6 +33,15 @@ data "oci_core_images" "ubuntu" {
   sort_order               = "DESC"
 }
 
+data "oci_core_images" "ubuntu_ingress" {
+  compartment_id           = local.compartment_ocid
+  operating_system         = var.instance_os
+  operating_system_version = var.instance_os_version
+  shape                    = var.ingress_instance_shape
+  sort_by                  = "TIMECREATED"
+  sort_order               = "DESC"
+}
+
 
 resource "oci_core_instance" "ingress" {
   count = var.enabled ? 1 : 0
@@ -40,12 +49,16 @@ resource "oci_core_instance" "ingress" {
   compartment_id      = local.compartment_ocid
   availability_domain = local.selected_ad
   display_name        = var.ingress_display_name
-  shape               = var.instance_shape
+  shape               = var.ingress_instance_shape
   freeform_tags       = var.common_tags
 
-  shape_config {
-    ocpus         = var.ingress_shape_config.ocpus
-    memory_in_gbs = var.ingress_shape_config.memory_in_gbs
+  # shape_config is only valid for Flex shapes — E2.1.Micro is a fixed shape
+  dynamic "shape_config" {
+    for_each = strcontains(var.ingress_instance_shape, "Flex") ? [1] : []
+    content {
+      ocpus         = var.ingress_shape_config.ocpus
+      memory_in_gbs = var.ingress_shape_config.memory_in_gbs
+    }
   }
 
   create_vnic_details {
@@ -59,15 +72,13 @@ resource "oci_core_instance" "ingress" {
   metadata = {
     ssh_authorized_keys = local.ssh_public_key
     user_data = local.use_cloud_init ? base64encode(templatefile("${path.module}/user-data/ingress.yaml", {
-      server_ip   = var.server_private_ip
-      k3s_token   = var.k3s_token
-      k3s_version = local.k3s_version
+      server_ip = var.server_private_ip
     })) : null
   }
 
   source_details {
     source_type = "image"
-    source_id   = data.oci_core_images.ubuntu.images[0].id
+    source_id   = data.oci_core_images.ubuntu_ingress.images[0].id
   }
 
   lifecycle {
