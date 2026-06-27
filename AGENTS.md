@@ -1,16 +1,12 @@
 # fabianpiper.com | Agent Operations Manual
 
-Last Updated: 2026-05-03
+Last Updated: 2026-06-27
 Generated for: AI Agents
 Repository: https://github.com/fapiper/fabianpiper.com
 Validation Status: Docs reviewed, Code cross-referenced, Ready for autonomous operation
 
-> **Changelog (2026-05-03)**: Kubernetes refactoring — deleted dead templates (`certificate.yaml`,
-> `referencegrant.yaml`, orphaned external-dns manifests, loki stub helpers); removed redundant
-> Namespace declaration from argocd-image-updater; eliminated `creationPolicy: Owner` (ESO default)
-> and dangling `oci-vault-config` ConfigMap; consolidated Envoy Gateway sync waves (5/5/10 instead
-> of 5/10/11/12); simplified www chart waves (5/10/25); stripped all prose comments from manifests
-> per comment policy (§6); fixed ApplicationSet template-wave misconception in §2.
+> **Changelog (2026-06-27)**: OCI Always Free Tier audit — updated §10 block storage figures from
+> 3-node (132 GB) to 2-node topology (106 GB); added worker re-enable cost warning.
 
 ---
 
@@ -939,7 +935,7 @@ curl -sI https://www.fabianpiper.com | head -1
 |----------|-------|----------------|--------|
 | Compute — OCPUs (ARM) | **2** | 2 (server only) | **0** |
 | Compute — RAM | **12 GB** | 12 GB (server only) | **0** |
-| Block Storage | 200 GB | ~132 GB (~120 GB boot vols + 12 Gi PVCs) | ~68 GB headroom |
+| Block Storage | 200 GB | ~106 GB (~94 GB boot vols for 2 nodes + 12 Gi PVCs) | ~94 GB headroom |
 | VCNs | 2 | 1 | 1 headroom |
 | Reserved Public IPs | 2 | 1 | 1 headroom |
 | Flexible Load Balancers | 1 | 0 (using NAT instance) | 1 headroom |
@@ -953,10 +949,15 @@ curl -sI https://www.fabianpiper.com | head -1
 | ingress | VM.Standard.E2.1.Micro (AMD) | 1 | 1 GB | N/A — no k3s |
 | server | VM.Standard.A1.Flex (ARM) | 2 | 12 GB | ~10 GB |
 
+> **⚠️ Worker node is permanently disabled (`enable_worker = false`).** Re-enabling it would add
+> 1 OCPU / 6 GB of A1 compute → total 3 OCPU / 18 GB, which **exceeds** the Always Free A1 limit
+> of 2 OCPU / 12 GB and will incur charges. Do not set `enable_worker = true` without first
+> downsizing the server node or switching to a paid account.
+
 **Before adding a new service**:
 1. Check current node pressure: `kubectl top nodes`
 2. Sum new pod's CPU + memory requests against available headroom
-3. Calculate PVC storage: `current ~127 GB + new PVC < 200 GB`
+3. Calculate PVC storage: `current ~106 GB + new PVC < 200 GB`
 4. Verify block storage via OCI CLI:
    ```bash
    oci bv volume list --all --compartment-id <COMPARTMENT_OCID> \
@@ -1346,7 +1347,7 @@ Before marking any task complete, verify **all applicable items**:
 - [ ] `terraform fmt -recursive` — no output (already formatted)
 - [ ] `terraform validate` in each affected module directory — exits 0
 - [ ] `make plan-prod-<component>` reviewed — no unexpected changes
-- [ ] Block storage impact calculated if new PVCs added (current ~132 GB, limit 200 GB)
+- [ ] Block storage impact calculated if new PVCs added (current ~106 GB, limit 200 GB)
 - [ ] Compute sizing stays within Always Free limits: server A1 ≤ 2 OCPU / 12 GB; ingress uses E2.1.Micro (see §10)
 
 **If Kubernetes manifests changed**:
