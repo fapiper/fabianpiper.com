@@ -36,7 +36,7 @@ setup:
 
 ## deploy-[env]: deploy all infrastructure
 deploy-%:
-	@$(run_atmos) bootstrap $(get_env) all
+	@$(run_atmos) apply $(get_env) all
 
 ## plan-[env]-[comp]: terraform plan (omit comp to plan all)
 plan-%:
