@@ -34,13 +34,17 @@ export default defineConfig({
     react(),
     sitemap(),
     icon(),
-    mixpanel({
-      token: PUBLIC_MIXPANEL_TOKEN,
-      config: {
-        api_host: 'https://api-eu.mixpanel.com',
-      },
-      autoTrack: true,
-    }),
+    ...(PUBLIC_MIXPANEL_TOKEN
+      ? [
+          mixpanel({
+            token: PUBLIC_MIXPANEL_TOKEN,
+            config: {
+              api_host: 'https://api-eu.mixpanel.com',
+            },
+            autoTrack: true,
+          }),
+        ]
+      : []),
   ],
   vite: {
     // Tailwind v4 and Astro 5 sometimes bring conflicting Vite type definitions, even if the code works perfectly
