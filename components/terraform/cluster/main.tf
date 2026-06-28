@@ -21,6 +21,7 @@ module "cluster" {
   ingress_display_name   = var.ingress_display_name
   ingress_hostname_label = var.ingress_hostname_label
   ingress_private_ip     = var.ingress_private_ip
+  ingress_instance_shape = var.ingress_instance_shape
   ingress_shape_config   = var.ingress_shape_config
 
   # Server instance
@@ -45,6 +46,7 @@ module "cluster" {
   git_repo_url = var.git_repo_url
   vault_id     = try(data.terraform_remote_state.vault.outputs.id, "")
 
-  common_tags = var.common_tags
-  enabled     = var.enabled
+  common_tags          = var.common_tags
+  enabled              = var.enabled
+  availability_domain  = var.availability_domain
 }

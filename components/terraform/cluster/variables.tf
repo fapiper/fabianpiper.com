@@ -62,6 +62,18 @@ variable "ssh_public_key_path" {
 }
 
 
+variable "ingress_instance_shape" {
+  description = "OCI instance shape for the ingress node"
+  type        = string
+  default     = "VM.Standard.E2.1.Micro"
+}
+
+variable "availability_domain" {
+  description = "Availability domain index (0-based)"
+  type        = number
+  default     = 0
+}
+
 # Instance configuration
 variable "instance_shape" {
   description = "OCI instance shape"

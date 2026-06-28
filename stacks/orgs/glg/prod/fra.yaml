@@ -6,7 +6,9 @@ vars:
   tenant: "glg"
 
 components:
+  terraform:
     cluster:
       vars:
+        availability_domain: 1
         common_tags:
           Environment: "prod"
