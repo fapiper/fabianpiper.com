@@ -55,7 +55,6 @@ spec:
             runAsNonRoot: true
             runAsUser: 101
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
             capabilities:
               drop: [ALL]
       volumes:
