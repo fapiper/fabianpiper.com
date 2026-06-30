@@ -82,7 +82,7 @@ resource "oci_core_instance" "ingress" {
   }
 
   lifecycle {
-    ignore_changes = [source_details]
+    ignore_changes = [source_details, metadata["user_data"]]
   }
 }
 
@@ -198,7 +198,7 @@ resource "oci_core_instance" "server" {
   }
 
   lifecycle {
-    ignore_changes = [source_details]
+    ignore_changes = [source_details, metadata["user_data"]]
   }
 
   depends_on = [oci_core_subnet.private_subnet]

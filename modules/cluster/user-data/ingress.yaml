@@ -32,9 +32,10 @@ runcmd:
     # SNAT forwarded internet→server traffic so return packets route back via ingress
     iptables -t nat -A POSTROUTING -d 10.0.2.0/24 -j MASQUERADE
 
-    # Forward HTTP/HTTPS to Envoy Gateway on the server node (REDIRECT only works locally)
-    iptables -t nat -A PREROUTING -p tcp --dport 80 -j DNAT --to-destination ${server_ip}:10080
-    iptables -t nat -A PREROUTING -p tcp --dport 443 -j DNAT --to-destination ${server_ip}:10443
+    # Forward HTTP/HTTPS to Envoy Gateway — exclude VCN-internal sources so the server
+    # can reach the internet on ports 80/443 without being DNAT'd back to itself
+    iptables -t nat -A PREROUTING ! -s 10.0.0.0/16 -p tcp --dport 80 -j DNAT --to-destination ${server_ip}:10080
+    iptables -t nat -A PREROUTING ! -s 10.0.0.0/16 -p tcp --dport 443 -j DNAT --to-destination ${server_ip}:10443
 
   - apt-get update -qq
   - DEBIAN_FRONTEND=noninteractive apt-get install -y iptables-persistent
