@@ -64,6 +64,9 @@ runcmd:
   # Initial K3s Wait
   - sleep 20
   - /usr/local/bin/k3s kubectl wait --for=condition=Ready nodes --all --timeout=300s
+  # Ensure role=ingress label is present before Envoy Gateway pods are scheduled.
+  # --node-label at install time can race with ArgoCD's first EnvoyProxy sync.
+  - /usr/local/bin/k3s kubectl label nodes --all role=ingress --overwrite
 
   # Bootstrap Envoy Gateway via Helm (before ArgoCD to break cold-start deadlock)
   - |
