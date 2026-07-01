@@ -50,13 +50,7 @@ spec:
             - --argocd-namespace=argocd
           env:
             - name: APPLICATIONS_API
-              value: argocd
-            - name: ARGOCD_GRPC_WEB
-              value: "true"
-            - name: ARGOCD_SERVER
-              value: argocd-server.argocd.svc.cluster.local:443
-            - name: ARGOCD_INSECURE
-              value: "true"
+              value: kubernetes
             - name: GITHUB_CREDENTIALS
               valueFrom:
                 secretKeyRef:
