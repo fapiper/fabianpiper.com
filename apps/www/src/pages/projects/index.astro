@@ -1,0 +1,28 @@
+---
+import MetaPage from "@/components/MetaPage.astro"
+import ProjectCard from "@/components/ProjectCard.astro"
+import Layout from "@/layouts/Layout.astro"
+import { getCollection } from "astro:content"
+import { getProjects } from "@/lib/content"
+
+const projects = await getProjects()
+---
+
+<Layout>
+  <MetaPage slot="head" title="Projects" />
+  {projects.length > 0 ? (
+      <ul>
+        {projects.map((project) => <ProjectCard entry={project} />)}
+      </ul>
+    ) : (
+      <p>No projects found</p>
+    )}
+</Layout>
+
+<style>
+  ul {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-m);
+  }
+</style>

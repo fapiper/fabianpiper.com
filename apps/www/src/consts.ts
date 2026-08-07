@@ -1,46 +1,38 @@
-import type { IconMap, SocialLink, Site } from '@/types'
+import type { SvgComponent } from "astro/types"
+import Email from "@/assets/icons/email.svg"
+import GitHub from "@/assets/icons/github.svg"
+import Linkedin from "@/assets/icons/linkedin.svg"
 
-export const SITE: Site = {
-  title: 'Fabian Piper',
+export const SITE = {
+  title: "Fabian Piper",
   description:
-    "I'm a Software Engineer and Researcher based in Berlin, Germany. Find a selection of my projects, contributions, and publications. Please feel free to reach out!",
-  href: 'https://glg.fabianpiper.com',
-  author: 'fapiper',
-  locale: 'en-US',
+    "I'm a Software Engineer based in Berlin, Germany. Find a selection of my projects, contributions, and publications. Please feel free to reach out!",
+  locale: "en-US",
+  dir: "ltr",
   featuredProjectCount: 4,
   featuredPublicationCount: 3,
   pageSize: 6,
-}
+  defaultPageImage: "/static/opengraph-image.png",
+  defaultPostImage: "/static/1200x630.png",
+} as const
 
-export const NAV_LINKS: SocialLink[] = [
+export const NAVIGATION = [
   {
-    href: '/projects',
-    label: 'projects',
+    href: "/projects",
+    label: "Projects",
   },
   {
-    href: '/publications',
-    label: 'publications',
+    href: "/publications",
+    label: "Publications",
   },
 ]
 
-export const SOCIAL_LINKS: SocialLink[] = [
+export const SOCIALS: { href: string; label: string; icon: SvgComponent }[] = [
+  { href: "https://github.com/fapiper", label: "GitHub", icon: GitHub },
   {
-    href: 'https://github.com/fapiper',
-    label: 'GitHub',
+    href: "https://linkedin.com/in/fabian-piper",
+    label: "LinkedIn",
+    icon: Linkedin,
   },
-  {
-    href: 'https://linkedin.com/in/fabian-piper',
-    label: 'LinkedIn',
-  },
-  {
-    href: 'mailto:hello@fabianpiper.com',
-    label: 'Email',
-  },
+  { href: "mailto:hello@fabianpiper.com", label: "Email", icon: Email },
 ]
-
-export const ICON_MAP: IconMap = {
-  Website: 'lucide:globe',
-  GitHub: 'lucide:github',
-  LinkedIn: 'lucide:linkedin',
-  Email: 'lucide:mail',
-}

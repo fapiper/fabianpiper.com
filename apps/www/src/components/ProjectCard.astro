@@ -1,16 +1,15 @@
 ---
-import Link from '@/components/Link.astro'
-import { Separator } from '@/components/ui/separator'
-import { Icon } from 'astro-icon/components'
-import { Image } from 'astro:assets'
-import type { CollectionEntry } from 'astro:content'
-import { formatYear } from '../lib/utils'
+import ExternalIcon from "@/assets/icons/external.svg"
+import { formatYear } from "@/lib/utils"
+import { Image } from "astro:assets"
+import type { CollectionEntry } from "astro:content"
 
-interface Props {
-  entry: CollectionEntry<'projects'>
-}
+type Props = { entry: CollectionEntry<"projects"> }
 
 const { entry } = Astro.props
+const { name, description, links, tags, image, date } = entry.data
+
+const primaryLink = links && links.length > 0 ? links[0].href : null
 
 let imageProps = null
 
@@ -22,59 +21,146 @@ if (entry.data.image) {
 }
 ---
 
-<div class="border p-4">
-  <div class="flex flex-col gap-4 sm:flex-row">
-    {
-      imageProps && (
-        <div class="w-full sm:max-w-3xs sm:shrink-0">
-          <Image {...imageProps} class="object-cover" />
-        </div>
-      )
+<li>
+  {imageProps && (
+      <a
+        href={primaryLink}
+        target="_blank"
+        rel="noopener noreferrer"
+        tabindex="-1"
+        aria-hidden="true"
+      >
+        <Image {...imageProps} width={640} height={336} />
+      </a>
+    )}
+  <entry-info>
+    <a href={primaryLink} target="_blank" rel="noopener noreferrer">{name}</a>
+    <entry-meta>
+      {date && (
+          <project-dates>
+            <time datetime={date.toISOString()}>
+              {formatYear(date)}
+            </time>
+          </project-dates>
+        )}
+      {primaryLink && (
+          <a class="primary-link" href={primaryLink} target="_blank" rel="noopener noreferrer">
+            <ExternalIcon aria-hidden="true" />
+            {new URL(primaryLink).hostname}
+          </a>
+        )}
+    </entry-meta>
+    <p>{description}</p>
+    {links && links.length > 0 && (
+      <project-links>
+          {links.map((link) => (
+            <a href={link.href} target="_blank" rel="noopener noreferrer">
+              {link.label}</a>
+          ))}
+        </project-links>
+      )}
+  </entry-info>
+</li>
+
+<style>
+  li {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-s);
+
+    > a {
+      flex-shrink: 0;
+      inline-size: 14rem;
+
+      :global(img) {
+        inline-size: 100%;
+        block-size: auto;
+      }
     }
 
-    <div class="flex grow flex-col gap-y-3">
-      <div class="flex grow flex-col gap-y-1">
-        <div class="flex items-start gap-x-1">
-          <h3 class="grow text-lg font-medium">
-            {entry.data.name}
-          </h3>
+    entry-info {
+      display: flex;
+      flex-direction: column;
 
-          {
-            entry.data.date && (
-              <div class="text-muted-foreground flex shrink-0 items-center gap-x-1 text-xs">
-                <Icon name={'lucide:calendar'} class="size-3" />
-                <span>{formatYear(entry.data.date)}</span>
-              </div>
-            )
-          }
-        </div>
-
-        <p class="text-muted-foreground text-sm">
-          {entry.data.description}
-        </p>
-      </div>
-
-      {
-        (entry.data.date || entry.data.links) && (
-          <div class="flex flex-wrap items-center gap-x-3 text-xs">
-            {entry.data.links?.map((link, index) => (
-              <>
-                {index > 0 && (
-                  <Separator orientation="vertical" className="h-3!" />
-                )}
-                <Link
-                  href={link.href}
-                  class="text-muted-foreground/60 hover:text-muted-foreground flex items-center gap-x-1 font-mono font-medium"
-                  external
-                >
-                  <Icon name={'lucide:external-link'} class="size-3" />
-                  <span>{link.label}</span>
-                </Link>
-              </>
-            ))}
-          </div>
-        )
+      > a {
+        font-size: var(--step-1);
+        line-height: calc(var(--leading-offset) + 1em);
+        font-weight: var(--font-weight-medium);
       }
-    </div>
-  </div>
-</div>
+
+      entry-meta {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-3xs);
+        margin-block-end: var(--space-3xs);
+        font-size: var(--step--1);
+        color: var(--muted-foreground);
+
+        project-dates {
+          display: flex;
+          align-items: center;
+          gap: var(--space-3xs);
+        }
+
+        project-dates:has(~ a.primary-link)::after {
+          content: "·";
+          color: var(--muted-foreground);
+        }
+      }
+
+      p {
+        color: var(--muted-foreground);
+      }
+
+      a.primary-link,
+      project-links a {
+        display: flex;
+        align-items: center;
+        gap: var(--space-3xs);
+        text-decoration: none;
+
+        svg {
+          inline-size: 1em;
+          block-size: 1em;
+        }
+      }
+
+      a.primary-link {
+        color: color-mix(in oklab, var(--muted-foreground) 50%, transparent);
+
+        &:hover {
+          color: var(--muted-foreground);
+        }
+      }
+
+      project-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-3xs);
+        margin-block-start: var(--space-2xs);
+        font-size: var(--step--1);
+
+        a {
+          padding-inline: var(--space-2xs);
+          color: var(--muted-foreground);
+          background-color: color-mix(in oklab, var(--muted) 50%, transparent);
+          border-radius: var(--radius-full);
+
+          &:hover {
+            background-color: var(--muted);
+          }
+        }
+      }
+    }
+
+    @media (width < 40rem) {
+      flex-direction: column;
+
+      > a {
+        inline-size: 100%;
+        max-inline-size: 32rem;
+      }
+    }
+  }
+</style>

@@ -1,0 +1,16 @@
+﻿---
+name: 'Krono'
+description: "Hackathon submission to 'Kraken Forge - Build the tools beneath the surface': A toolkit for building orderbook visualizations with time travel playback using Kraken's WebSocket API"
+tags: ['WebSocket', 'Data Visualization', 'Trading', 'TypeScript']
+links:
+  - label: 'Demo'
+    href: 'https://krono.fabianpiper.com'
+  - label: 'Docs'
+    href: 'https://krono.fabianpiper.com/docs'
+  - label: 'GitHub'
+    href: 'https://github.com/fapiper/krono'
+  - label: 'Hackathon'
+    href: 'https://taikai.network/en/kraken/hackathons/kraken-forge/overview'
+date: '2025-12-24'
+image: './banner.png'
+---

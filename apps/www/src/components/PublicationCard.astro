@@ -1,154 +1,217 @@
 ---
-import Link from '@/components/Link.astro'
-import { formatDate } from '@/lib/utils'
-import { Icon } from 'astro-icon/components'
-import { Image } from 'astro:assets'
-import type { CollectionEntry } from 'astro:content'
-import { Separator } from './ui/separator'
+import ExternalIcon from "@/assets/icons/external.svg"
+import { formatYear } from "@/lib/utils"
+import { Image } from "astro:assets"
+import type { CollectionEntry } from "astro:content"
 
-interface Props {
-  entry: CollectionEntry<'publications'>
-}
+type Props = { entry: CollectionEntry<"publications"> }
 
 const { entry } = Astro.props
+const {
+  title,
+  authors,
+  published,
+  publishedIn,
+  pdfUrl,
+  htmlUrl,
+  doi,
+  paperType,
+  date,
+  image,
+} = entry.data
 
-const metadataItems = [
-  entry.data.doi && {
-    label: entry.data.paperType,
-    icon: 'lucide:external-link',
-    href: `https://doi.org/${entry.data.doi}`,
-  },
-  entry.data.pdfUrl && {
-    label: 'PDF',
-    icon: 'lucide:external-link',
-    href: entry.data.pdfUrl,
-  },
-  entry.data.htmlUrl && {
-    label: 'HTML',
-    icon: 'lucide:external-link',
-    href: entry.data.htmlUrl,
-  },
-].filter(Boolean) as Array<{
-  label: string
-  icon: string
-  href: string | null
-}>
+const MAIN_AUTHOR = "Fabian Piper"
 
-const abbreviateName = (name: string): string => {
-  const parts = name.trim().split(' ')
+const abbreviate = (name: string) => {
+  const parts = name.trim().split(" ")
   if (parts.length === 1) return name
-
-  const lastName = parts[parts.length - 1]
   const initials = parts
     .slice(0, -1)
-    .map((part) => part[0] + '.')
-    .join(' ')
-  return `${initials} ${lastName}`
+    .map((p) => p[0] + ".")
+    .join(" ")
+  return `${initials} ${parts[parts.length - 1]}`
 }
 
-const isMainAuthor = (author: string): boolean => {
-  return author === 'Fabian Piper'
-}
+const pillLinks = [
+  pdfUrl && { label: "PDF", href: pdfUrl },
+  htmlUrl && { label: "HTML", href: htmlUrl },
+  doi && { label: "DOI", href: `https://doi.org/${doi}` },
+].filter(Boolean) as { label: string; href: string }[]
+
+const primaryMetaLink = doi
+  ? { href: `https://doi.org/${doi}`, label: paperType }
+  : pdfUrl
+    ? { href: pdfUrl, label: paperType }
+    : htmlUrl
+      ? { href: htmlUrl, label: paperType }
+      : null
+
+const primaryHref = doi ? `https://doi.org/${doi}` : (pdfUrl ?? htmlUrl ?? null)
+
+const imageProps = image ? { src: image, alt: title } : null
 ---
 
-<div class="border p-4">
-  <div class="flex flex-col gap-4 sm:flex-row">
-    {
-      entry.data.image && (
-        <div class="w-full sm:max-w-3xs sm:shrink-0">
-          <Image
-            src={entry.data.image}
-            alt={entry.data.title}
-            width={1200}
-            height={675}
-            class="object-cover"
-          />
-        </div>
-      )
-    }
-    <div class="flex grow flex-col gap-y-2">
-      <div class="flex grow flex-col gap-y-1">
-        <div class="flex items-start gap-x-1">
-          <h3 class="grow text-lg font-medium">
-            {entry.data.title}
-          </h3>
-          {
-            entry.data.date && (
-              <div class="text-muted-foreground flex shrink-0 items-center gap-x-1 text-xs">
-                <Icon name={'lucide:calendar'} class="size-3" />
-                <span>{formatDate(entry.data.date)}</span>
-              </div>
-            )
-          }
-        </div>
+<li>
+  {imageProps && (
+    <a
+      href={primaryHref}
+      target="_blank"
+      rel="noopener noreferrer"
+      tabindex="-1"
+      aria-hidden="true"
+    >
+      <Image {...imageProps} width={640} height={336} />
+    </a>
+  )}
+  <entry-info>
+    <h3>{title}</h3>
+    <entry-meta>
+      {date && (
+        <publication-date>
+          <time datetime={date.toISOString()}>{formatYear(date)}</time>
+        </publication-date>
+      )}
+      {primaryMetaLink && (
+        <a class="primary-link" href={primaryMetaLink.href} target="_blank" rel="noopener noreferrer">
+          <ExternalIcon aria-hidden="true" />
+          {primaryMetaLink.label}
+        </a>
+      )}
+    </entry-meta>
+    <publication-authors>
+      By{" "}
+      {authors.map((author, i) => (
+        <span>
+          <span class:list={[author === MAIN_AUTHOR && "main-author"]}>
+            {author === MAIN_AUTHOR ? author : abbreviate(author)}
+          </span>{i < authors.length - 1 ? ",\u00A0" : ""}
+        </span>
+      ))}
+    </publication-authors>
+    {publishedIn && (
+      <p class="publication-venue">
+        {published ? "In proceedings of" : "To appear in"}{" "}
+        <a href={publishedIn.url} target="_blank" rel="noopener noreferrer">{publishedIn.name}</a>
+      </p>
+    )}
+    {pillLinks.length > 0 && (
+      <project-links>
+        {pillLinks.map((link) => (
+          <a href={link.href} target="_blank" rel="noopener noreferrer">
+            {link.label}
+          </a>
+        ))}
+      </project-links>
+    )}
+  </entry-info>
+</li>
 
-        <p class="text-muted-foreground text-sm">
-          By{' '}
-          {
-            entry.data.authors.map((author, index) => (
-              <span>
-                <span
-                  class:list={[
-                    isMainAuthor(author) &&
-                      'text-foreground underline underline-offset-2',
-                  ]}
-                >
-                  {abbreviateName(author)}
-                </span>
-                {index < entry.data.authors.length - 1 && ', '}
-                {index === entry.data.authors.length - 2 && 'and '}
-              </span>
-            ))
-          }
-        </p>
+<style>
+  li {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-s);
 
-        {
-          entry.data.publishedIn && (
-            <p class="text-muted-foreground text-sm">
-              {entry.data.published ? 'In proceedings of ' : 'To appear in '}
-              <Link
-                href={entry.data.publishedIn.url}
-                class="text-muted-foreground/60 hover:text-muted-foreground inline"
-                external
-              >
-                {entry.data.publishedIn.name}
-              </Link>
-            </p>
-          )
-        }
-      </div>
+    > a {
+      flex-shrink: 0;
+      inline-size: 14rem;
 
-      {
-        metadataItems.length > 0 && (
-          <div class="flex flex-wrap items-center gap-x-3 text-xs">
-            {metadataItems.map((item, index) => (
-              <>
-                {index > 0 && (
-                  <Separator orientation="vertical" className="h-3!" />
-                )}
-
-                <div class="text-muted-foreground font-mono font-medium">
-                  {item.href ? (
-                    <Link
-                      href={item.href}
-                      class="text-muted-foreground/60 hover:text-muted-foreground flex items-center gap-x-1"
-                      external
-                    >
-                      <Icon name={item.icon} class="size-3" />
-                      {item.label}
-                    </Link>
-                  ) : (
-                    <div class="flex items-center gap-x-1">
-                      <Icon name={item.icon} class="size-3" />
-                      <span>{item.label}</span>
-                    </div>
-                  )}
-                </div>
-              </>
-            ))}
-          </div>
-        )
+      :global(img) {
+        inline-size: 100%;
+        block-size: auto;
       }
-    </div>
-  </div>
-</div>
+    }
+
+    entry-info {
+      display: flex;
+      flex-direction: column;
+
+      h3 {
+        font-size: var(--step-1);
+        line-height: calc(var(--leading-offset) + 1em);
+        font-weight: var(--font-weight-medium);
+      }
+
+      entry-meta {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-3xs);
+        margin-block-end: var(--space-3xs);
+        font-size: var(--step--1);
+        color: var(--muted-foreground);
+
+        publication-date {
+          display: flex;
+          align-items: center;
+          gap: var(--space-3xs);
+        }
+
+        publication-date:has(~ a.primary-link)::after {
+          content: "·";
+          color: var(--muted-foreground);
+        }
+      }
+
+      publication-authors,
+      p.publication-venue {
+        font-size: var(--step--1);
+        color: var(--muted-foreground);
+      }
+
+      publication-authors .main-author {
+        color: var(--foreground);
+        font-weight: var(--font-weight-medium);
+      }
+
+      a.primary-link,
+      project-links a {
+        display: flex;
+        align-items: center;
+        gap: var(--space-3xs);
+        text-decoration: none;
+
+        svg {
+          inline-size: 1em;
+          block-size: 1em;
+        }
+      }
+
+      a.primary-link {
+        color: color-mix(in oklab, var(--muted-foreground) 50%, transparent);
+
+        &:hover {
+          color: var(--muted-foreground);
+        }
+      }
+
+      project-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-3xs);
+        margin-block-start: var(--space-2xs);
+        font-size: var(--step--1);
+
+        a {
+          padding-inline: var(--space-2xs);
+          color: var(--muted-foreground);
+          background-color: color-mix(in oklab, var(--muted) 50%, transparent);
+          border-radius: var(--radius-full);
+
+          &:hover {
+            background-color: var(--muted);
+          }
+        }
+      }
+    }
+
+    @media (width < 40rem) {
+      flex-direction: column;
+
+      > a {
+        inline-size: 100%;
+        max-inline-size: 32rem;
+      }
+    }
+  }
+</style>

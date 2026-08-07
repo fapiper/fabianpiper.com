@@ -1,104 +1,105 @@
 ---
-import Link from '@/components/Link.astro'
-import PageHead from '@/components/PageHead.astro'
-import ProjectCard from '@/components/ProjectCard.astro'
-import PublicationCard from '@/components/PublicationCard.astro'
-import { buttonVariants } from '@/components/ui/button'
-import Layout from '@/layouts/Layout.astro'
-import { Image } from 'astro:assets'
-import logo from '../../public/static/logo.png'
-import SocialIcons from '../components/SocialIcons.astro'
-import { SOCIAL_LINKS } from '../consts'
-import { getFeaturedProjects, getFeaturedPublications } from '../lib/data-utils'
+import MetaPage from "@/components/MetaPage.astro"
+import ProjectCard from "@/components/ProjectCard.astro"
+import Layout from "@/layouts/Layout.astro"
+import { getFeaturedProjects } from "@/lib/content"
+import { Image } from "astro:assets"
+import logo from "../../public/static/logo.png"
 
 const projects = await getFeaturedProjects()
-const publications = await getFeaturedPublications()
+// const publications = await getFeaturedPublications()
 ---
 
-<Layout class="max-w-3xl">
-  <PageHead slot="head" title="Home" />
-  <section class="py-6">
-    <div class="mb-6">
-      <div
-        class="mx-auto w-full max-w-32 overflow-hidden border p-2 sm:shrink-0"
-      >
-        <Image
-          src={logo}
-          alt={'Fabian Piper'}
-          width={512}
-          height={512}
-          class="object-cover"
-        />
-      </div>
-    </div>
+<Layout>
+  <MetaPage slot="head" />
+  <dictionary-entry>
+    <Image src={logo} alt={'Fabian Piper'} width={512} height={512} />
+    <h1>Hi 👋</h1>
+    <p>
+      I'm a Software Engineer based in Berlin, Germany. Below, you can find a
+      selection of my <a href="projects">projects</a>,
+      <a href="projects">contributions</a>, and
+      <a href="publications">publications</a>
+      . I'm always open to new connections and interesting discussions. Please
+      feel free to reach out. I'd love to hear from you!
+    </p>
+    <hr>
+  </dictionary-entry>
+  <section>
+    <h2>Projects</h2>
 
-    <div class="prose text-center">
-      <p class="mt-0">
-        I'm a Software Engineer and Researcher based in Berlin, Germany. Below,
-        you can find a selection of my <Link
-          href="/projects"
-          class="text-foreground"
-          underline>projects</Link
-        >, <Link href="/projects" class="text-foreground" underline
-          >contributions</Link
-        >, and <Link href="/publications" class="text-foreground" underline
-          >publications</Link
-        >.
-      </p>
-      <p>
-        I'm always open to new connections and interesting discussions. Please
-        feel free to <Link
-          href="mailto:hello@fabianpiper.com"
-          class="text-foreground"
-          underline>reach out</Link
-        >, I'd love to hear from you!
-      </p>
-    </div>
-
-    <div class="mx-auto flex items-center justify-center">
-      <SocialIcons links={SOCIAL_LINKS} />
-    </div>
-  </section>
-
-  <section class="flex flex-col gap-y-4">
-    <h2 class="text-2xl font-medium">Latest projects</h2>
-    <ul class="flex flex-col gap-y-4">
+    {projects.length > 0 ? (
+    <ul>
       {projects.map((project) => <ProjectCard entry={project} />)}
     </ul>
-    <div class="flex justify-center">
-      <Link
-        href="/projects"
-        class={buttonVariants({ variant: 'ghost' }) + ' group'}
-      >
-        See all projects <span
-          class="ml-1.5 transition-transform group-hover:translate-x-1"
-          >&rarr;</span
-        >
-      </Link>
-    </div>
-  </section>
-
-  <section class="flex flex-col gap-y-4">
-    <h2 class="text-2xl font-medium">Latest publications</h2>
-    <ul class="flex flex-col gap-y-4">
-      {
-        publications.map((publication) => (
-          <li>
-            <PublicationCard entry={publication} />
-          </li>
-        ))
-      }
-    </ul>
-    <div class="flex justify-center">
-      <Link
-        href="/publications"
-        class={buttonVariants({ variant: 'ghost' }) + ' group'}
-      >
-        See all publications <span
-          class="ml-1.5 transition-transform group-hover:translate-x-1"
-          >&rarr;</span
-        >
-      </Link>
-    </div>
+  ) : (
+    <p>No projects found</p>
+  )}
   </section>
 </Layout>
+
+<style>
+  h1,
+  h2 {
+    font-size: var(--step-2);
+    line-height: calc(var(--leading-offset) + 1em);
+    font-weight: var(--font-weight-medium);
+    color: var(--foreground);
+    margin-block-end: var(--space-2xs);
+  }
+
+  dictionary-entry {
+    display: block;
+    font-size: var(--step-0);
+    color: var(--muted-foreground);
+
+    @media (width >= 64rem) {
+      margin-block-start: -0.2em;
+    }
+
+    :global(img) {
+      margin-block-end: var(--space-2xs);
+      flex-shrink: 0;
+      border-radius: 0rem;
+      inline-size: 9rem;
+      block-size: auto;
+    }
+
+    ol {
+      margin-block-start: var(--space-xs);
+      list-style: none;
+
+      li {
+        padding-inline-start: 1em;
+        text-indent: -1em;
+
+        &::before {
+          content: counter(list-item);
+          display: inline-block;
+          inline-size: 1em;
+          text-indent: 0;
+          font-weight: var(--font-weight-medium);
+        }
+
+        + li {
+          margin-block-start: var(--space-3xs);
+        }
+      }
+    }
+
+    hr {
+      margin-block: var(--space-m);
+      border-block-start: 2px solid var(--border);
+    }
+
+    prose-content {
+      margin-block-start: var(--space-xs);
+    }
+  }
+
+  ul {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-m);
+  }
+</style>

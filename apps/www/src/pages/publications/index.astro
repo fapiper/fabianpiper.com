@@ -1,0 +1,27 @@
+---
+import MetaPage from "@/components/MetaPage.astro"
+import PublicationCard from "@/components/PublicationCard.astro"
+import Layout from "@/layouts/Layout.astro"
+import { getPublications } from "@/lib/content"
+
+const publications = await getPublications()
+---
+
+<Layout>
+  <MetaPage slot="head" title="Publications" />
+  {publications.length > 0 ? (
+      <ul>
+        {publications.map((publication) => <PublicationCard entry={publication} />)}
+      </ul>
+    ) : (
+      <p>No publications found</p>
+    )}
+</Layout>
+
+<style>
+  ul {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-m);
+  }
+</style>
