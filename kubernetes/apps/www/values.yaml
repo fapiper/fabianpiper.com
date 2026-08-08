@@ -3,7 +3,6 @@ replicaCount: 2
 image:
   repository: ghcr.io/fapiper/fabianpiper.com/www
   tag: latest
-  digest: ""
   pullPolicy: IfNotPresent
 
 service:
