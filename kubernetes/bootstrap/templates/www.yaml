@@ -9,6 +9,7 @@ metadata:
     argocd-image-updater.argoproj.io/www.update-strategy: digest
     argocd-image-updater.argoproj.io/www.allow-tags: regexp:^latest$
     argocd-image-updater.argoproj.io/write-back-method: git:secret:argocd/argocd-image-updater-github-creds
+    argocd-image-updater.argoproj.io/git-branch: main
     argocd-image-updater.argoproj.io/www.helm.image-name: image.repository
     argocd-image-updater.argoproj.io/www.helm.image-tag: image.digest
   finalizers:
