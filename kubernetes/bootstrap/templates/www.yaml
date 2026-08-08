@@ -5,7 +5,7 @@ metadata:
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "10"
-    argocd-image-updater.argoproj.io/image-list: www=ghcr.io/fapiper/fabianpiper.com/www
+    argocd-image-updater.argoproj.io/image-list: www=ghcr.io/fapiper/fabianpiper.com/www:latest
     argocd-image-updater.argoproj.io/www.update-strategy: digest
     argocd-image-updater.argoproj.io/www.allow-tags: regexp:^latest$
     argocd-image-updater.argoproj.io/write-back-method: git:secret:argocd/argocd-image-updater-github-creds
