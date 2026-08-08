@@ -3,6 +3,6 @@ helm:
   - name: image.repository
     value: ghcr.io/fapiper/fabianpiper.com/www
     forcestring: true
-  - name: image.digest
+  - name: image.tag
     value: latest@sha256:b65f8d731c0466d8db6aecfdd777a6b50521f3186bef24646e104001a24e18c0
     forcestring: true
