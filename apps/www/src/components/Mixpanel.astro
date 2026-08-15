@@ -1,0 +1,12 @@
+<script>
+  import mixpanel from "mixpanel-browser"
+
+  const token = import.meta.env.PUBLIC_MIXPANEL_TOKEN
+  if (token) {
+    mixpanel.init(token, {
+      api_host: "https://api-eu.mixpanel.com",
+      track_pageview: true,
+      persistence: "localStorage",
+    })
+  }
+</script>

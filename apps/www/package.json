@@ -1,7 +1,8 @@
 {
-  "name": "www",
+  "name": "fabianpiper",
   "type": "module",
   "version": "2.0.1",
+  "private": "true",
   "engines": {
     "node": ">=22.12.0"
   },
@@ -20,11 +21,11 @@
     "@expressive-code/plugin-collapsible-sections": "^0.42.0",
     "@expressive-code/plugin-line-numbers": "^0.42.0",
     "astro": "^7.0.2",
-    "astrojs-mixpanel": "^1.0.3",
     "github-slugger": "^2.0.0",
     "hast-util-select": "^6.0.4",
     "hast-util-to-html": "^9.0.5",
     "hastscript": "^9.0.1",
+    "mixpanel-browser": "^2.80.0",
     "satteri-expressive-code": "^0.1.15",
     "temml": "^0.13.3"
   },
