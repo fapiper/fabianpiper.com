@@ -7,6 +7,7 @@ workflows:
       - command: terraform apply vault
       - command: terraform apply cluster
       - command: terraform apply dns
+      - command: terraform apply pages
   plan:
     description: "Dry-run of all infrastructure components"
     steps:
@@ -15,9 +16,11 @@ workflows:
       - command: terraform plan vault
       - command: terraform plan cluster
       - command: terraform plan dns
+      - command: terraform plan pages
   destroy:
     description: "Teardown of all resources"
     steps:
+      - command: terraform destroy pages
       - command: terraform destroy dns
       - command: terraform destroy cluster
       - command: terraform destroy vault
@@ -31,3 +34,4 @@ workflows:
       - command: terraform validate vault
       - command: terraform validate cluster
       - command: terraform validate dns
+      - command: terraform validate pages

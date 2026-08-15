@@ -5,6 +5,11 @@ Generated for: AI Agents
 Repository: https://github.com/fapiper/fabianpiper.com
 Validation Status: Docs reviewed, Code cross-referenced, Ready for autonomous operation
 
+> **Changelog (2026-08-15)**: Added Cloudflare Pages deployment for `fabianpiper.com` + `www.fabianpiper.com`
+> (`modules/pages`, `components/terraform/pages`, `deploy-www.yaml` CI workflow). `glg.fabianpiper.com`
+> remains on cluster as staging. Removed `www` from cluster TLS cert and HTTPRoute. Added
+> `cloudflare-account-id` OCI Vault secret and `TF_VAR_cloudflare_account_id` SOPS var.
+>
 > **Changelog (2026-06-27)**: OCI Always Free Tier audit — updated §10 block storage figures from
 > 3-node (132 GB) to 2-node topology (106 GB); added worker re-enable cost warning.
 
@@ -54,17 +59,17 @@ Validation Status: Docs reviewed, Code cross-referenced, Ready for autonomous op
 ### Architecture Mental Model
 
 ```
-GitHub Push → GitHub Actions (build image, push to ghcr.io)
-                    ↓
-ArgoCD Image Updater (resolves digest of :latest, writes sha256 to git)
-                    ↓
-ArgoCD (polls git every 30s, syncs K8s manifests)
-                    ↓
+GitHub Push → GitHub Actions (two parallel pipelines):
+  ├─ build-and-push.yaml   → builds Docker image → ghcr.io → ArgoCD Image Updater
+  │                            → ArgoCD → K3s cluster (glg.fabianpiper.com — staging)
+  └─ deploy-www.yaml       → builds Astro static site → wrangler pages deploy
+                               → Cloudflare Pages (fabianpiper.com, www.fabianpiper.com — prod)
+
 K3s cluster (1 ARM server + 1 AMD NAT node on OCI)
   ├─ Ingress node  → NAT gateway + SSH jump host (AMD E2.1.Micro, no k3s)
   └─ Server node   → K3s single-node: control plane + all pods incl. Envoy Gateway
 
-Terraform → OCI (VCN, compute, vault, IAM)
+Terraform → OCI (VCN, compute, vault, IAM) + Cloudflare Pages project + DNS
 SOPS+age  → secrets at rest in git
 OCI Vault → secrets at runtime (Instance Principal, no API keys on nodes)
 ```
@@ -164,7 +169,8 @@ Waves used in each Application (lower = applied first):
 ```
 fabianpiper.com/
 ├── .github/workflows/
-│   └── build-and-push.yaml       # Builds multi-arch (amd64+arm64) images on push to apps/
+│   ├── build-and-push.yaml       # Builds multi-arch (amd64+arm64) images on push to apps/
+│   └── deploy-www.yaml           # Builds Astro static site + deploys to Cloudflare Pages
 ├── apps/
 │   └── www/                      # Astro 5.7 portfolio site
 │       ├── Dockerfile
@@ -182,7 +188,7 @@ fabianpiper.com/
 │   │       ├── apps.yaml            # ApplicationSet → kubernetes/apps/* (excludes www)
 │   │       └── www.yaml             # Dedicated Application for www (Image Updater annotations)
 │   ├── apps/
-│   │   └── www/                  # Portfolio – Helm chart (Chart.yaml + values.yaml + templates/)
+│   │   └── www/                  # Portfolio staging – Helm chart (glg.fabianpiper.com only)
 │   └── infrastructure/
 │       ├── argocd-image-updater/   # Auto-updates image digest, git write-back   [Kustomize]
 │       ├── cert-manager/           # TLS via Let's Encrypt (K3s HelmChart CRD)   [Kustomize]
@@ -197,6 +203,7 @@ fabianpiper.com/
 │   ├── dns/
 │   ├── iam/
 │   ├── networking/
+│   ├── pages/                    # Cloudflare Pages project + custom domain bindings
 │   └── vault/
 ├── modules/                      # Terraform modules (all logic lives here)
 │   ├── cluster/                  # 3 ARM instances + cloud-init templates
@@ -211,6 +218,7 @@ fabianpiper.com/
 │   ├── dns/                      # Cloudflare static A records (ingress IP bootstrap)
 │   ├── iam/                      # OCI Dynamic Group + policies (Instance Principal)
 │   ├── networking/               # VCN, subnets, internet gateway, security lists
+│   ├── pages/                    # Cloudflare Pages project + custom domain bindings
 │   └── vault/                    # OCI Vault + initial secrets
 ├── stacks/
 │   ├── catalog/                  # Per-component default var definitions
@@ -243,13 +251,14 @@ fabianpiper.com/
 
 ### Deployed Kubernetes Applications
 
-#### `kubernetes/apps/www` — Portfolio Website
+#### `kubernetes/apps/www` — Portfolio Website (Staging)
 - **Image**: `ghcr.io/fapiper/fabianpiper.com/www:latest`
 - **Replicas**: 2
 - **Deployed as**: Custom **Helm chart** (`Chart.yaml` + `values.yaml` + `templates/`)
 - **Image updates**: ArgoCD Image Updater (digest strategy) monitors `:latest` tag → resolves sha256 digest → writes to `.argocd-source-www.yaml` via git → ArgoCD syncs with `image@sha256:…` reference
 - **Image Updater annotations**: Live on the dedicated `bootstrap/templates/www.yaml` Application (NOT on the Deployment)
-- **URLs**: `https://www.fabianpiper.com`, `https://glg.fabianpiper.com`
+- **URL**: `https://glg.fabianpiper.com` (staging — cluster deployment)
+- **Production URL**: `https://fabianpiper.com` / `https://www.fabianpiper.com` → Cloudflare Pages (separate pipeline)
 - **Secrets**: `regcred` (GHCR pull secret), app env vars from OCI Vault via ExternalSecret
 - **TLS**: certificate `glg-tls` is owned by `envoy-gateway` infrastructure app (`kubernetes/infrastructure/envoy-gateway/certificate.yaml`); TLS is not managed in this chart.
 - **Chart templates**: `_helpers.tpl`, `deployment.yaml`, `service.yaml`, `httproute.yaml`, `external-secret.yaml`
@@ -265,8 +274,8 @@ fabianpiper.com/
 - GatewayClass `eg`, Gateway `public-gateway` in namespace `envoy-gateway-system`
 - Envoy pods: `hostNetwork: true`, NodeSelector `role: ingress`
 - **Listens on ports 80 (HTTP) and 443 (HTTPS)**
-- **TLS certificate** (`glg-tls`) is managed here (not in the `www` chart) — `certificate.yaml` covers all four public hostnames. This avoids cross-namespace ReferenceGrants and decouples TLS from app deployments.
-- **HTTP→HTTPS redirect**: `www-redirect` HTTPRoute in `kubernetes/apps/www/templates/httproute.yaml` covers all four public hostnames (`www`, `glg`, `grafana`, `status`). When adding a new subdomain, update `ingress.redirectHostnames` in `kubernetes/apps/www/values.yaml`.
+- **TLS certificate** (`glg-tls`) is managed here (not in the `www` chart) — `certificate.yaml` covers `glg`, `status`, and `grafana` hostnames. `fabianpiper.com` and `www.fabianpiper.com` are on Cloudflare Pages (Cloudflare manages their TLS).
+- **HTTP→HTTPS redirect**: `www-redirect` HTTPRoute in `kubernetes/apps/www/templates/httproute.yaml` covers `glg`, `grafana`, and `status` hostnames. When adding a new cluster-hosted subdomain, update `ingress.redirectHostnames` in `kubernetes/apps/www/values.yaml`.
 - All HTTPRoutes attach to `public-gateway`
 
 #### `kubernetes/infrastructure/external-dns` — DNS Automation (disabled)
@@ -274,14 +283,24 @@ fabianpiper.com/
 - All DNS records are managed exclusively by Terraform (`modules/dns`)
 - The directory is kept to preserve ArgoCD app registration; enabling it would conflict with Terraform-owned records
 
-> **DNS management**: All Cloudflare A records are managed by Terraform via `stacks/catalog/dns/defaults.yaml`.
-> Records: `www.fabianpiper.com`, `glg.fabianpiper.com`, `grafana.fabianpiper.com`, `status.fabianpiper.com` → ingress IP.
-> To add/remove a hostname: edit `stacks/catalog/dns/defaults.yaml` → run `make apply-prod-dns`.
-> Also add the hostname to `ingress.redirectHostnames` in `kubernetes/apps/www/values.yaml` (HTTP→HTTPS redirect)
-> and to `spec.dnsNames` in `kubernetes/infrastructure/envoy-gateway/certificate.yaml` (shared TLS cert).
+> **DNS management**: Cloudflare DNS is split between two Terraform modules:
+> - `modules/dns`: A records for cluster-hosted services (`glg`, `grafana`, `status` → ingress IP). To add a cluster hostname: edit `stacks/catalog/dns/defaults.yaml` → `make apply-prod-dns`. Also add to `ingress.redirectHostnames` in `kubernetes/apps/www/values.yaml` and `spec.dnsNames` in `kubernetes/infrastructure/envoy-gateway/certificate.yaml`.
+> - `modules/pages`: `fabianpiper.com` and `www.fabianpiper.com` are managed by `cloudflare_pages_domain` (Cloudflare auto-creates the DNS CNAME records). Do NOT add these to the dns module.
 > `proxied` defaults to `false` (direct TLS via cert-manager DNS-01), `ttl` defaults to `300`.
 
-#### `kubernetes/infrastructure/external-secrets` — Secret Sync
+#### `modules/pages` — Cloudflare Pages (Production)
+- **Terraform module**: `cloudflare_pages_project` + `cloudflare_pages_domain`
+- **Atmos component**: `components/terraform/pages/`
+- **Stack catalog**: `stacks/catalog/pages/defaults.yaml`
+- **Project name**: `www`
+- **Custom domains**: `fabianpiper.com`, `www.fabianpiper.com`
+- **DNS**: `cloudflare_pages_domain` registers domains with the Pages project; `cloudflare_dns_record` CNAME records (proxied=true) are created separately in the same module pointing to `<project>.pages.dev`. Do NOT also manage `fabianpiper.com` or `www.fabianpiper.com` in the dns module.
+- **CI deploy**: `.github/workflows/deploy-www.yaml` — builds Astro static site, deploys via `wrangler pages deploy`
+- **Required Cloudflare token permissions**: Zone:DNS:Edit + Account:Cloudflare Pages:Edit
+- **Required OCI Vault secret**: `cloudflare-account-id` (new — fetched by CI as `CLOUDFLARE_ACCOUNT_ID` for wrangler)
+- **⚠️ Migration**: Before first `make apply-prod-pages`, delete the manually deployed Cloudflare Workers script for `fabianpiper.com` from the Cloudflare dashboard (Workers & Pages → delete the worker route). Also run `make apply-prod-dns` first to remove the old `www` A record.
+
+
 - Installed via K3s `HelmChart` CRD
 - `ClusterSecretStore` authenticates to OCI Vault via **Instance Principal** (no static credentials)
 - `ExternalSecret` → creates K8s `Secret` by referencing OCI Vault secret names
@@ -342,10 +361,11 @@ fabianpiper.com/
 |-------------|----------|-------------|
 | `git-pat` | argocd-image-updater | GitHub PAT for GHCR read + git write-back |
 | `git-username` | argocd-image-updater | GitHub username |
-| `site-url` | www app | Public site URL |
-| `mixpanel-token` | www app | Analytics token (optional) |
+| `site-url` | www app (cluster + Pages CI) | Public site URL |
+| `mixpanel-token` | www app (cluster + Pages CI) | Analytics token (optional) |
 | `grafana-admin-password` | kube-prometheus-stack (Grafana) | Grafana admin password |
-| `cloudflare-api-token` | cert-manager (DNS-01 solver) | Cloudflare API token for Let's Encrypt DNS-01 challenge |
+| `cloudflare-api-token` | cert-manager (DNS-01) + CI wrangler | Cloudflare API token — must have Zone:DNS:Edit AND Account:Cloudflare Pages:Edit |
+| `cloudflare-account-id` | CI wrangler (deploy-www.yaml) | Cloudflare account ID for Pages deployment |
 
 ---
 
@@ -429,7 +449,8 @@ cp secrets/prod/secrets.example.yaml secrets/prod/secrets.decrypted.yaml
 #   TF_VAR_git_username            GitHub username
 #   TF_VAR_git_email               GitHub email
 #   TF_VAR_git_repo_url            https://github.com/fapiper/fabianpiper.com.git
-#   TF_VAR_cloudflare_api_token    Cloudflare API token (Zone:DNS:Edit)
+#   TF_VAR_cloudflare_api_token    Cloudflare API token (Zone:DNS:Edit + Account:Cloudflare Pages:Edit)
+#   TF_VAR_cloudflare_account_id   Cloudflare account ID (find in Cloudflare Dashboard → right sidebar)
 #   TF_VAR_k3s_token               Cluster join token — generate with: uuidgen
 #   TF_VAR_grafana_admin_password  Grafana admin password
 
@@ -450,8 +471,9 @@ cat secrets/.sops.key
 
 # 7. Deploy (~15–20 min)
 make deploy-prod
-# Order: networking → iam → vault → cluster → dns
+# Order: networking → iam → vault → cluster → dns → pages
 # cloud-init on server node installs K3s, ArgoCD, and applies root.yaml automatically
+# Pages: Terraform creates the project + domain bindings; CI deploys content on first push
 ```
 
 ### Verify Deployment
@@ -651,14 +673,20 @@ bun run dev            # http://localhost:1234
 bun run build          # Runs `astro check && astro build` — must exit 0 (check + build in one step)
 bun run preview        # Smoke-test prod build at http://localhost:1234
 
-# Deploy — just push to main
+# Deploy — just push to main (triggers two parallel CI pipelines)
 git add apps/www/
 git commit -m "feat(www): <description>"
 git push origin main
-# → GitHub Actions builds linux/amd64 + linux/arm64
-# → Pushes ghcr.io/fapiper/fabianpiper.com/www:latest and www:<sha>
-# → ArgoCD Image Updater detects :latest digest change (~2 min), writes sha256 to git
-# → ArgoCD syncs deployment with new image@sha256 reference (~30 sec)
+# Pipeline 1 — build-and-push.yaml (staging):
+#   → Builds linux/amd64 + linux/arm64 Docker image
+#   → Pushes ghcr.io/fapiper/fabianpiper.com/www:latest
+#   → ArgoCD Image Updater detects :latest digest change (~2 min)
+#   → ArgoCD syncs glg.fabianpiper.com deployment (~30 sec)
+# Pipeline 2 — deploy-www.yaml (production):
+#   → Fetches secrets from OCI Vault
+#   → Builds Astro static site (bun run build)
+#   → Deploys to Cloudflare Pages via wrangler (~1 min total)
+#   → fabianpiper.com + www.fabianpiper.com updated
 ```
 
 ### Infrastructure Changes

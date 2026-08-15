@@ -1,0 +1,14 @@
+components:
+  terraform:
+    pages:
+      metadata:
+        component: pages
+      vars:
+        enabled: true
+        name: pages
+        zone_name: fabianpiper.com
+        project_name: www
+        production_branch: main
+        domains:
+          - fabianpiper.com
+          - www.fabianpiper.com

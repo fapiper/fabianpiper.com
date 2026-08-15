@@ -9,11 +9,9 @@ service:
   port: 8080
 
 ingress:
-  hostname: www.fabianpiper.com
-  secondaryHostname: glg.fabianpiper.com
+  hostname: glg.fabianpiper.com
   gatewayNamespace: envoy-gateway-system
   redirectHostnames:
-    - www.fabianpiper.com
     - glg.fabianpiper.com
     - grafana.fabianpiper.com
     - status.fabianpiper.com

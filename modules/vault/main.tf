@@ -142,6 +142,24 @@ resource "oci_vault_secret" "cloudflare_api_token" {
   depends_on = [oci_kms_key.default]
 }
 
+resource "oci_vault_secret" "cloudflare_account_id" {
+  count = local.enabled ? 1 : 0
+
+  compartment_id = local.compartment_ocid
+  vault_id       = oci_kms_vault.default[0].id
+  key_id         = oci_kms_key.default[0].id
+  secret_name    = "cloudflare-account-id"
+
+  secret_content {
+    content_type = "BASE64"
+    content      = base64encode(var.cloudflare_account_id)
+  }
+
+  freeform_tags = data.context_tags.main.tags
+
+  depends_on = [oci_kms_key.default]
+}
+
 resource "oci_vault_secret" "grafana_admin_password" {
   count = local.enabled ? 1 : 0
 
