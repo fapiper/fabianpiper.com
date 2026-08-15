@@ -5,5 +5,5 @@ output "project_subdomain" {
 
 output "project_domains" {
   description = "Custom domains attached to the Pages project"
-  value       = { for k, v in cloudflare_pages_domain.custom : k => v.domain }
+  value       = { for k, v in cloudflare_pages_domain.custom : k => v.name }
 }
