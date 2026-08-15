@@ -5,6 +5,12 @@ Generated for: AI Agents
 Repository: https://github.com/fapiper/fabianpiper.com
 Validation Status: Docs reviewed, Code cross-referenced, Ready for autonomous operation
 
+> **Changelog (2026-08-15)**: DRY refactor — extracted `.github/actions/fetch-vault-secrets` composite
+> action (replaces ~150 lines duplicated across `build-and-push.yaml` and `deploy-www.yaml`);
+> collapsed `modules/vault` 7 separate `oci_vault_secret` blocks into one `for_each` resource
+> (with `moved` blocks to preserve live OCI Vault state); documented intentional Atmos boilerplate
+> patterns (context vars, provider blocks, versions.tf) in §6.
+>
 > **Changelog (2026-08-15)**: Added Cloudflare Pages deployment for `fabianpiper.com` + `www.fabianpiper.com`
 > (`modules/pages`, `components/terraform/pages`, `deploy-www.yaml` CI workflow). `glg.fabianpiper.com`
 > remains on cluster as staging. Removed `www` from cluster TLS cert and HTTPRoute. Added
@@ -168,9 +174,13 @@ Waves used in each Application (lower = applied first):
 
 ```
 fabianpiper.com/
-├── .github/workflows/
-│   ├── build-and-push.yaml       # Builds multi-arch (amd64+arm64) images on push to apps/
-│   └── deploy-www.yaml           # Builds Astro static site + deploys to Cloudflare Pages
+├── .github/
+│   ├── actions/
+│   │   └── fetch-vault-secrets/
+│   │       └── action.yml            # Composite action: SOPS decrypt → OCI CLI → Vault fetch
+│   └── workflows/
+│       ├── build-and-push.yaml       # Builds multi-arch (amd64+arm64) images on push to apps/
+│       └── deploy-www.yaml           # Builds Astro static site + deploys to Cloudflare Pages
 ├── apps/
 │   └── www/                      # Astro 5.7 portfolio site
 │       ├── Dockerfile
@@ -566,6 +576,36 @@ kubectl get pods -A
 - **Variables**: `default = null` for optional; `validation` blocks for constrained inputs
 - **Never commit**: `.tfstate`, `.tfvars` containing real values, `*.decrypted.*`
 
+#### Atmos component boilerplate — intentional repetition
+
+Every `components/terraform/*/` directory is a standalone Terraform root module. Atmos composes
+them at runtime but never merges their files. The following patterns appear in every component by
+design — **do not remove them**:
+
+- **Context variables** (`enabled`, `tenant`, `environment`, `stage`, `name`, `region`): Atmos
+  auto-injects these from top-level stack vars (see `stacks/mixins/` and `stacks/orgs/`) into every
+  component via a generated `.tfvars.json` file. Terraform errors on any variable present in the
+  generated file but not declared in `variables.tf`. Even for components (e.g. `dns`, `pages`) that
+  don't actually use `tenant`/`stage` in their `.tf` logic, the declarations must exist so Terraform
+  can accept the Atmos-generated input.
+
+- **Provider and `versions.tf` blocks**: Each component must declare its own providers and version
+  constraints — Terraform has no concept of shared root-module provider config. The identical
+  `provider "context" {}` block in `iam`, `networking`, `vault`, `cluster` and the identical
+  `provider "cloudflare" {}` block in `dns` and `pages` are correct Atmos isolation, not removable
+  duplication. Extracting them would require a shared Terraform module, which would break the
+  flat Atmos component model.
+
+#### Vault module — `for_each` pattern
+
+`modules/vault/main.tf` uses a single `oci_vault_secret.secrets` resource with `for_each` over a
+`locals.secrets` map (secret name → variable value). Adding a new OCI Vault secret requires:
+1. Add the variable to `modules/vault/variables.tf` and `components/terraform/vault/variables.tf`.
+2. Add an entry to the `locals.secrets` map in `modules/vault/main.tf`.
+3. Add the secret value to `secrets/prod/secrets.decrypted.yaml` → encrypt.
+4. Optionally add an output to `modules/vault/outputs.tf` using `try(oci_vault_secret.secrets["key"].id, "")`.
+No `moved` block is needed for new secrets (only for state renames of existing ones).
+
 ### Kubernetes Manifests
 
 - **One resource type per file**: `deployment.yaml`, `service.yaml`, `httproute.yaml`, etc.
@@ -706,6 +746,28 @@ ssh -i ~/.ssh/id_rsa ubuntu@$INGRESS_IP \
 git add modules/<module>/
 git commit -m "feat(<module>): <description>"
 ```
+
+### Adding a new OCI Vault secret
+
+Both CI workflows (`.github/workflows/build-and-push.yaml` and `.github/workflows/deploy-www.yaml`)
+share OCI credential setup via the reusable composite action at
+`.github/actions/fetch-vault-secrets/action.yml`. The action:
+- Installs SOPS, decrypts `secrets/prod/secrets.yaml`, configures `~/.oci/`
+- Installs OCI CLI, lists and fetches all active Vault secrets
+- Writes `KEY=VALUE` pairs to a mode-0600 temp file, outputs its path as `secret_file`
+- Exports `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` to `GITHUB_ENV`
+
+The calling workflow is responsible for secret cleanup (`shred`), as timing differs per pipeline.
+The calling workflow **must** set `SOPS_AGE_KEY` as a **job-level** environment variable so the
+composite action can inherit it:
+```yaml
+env:
+  SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+```
+
+To add a new secret: add to `secrets/prod/secrets.decrypted.yaml` → encrypt → add to OCI Vault via
+`modules/vault` (§6 Vault `for_each` pattern) → the composite action will fetch it automatically on
+the next run.
 
 ### Adding a New Kubernetes Service
 

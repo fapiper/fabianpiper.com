@@ -1,7 +1,7 @@
 module "cluster" {
   source = "../../../modules/cluster"
 
-  compartment_ocid    = var.compartment_ocid
+  compartment_ocid = var.compartment_ocid
 
   # Network Configuration
   vcn_id              = try(data.terraform_remote_state.networking.outputs.vcn_id, "")
@@ -10,7 +10,7 @@ module "cluster" {
   private_subnet_cidr = var.private_subnet_cidr
 
   # SSH Configuration
-  ssh_public_key_path  = var.ssh_public_key_path
+  ssh_public_key_path = var.ssh_public_key_path
 
   # Instance configuration
   instance_shape      = var.instance_shape
@@ -37,16 +37,16 @@ module "cluster" {
   enable_worker         = var.enable_worker
 
   # K3s configuration
-  k3s_version            = var.k3s_version
-  k3s_token              = var.k3s_token
-  initialization_method  = var.initialization_method
-  git_pat      = var.git_pat
-  git_username = var.git_username
-  git_email    = var.git_email
-  git_repo_url = var.git_repo_url
-  vault_id     = try(data.terraform_remote_state.vault.outputs.id, "")
+  k3s_version           = var.k3s_version
+  k3s_token             = var.k3s_token
+  initialization_method = var.initialization_method
+  git_pat               = var.git_pat
+  git_username          = var.git_username
+  git_email             = var.git_email
+  git_repo_url          = var.git_repo_url
+  vault_id              = try(data.terraform_remote_state.vault.outputs.id, "")
 
-  common_tags          = var.common_tags
-  enabled              = var.enabled
-  availability_domain  = var.availability_domain
+  common_tags         = var.common_tags
+  enabled             = var.enabled
+  availability_domain = var.availability_domain
 }

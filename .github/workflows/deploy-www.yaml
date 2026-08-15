@@ -12,156 +12,14 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    env:
+      SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - uses: nhedger/setup-sops@v2
-
-      - name: Decrypt SOPS Secrets and Setup OCI
-        id: setup_oci
-        env:
-          SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
-        run: |
-          set -euo pipefail
-
-          TMPKEY=$(mktemp)
-          trap 'rm -f "$TMPKEY"' EXIT
-          echo "$SOPS_AGE_KEY" > "$TMPKEY"
-          export SOPS_AGE_KEY_FILE="$TMPKEY"
-
-          SECRETS_JSON=$(sops -d --output-type json secrets/prod/secrets.yaml)
-
-          OCI_USER=$(echo "$SECRETS_JSON" | jq -r '.TF_VAR_user_ocid')
-          OCI_TENANCY=$(echo "$SECRETS_JSON" | jq -r '.TF_VAR_tenancy_ocid')
-          OCI_FINGERPRINT=$(echo "$SECRETS_JSON" | jq -r '.TF_VAR_fingerprint')
-          OCI_REGION=$(echo "$SECRETS_JSON" | jq -r '.TF_VAR_region')
-          OCI_COMPARTMENT=$(echo "$SECRETS_JSON" | jq -r '.TF_VAR_compartment_ocid')
-          OCI_PRIVATE_KEY=$(echo "$SECRETS_JSON" | jq -r '.TF_VAR_private_key_content')
-
-          echo "::add-mask::$OCI_USER"
-          echo "::add-mask::$OCI_TENANCY"
-          echo "::add-mask::$OCI_FINGERPRINT"
-          echo "::add-mask::$OCI_COMPARTMENT"
-
-          while IFS= read -r line; do
-            [ -n "$line" ] && echo "::add-mask::$line"
-          done <<< "$OCI_PRIVATE_KEY"
-
-          echo "OCI_CLI_USER=$OCI_USER" >> "$GITHUB_ENV"
-          echo "OCI_CLI_TENANCY=$OCI_TENANCY" >> "$GITHUB_ENV"
-          echo "OCI_CLI_FINGERPRINT=$OCI_FINGERPRINT" >> "$GITHUB_ENV"
-          echo "OCI_CLI_REGION=$OCI_REGION" >> "$GITHUB_ENV"
-          echo "OCI_COMPARTMENT_ID=$OCI_COMPARTMENT" >> "$GITHUB_ENV"
-
-          {
-            echo "OCI_CLI_KEY_CONTENT<<EOF_OCI_KEY"
-            echo "$OCI_PRIVATE_KEY"
-            echo "EOF_OCI_KEY"
-          } >> "$GITHUB_ENV"
-
-      - name: Setup OCI Config
-        run: |
-          set -euo pipefail
-
-          mkdir -p ~/.oci
-          chmod 700 ~/.oci
-
-          echo "$OCI_CLI_KEY_CONTENT" > ~/.oci/key.pem
-          chmod 600 ~/.oci/key.pem
-
-          cat > ~/.oci/config <<EOF
-          [DEFAULT]
-          user=$OCI_CLI_USER
-          fingerprint=$OCI_CLI_FINGERPRINT
-          tenancy=$OCI_CLI_TENANCY
-          region=$OCI_CLI_REGION
-          key_file=~/.oci/key.pem
-          EOF
-          chmod 600 ~/.oci/config
-
-      - name: Install OCI CLI
-        run: |
-          set -euo pipefail
-          python3 -m pip install --user oci-cli
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-
-      - name: List Vault Secrets
-        id: list_secrets
-        run: |
-          set -euo pipefail
-
-          SECRETS_JSON=$(oci vault secret list \
-            --config-file ~/.oci/config \
-            --compartment-id "$OCI_COMPARTMENT_ID" \
-            --all \
-            --lifecycle-state ACTIVE \
-            --query 'data[].{"name": "secret-name", "id": id}' \
-            --output json)
-
-          {
-            echo "secrets<<EOF_SECRETS_JSON"
-            echo "$SECRETS_JSON"
-            echo "EOF_SECRETS_JSON"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Resolve Vault Secrets
-        id: vault_secrets
-        run: |
-          set -euo pipefail
-
-          VAULT_SECRETS='${{ steps.list_secrets.outputs.secrets }}'
-
-          SECRET_FILE="$RUNNER_TEMP/vault-secrets-${{ github.run_id }}.env"
-          > "$SECRET_FILE"
-          chmod 600 "$SECRET_FILE"
-
-          if [ -n "$VAULT_SECRETS" ] && [ "$VAULT_SECRETS" != "[]" ]; then
-            while IFS= read -r secret; do
-              NAME=$(echo "$secret" | jq -r '.name')
-              ID=$(echo "$secret" | jq -r '.id')
-
-              if ! echo "$NAME" | grep -qE '^[a-zA-Z0-9_-]+$'; then
-                echo "::warning::Skipping secret with unsafe name: $NAME"
-                continue
-              fi
-
-              BUNDLE=$(oci secrets secret-bundle get \
-                --config-file ~/.oci/config \
-                --secret-id "$ID" \
-                --stage CURRENT 2>&1) || {
-                echo "::warning::Could not fetch secret: $NAME" >&2
-                continue
-              }
-
-              VAL=$(echo "$BUNDLE" | jq -r '.data."secret-bundle-content".content' 2>/dev/null | base64 -d 2>/dev/null) || {
-                echo "::warning::Could not decode secret: $NAME" >&2
-                continue
-              }
-
-              if [ -n "$VAL" ]; then
-                echo "::add-mask::$VAL"
-
-                while IFS= read -r line; do
-                  [ -n "$line" ] && echo "::add-mask::$line"
-                done <<< "$VAL"
-
-                ARG_NAME=$(echo "$NAME" | tr '-' '_' | tr '[:lower:]' '[:upper:]')
-                echo "${ARG_NAME}=${VAL}" >> "$SECRET_FILE"
-              fi
-            done < <(echo "$VAULT_SECRETS" | jq -c '.[]')
-          fi
-
-          # Export Cloudflare credentials to GITHUB_ENV so the deploy step can use them
-          for VAR_NAME in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID; do
-            VAL=$(grep "^${VAR_NAME}=" "$SECRET_FILE" | cut -d= -f2- || true)
-            if [ -n "$VAL" ]; then
-              echo "::add-mask::$VAL"
-              echo "${VAR_NAME}=${VAL}" >> "$GITHUB_ENV"
-            fi
-          done
-
-          echo "secret_file=$SECRET_FILE" >> "$GITHUB_OUTPUT"
+      - uses: ./.github/actions/fetch-vault-secrets
+        id: vault
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -175,7 +33,7 @@ jobs:
         working-directory: apps/www
         run: |
           set -euo pipefail
-          SECRET_FILE="${{ steps.vault_secrets.outputs.secret_file }}"
+          SECRET_FILE="${{ steps.vault.outputs.secret_file }}"
           set -a && . "$SECRET_FILE" && set +a
           PUBLIC_SITE_URL="${SITE_URL:-}" \
           PUBLIC_MIXPANEL_TOKEN="${MIXPANEL_TOKEN:-}" \
@@ -188,7 +46,7 @@ jobs:
       - name: Cleanup Secrets File
         if: always()
         run: |
-          SECRET_FILE="${{ steps.vault_secrets.outputs.secret_file }}"
+          SECRET_FILE="${{ steps.vault.outputs.secret_file }}"
           if [ -f "$SECRET_FILE" ]; then
             shred -vfz -n 3 "$SECRET_FILE" 2>/dev/null || rm -f "$SECRET_FILE"
           fi

@@ -1,0 +1,174 @@
+name: Fetch OCI Vault Secrets
+description: >
+  Decrypts SOPS secrets, configures the OCI CLI, lists all active Vault secrets,
+  fetches each one, and writes KEY=VALUE pairs to a secure temp file.
+  Also exports CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID to GITHUB_ENV.
+  Requires SOPS_AGE_KEY to be set as a job-level environment variable by the caller.
+
+outputs:
+  secret_file:
+    description: Absolute path to the temp file containing vault secrets (KEY=VALUE per line, mode 0600)
+    value: ${{ steps.resolve.outputs.secret_file }}
+
+runs:
+  using: composite
+  steps:
+    - uses: nhedger/setup-sops@v2
+
+    - name: Decrypt SOPS Secrets and Setup OCI
+      id: setup_oci
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        TMPKEY=$(mktemp)
+        trap 'rm -f "$TMPKEY"' EXIT
+        echo "$SOPS_AGE_KEY" > "$TMPKEY"
+        export SOPS_AGE_KEY_FILE="$TMPKEY"
+
+        SECRETS_JSON=$(sops -d --output-type json secrets/prod/secrets.yaml)
+
+        OCI_USER=$(echo "$SECRETS_JSON" | jq -r '.TF_VAR_user_ocid')
+        OCI_TENANCY=$(echo "$SECRETS_JSON" | jq -r '.TF_VAR_tenancy_ocid')
+        OCI_FINGERPRINT=$(echo "$SECRETS_JSON" | jq -r '.TF_VAR_fingerprint')
+        OCI_REGION=$(echo "$SECRETS_JSON" | jq -r '.TF_VAR_region')
+        OCI_COMPARTMENT=$(echo "$SECRETS_JSON" | jq -r '.TF_VAR_compartment_ocid')
+        OCI_PRIVATE_KEY=$(echo "$SECRETS_JSON" | jq -r '.TF_VAR_private_key_content')
+
+        echo "::add-mask::$OCI_USER"
+        echo "::add-mask::$OCI_TENANCY"
+        echo "::add-mask::$OCI_FINGERPRINT"
+        echo "::add-mask::$OCI_COMPARTMENT"
+
+        while IFS= read -r line; do
+          [ -n "$line" ] && echo "::add-mask::$line"
+        done <<< "$OCI_PRIVATE_KEY"
+
+        echo "OCI_CLI_USER=$OCI_USER" >> "$GITHUB_ENV"
+        echo "OCI_CLI_TENANCY=$OCI_TENANCY" >> "$GITHUB_ENV"
+        echo "OCI_CLI_FINGERPRINT=$OCI_FINGERPRINT" >> "$GITHUB_ENV"
+        echo "OCI_CLI_REGION=$OCI_REGION" >> "$GITHUB_ENV"
+        echo "OCI_COMPARTMENT_ID=$OCI_COMPARTMENT" >> "$GITHUB_ENV"
+
+        {
+          echo "OCI_CLI_KEY_CONTENT<<EOF_OCI_KEY"
+          echo "$OCI_PRIVATE_KEY"
+          echo "EOF_OCI_KEY"
+        } >> "$GITHUB_ENV"
+
+    - name: Setup OCI Config
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        mkdir -p ~/.oci
+        chmod 700 ~/.oci
+
+        echo "$OCI_CLI_KEY_CONTENT" > ~/.oci/key.pem
+        chmod 600 ~/.oci/key.pem
+
+        cat > ~/.oci/config <<EOF
+        [DEFAULT]
+        user=$OCI_CLI_USER
+        fingerprint=$OCI_CLI_FINGERPRINT
+        tenancy=$OCI_CLI_TENANCY
+        region=$OCI_CLI_REGION
+        key_file=~/.oci/key.pem
+        EOF
+        chmod 600 ~/.oci/config
+
+        echo "✓ OCI CLI configured"
+
+    - name: Install OCI CLI
+      shell: bash
+      run: |
+        set -euo pipefail
+        python3 -m pip install --user oci-cli
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+    - name: List Vault Secrets
+      id: list_secrets
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        SECRETS_JSON=$(oci vault secret list \
+          --config-file ~/.oci/config \
+          --compartment-id "$OCI_COMPARTMENT_ID" \
+          --all \
+          --lifecycle-state ACTIVE \
+          --query 'data[].{"name": "secret-name", "id": id}' \
+          --output json)
+
+        {
+          echo "secrets<<EOF_SECRETS_JSON"
+          echo "$SECRETS_JSON"
+          echo "EOF_SECRETS_JSON"
+        } >> "$GITHUB_OUTPUT"
+
+        echo "✓ Found $(echo "$SECRETS_JSON" | jq '. | length') secrets"
+
+    - name: Resolve Vault Secrets
+      id: resolve
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        VAULT_SECRETS='${{ steps.list_secrets.outputs.secrets }}'
+
+        SECRET_FILE="$RUNNER_TEMP/vault-secrets-${{ github.run_id }}.env"
+        > "$SECRET_FILE"
+        chmod 600 "$SECRET_FILE"
+
+        if [ -n "$VAULT_SECRETS" ] && [ "$VAULT_SECRETS" != "[]" ]; then
+          while IFS= read -r secret; do
+            NAME=$(echo "$secret" | jq -r '.name')
+            ID=$(echo "$secret" | jq -r '.id')
+
+            if ! echo "$NAME" | grep -qE '^[a-zA-Z0-9_-]+$'; then
+              echo "::warning::Skipping secret with unsafe name: $NAME"
+              continue
+            fi
+
+            echo "Fetching secret: $NAME"
+
+            BUNDLE=$(oci secrets secret-bundle get \
+              --config-file ~/.oci/config \
+              --secret-id "$ID" \
+              --stage CURRENT 2>&1) || {
+              echo "::warning::Could not fetch secret: $NAME" >&2
+              continue
+            }
+
+            VAL=$(echo "$BUNDLE" | jq -r '.data."secret-bundle-content".content' 2>/dev/null | base64 -d 2>/dev/null) || {
+              echo "::warning::Could not decode secret: $NAME" >&2
+              continue
+            }
+
+            if [ -n "$VAL" ]; then
+              echo "::add-mask::$VAL"
+
+              while IFS= read -r line; do
+                [ -n "$line" ] && echo "::add-mask::$line"
+              done <<< "$VAL"
+
+              ARG_NAME=$(echo "$NAME" | tr '-' '_' | tr '[:lower:]' '[:upper:]')
+              echo "${ARG_NAME}=${VAL}" >> "$SECRET_FILE"
+              echo "✓ Added secret: $ARG_NAME"
+            fi
+          done < <(echo "$VAULT_SECRETS" | jq -c '.[]')
+        else
+          echo "::warning::No secrets found or empty list"
+        fi
+
+        # Export Cloudflare credentials to GITHUB_ENV for deploy steps
+        for VAR_NAME in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID; do
+          VAL=$(grep "^${VAR_NAME}=" "$SECRET_FILE" | cut -d= -f2- || true)
+          if [ -n "$VAL" ]; then
+            echo "::add-mask::$VAL"
+            echo "${VAR_NAME}=${VAL}" >> "$GITHUB_ENV"
+          fi
+        done
+
+        echo "secret_file=$SECRET_FILE" >> "$GITHUB_OUTPUT"
+        echo "::notice::Secrets written to secure file ($(wc -l < "$SECRET_FILE") lines)"

@@ -14,21 +14,21 @@ output "encryption_key_id" {
 }
 
 output "git_username_secret_id" {
-  value       = join("", oci_vault_secret.git_username[*].id)
+  value       = try(oci_vault_secret.secrets["git-username"].id, "")
   description = "The OCID of the git username secret"
 }
 
 output "git_pat_secret_id" {
-  value       = join("", oci_vault_secret.git_pat[*].id)
+  value       = try(oci_vault_secret.secrets["git-pat"].id, "")
   description = "The OCID of the GitHub PAT secret"
 }
 
 output "mixpanel_token_secret_id" {
-  value       = join("", oci_vault_secret.mixpanel_token[*].id)
+  value       = try(oci_vault_secret.secrets["mixpanel-token"].id, "")
   description = "The OCID of the Mixpanel token secret"
 }
 
 output "site_url_secret_id" {
-  value       = join("", oci_vault_secret.site_url[*].id)
+  value       = try(oci_vault_secret.secrets["site-url"].id, "")
   description = "The OCID of the site URL secret"
 }

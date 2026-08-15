@@ -3,6 +3,16 @@ locals {
 
   compartment_ocid = var.compartment_ocid
   name             = var.name
+
+  secrets = {
+    "git-username"           = var.git_username
+    "git-pat"                = var.git_pat
+    "mixpanel-token"         = var.mixpanel_token
+    "site-url"               = var.site_url
+    "cloudflare-api-token"   = var.cloudflare_api_token
+    "cloudflare-account-id"  = var.cloudflare_account_id
+    "grafana-admin-password" = var.grafana_admin_password
+  }
 }
 
 data "context_config" "main" {}
@@ -52,17 +62,17 @@ resource "oci_kms_key" "default" {
   depends_on = [time_sleep.wait_for_vault_dns]
 }
 
-resource "oci_vault_secret" "git_username" {
-  count = local.enabled ? 1 : 0
+resource "oci_vault_secret" "secrets" {
+  for_each = local.enabled ? local.secrets : {}
 
   compartment_id = local.compartment_ocid
   vault_id       = oci_kms_vault.default[0].id
   key_id         = oci_kms_key.default[0].id
-  secret_name    = "git-username"
+  secret_name    = each.key
 
   secret_content {
     content_type = "BASE64"
-    content      = base64encode(var.git_username)
+    content      = base64encode(each.value)
   }
 
   freeform_tags = data.context_tags.main.tags
@@ -70,111 +80,38 @@ resource "oci_vault_secret" "git_username" {
   depends_on = [oci_kms_key.default]
 }
 
-resource "oci_vault_secret" "git_pat" {
-  count = local.enabled ? 1 : 0
-
-  compartment_id = local.compartment_ocid
-  vault_id       = oci_kms_vault.default[0].id
-  key_id         = oci_kms_key.default[0].id
-  secret_name    = "git-pat"
-
-  secret_content {
-    content_type = "BASE64"
-    content      = base64encode(var.git_pat)
-  }
-
-  freeform_tags = data.context_tags.main.tags
-
-  depends_on = [oci_kms_key.default]
+moved {
+  from = oci_vault_secret.git_username[0]
+  to   = oci_vault_secret.secrets["git-username"]
 }
 
-resource "oci_vault_secret" "mixpanel_token" {
-  count = local.enabled ? 1 : 0
-
-  compartment_id = local.compartment_ocid
-  vault_id       = oci_kms_vault.default[0].id
-  key_id         = oci_kms_key.default[0].id
-  secret_name    = "mixpanel-token"
-
-  secret_content {
-    content_type = "BASE64"
-    content      = base64encode(var.mixpanel_token)
-  }
-
-  freeform_tags = data.context_tags.main.tags
-
-  depends_on = [oci_kms_key.default]
+moved {
+  from = oci_vault_secret.git_pat[0]
+  to   = oci_vault_secret.secrets["git-pat"]
 }
 
-resource "oci_vault_secret" "site_url" {
-  count = local.enabled ? 1 : 0
-
-  compartment_id = local.compartment_ocid
-  vault_id       = oci_kms_vault.default[0].id
-  key_id         = oci_kms_key.default[0].id
-  secret_name    = "site-url"
-
-  secret_content {
-    content_type = "BASE64"
-    content      = base64encode(var.site_url)
-  }
-
-  freeform_tags = data.context_tags.main.tags
-
-  depends_on = [oci_kms_key.default]
+moved {
+  from = oci_vault_secret.mixpanel_token[0]
+  to   = oci_vault_secret.secrets["mixpanel-token"]
 }
 
-resource "oci_vault_secret" "cloudflare_api_token" {
-  count = local.enabled ? 1 : 0
-
-  compartment_id = local.compartment_ocid
-  vault_id       = oci_kms_vault.default[0].id
-  key_id         = oci_kms_key.default[0].id
-  secret_name    = "cloudflare-api-token"
-
-  secret_content {
-    content_type = "BASE64"
-    content      = base64encode(var.cloudflare_api_token)
-  }
-
-  freeform_tags = data.context_tags.main.tags
-
-  depends_on = [oci_kms_key.default]
+moved {
+  from = oci_vault_secret.site_url[0]
+  to   = oci_vault_secret.secrets["site-url"]
 }
 
-resource "oci_vault_secret" "cloudflare_account_id" {
-  count = local.enabled ? 1 : 0
-
-  compartment_id = local.compartment_ocid
-  vault_id       = oci_kms_vault.default[0].id
-  key_id         = oci_kms_key.default[0].id
-  secret_name    = "cloudflare-account-id"
-
-  secret_content {
-    content_type = "BASE64"
-    content      = base64encode(var.cloudflare_account_id)
-  }
-
-  freeform_tags = data.context_tags.main.tags
-
-  depends_on = [oci_kms_key.default]
+moved {
+  from = oci_vault_secret.cloudflare_api_token[0]
+  to   = oci_vault_secret.secrets["cloudflare-api-token"]
 }
 
-resource "oci_vault_secret" "grafana_admin_password" {
-  count = local.enabled ? 1 : 0
+moved {
+  from = oci_vault_secret.cloudflare_account_id[0]
+  to   = oci_vault_secret.secrets["cloudflare-account-id"]
+}
 
-  compartment_id = local.compartment_ocid
-  vault_id       = oci_kms_vault.default[0].id
-  key_id         = oci_kms_key.default[0].id
-  secret_name    = "grafana-admin-password"
-
-  secret_content {
-    content_type = "BASE64"
-    content      = base64encode(var.grafana_admin_password)
-  }
-
-  freeform_tags = data.context_tags.main.tags
-
-  depends_on = [oci_kms_key.default]
+moved {
+  from = oci_vault_secret.grafana_admin_password[0]
+  to   = oci_vault_secret.secrets["grafana-admin-password"]
 }
 
