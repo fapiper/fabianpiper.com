@@ -4,5 +4,5 @@ helm:
     value: ghcr.io/fapiper/fabianpiper.com/www
     forcestring: true
   - name: image.tag
-    value: latest@sha256:fa91b7a88456d7750e9c66f8bd608a188e467ab99105c504e3fce97fc388cc36
+    value: latest@sha256:32fa70097287fbd65a049e1dc01f2411e404be9d1c98c70dcf5eb7a514a2830b
     forcestring: true
