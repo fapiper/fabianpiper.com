@@ -1,13 +1,14 @@
 ---
 import MetaPage from "@/components/MetaPage.astro"
 import ProjectCard from "@/components/ProjectCard.astro"
+import PublicationCard from "@/components/PublicationCard.astro"
 import Layout from "@/layouts/Layout.astro"
-import { getFeaturedProjects } from "@/lib/content"
+import { getFeaturedProjects, getFeaturedPublications } from "@/lib/content"
 import { Image } from "astro:assets"
 import logo from "../../public/static/logo.png"
 
 const projects = await getFeaturedProjects()
-// const publications = await getFeaturedPublications()
+const publications = await getFeaturedPublications()
 ---
 
 <Layout>
@@ -35,6 +36,30 @@ const projects = await getFeaturedProjects()
   ) : (
     <p>No projects found</p>
   )}
+
+    <section-footer>
+      <button>
+        <a href="projects/">View more projects</a>
+      </button>
+    </section-footer>
+  </section>
+
+  <section>
+    <h2>Publications</h2>
+
+    {publications.length > 0 ? (
+      <ul>
+        {publications.map((publication) => <PublicationCard entry={publication} />)}
+      </ul>
+    ) : (
+      <p>No publications found</p>
+    )}
+
+    <section-footer>
+      <button>
+        <a href="publications/">View more publications</a>
+      </button>
+    </section-footer>
   </section>
 </Layout>
 
@@ -45,7 +70,7 @@ const projects = await getFeaturedProjects()
     line-height: calc(var(--leading-offset) + 1em);
     font-weight: var(--font-weight-medium);
     color: var(--foreground);
-    margin-block-end: var(--space-2xs);
+    margin-block: var(--space-xs);
   }
 
   dictionary-entry {
@@ -94,6 +119,50 @@ const projects = await getFeaturedProjects()
 
     prose-content {
       margin-block-start: var(--space-xs);
+    }
+  }
+
+  section {
+    display: block;
+    margin-block: var(--space-l);
+
+    section-footer {
+      display: flex;
+      justify-content: flex-start;
+      margin-block-start: var(--space-s);
+
+      @media (width < 40rem) {
+        justify-content: center;
+      }
+
+      button {
+        padding: var(--space-xs) var(--space-s);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        background-color: var(--background);
+        color: var(--foreground);
+        font-size: var(--step--2);
+        font-weight: var(--font-weight-medium);
+        cursor: pointer;
+
+        @media (width < 40rem) {
+          width: 100%;
+        }
+
+        a {
+          text-decoration: none;
+          color: inherit;
+        }
+
+        &:hover {
+          background-color: var(--muted-background);
+          border-color: color-mix(
+            in oklab,
+            var(--muted-foreground) 50%,
+            transparent
+          );
+        }
+      }
     }
   }
 

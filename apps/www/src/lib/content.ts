@@ -57,6 +57,13 @@ export async function getFeaturedProjects(): Promise<
   return projects.filter((project) => project.data.featured)
 }
 
+export async function getFeaturedPublications(): Promise<
+  CollectionEntry<"publications">[]
+> {
+  const publications = await getPublications()
+  return publications.filter((publication) => publication.data.featured)
+}
+
 export async function getPublications(): Promise<
   CollectionEntry<"publications">[]
 > {
